@@ -88,11 +88,11 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     };
     
     // Column positions and widths for better spacing
-    const colPositions = [14, 22, 50, 68, 88, 108, 125, 140, 155, 175];
-    const colWidths = [6, 26, 16, 18, 18, 15, 13, 13, 18, 20];
+    const colPositions = [14, 20, 55, 75, 95, 115, 135, 150, 165, 180];
+    const colWidths = [4, 33, 18, 18, 18, 18, 13, 13, 13, 15];
     
     // Add table headers
-    const headers = ['No', 'Nama', 'NIM', 'Program Studi', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Nilai Akhir'];
+    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Nilai Akhir'];
     let yPosition = 52;
     
     // Draw header background
@@ -109,7 +109,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     // Draw header border
     doc.setDrawColor(0, 0, 0);
-    doc.rect(14, yPosition - 6, 187, 10);
+    doc.rect(14, yPosition - 6, 181, 10);
     
     yPosition += 8;
     
@@ -151,19 +151,19 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       // Alternate row colors
       if (sessionIndex % 2 === 0) {
         doc.setFillColor(250, 250, 250);
-        doc.rect(14, yPosition - 4, 187, rowHeight, 'F');
+        doc.rect(14, yPosition - 4, 181, rowHeight, 'F');
       }
       
       // Draw row border
       doc.setDrawColor(200, 200, 200);
-      doc.rect(14, yPosition - 4, 187, rowHeight);
+      doc.rect(14, yPosition - 4, 181, rowHeight);
       
       const rowData = [
         (sessionIndex + 1).toString(),
         '', // Name will be handled separately with wrapping
-        truncateText(session.studentInfo.nim || '', 12),
-        truncateText(session.studentInfo.major || '', 14),
-        truncateText(session.studentInfo.className || '', 14),
+        truncateText(session.studentInfo.nim || '', 15),
+        truncateText(session.studentInfo.major || '', 15),
+        truncateText(session.studentInfo.className || '', 15),
         session.status || '',
         session.violations.toString(),
         session.finalScore?.toFixed(2) ?? 'N/A',
@@ -177,14 +177,14 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         
         // Redraw header on new page
         doc.setFillColor(240, 240, 240);
-        doc.rect(14, yPosition - 6, 187, 10, 'F');
+        doc.rect(14, yPosition - 6, 181, 10, 'F');
         doc.setFont(undefined, 'bold');
         doc.setFontSize(10);
         headers.forEach((header, index) => {
           doc.text(header, colPositions[index], yPosition);
         });
         doc.setDrawColor(0, 0, 0);
-        doc.rect(14, yPosition - 6, 187, 10);
+        doc.rect(14, yPosition - 6, 181, 10);
         yPosition += 8;
         doc.setFont(undefined, 'normal');
         doc.setFontSize(9);
@@ -196,10 +196,10 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         // Redraw current row background if needed
         if (sessionIndex % 2 === 0) {
           doc.setFillColor(250, 250, 250);
-          doc.rect(14, yPosition - 4, 187, newRowHeight, 'F');
+          doc.rect(14, yPosition - 4, 181, newRowHeight, 'F');
         }
         doc.setDrawColor(200, 200, 200);
-        doc.rect(14, yPosition - 4, 187, newRowHeight);
+        doc.rect(14, yPosition - 4, 181, newRowHeight);
       }
       
       // Draw cell data (except name)
@@ -225,7 +225,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       doc.setFontSize(8);
       doc.setTextColor(128, 128, 128);
       doc.text(`Halaman ${i} dari ${pageCount}`, 14, 285);
-      doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 140, 285);
+      doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 120, 285);
     }
     
     // Save the PDF
