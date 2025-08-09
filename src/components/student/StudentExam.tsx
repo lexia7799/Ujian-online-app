@@ -514,18 +514,20 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowUnansweredModal(false);
     
     // Exit fullscreen when exam is finished
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen();
-      } else if ((document as any).mozCancelFullScreen) {
-        await (document as any).mozCancelFullScreen();
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen();
+    if (isInFullscreen()) {
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      } catch (error) {
+        console.error("Failed to exit fullscreen:", error);
       }
-    } catch (error) {
-      console.error("Failed to exit fullscreen:", error);
     }
     
     let score = 0;
