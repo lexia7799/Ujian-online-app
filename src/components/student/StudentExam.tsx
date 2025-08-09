@@ -180,12 +180,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
         handleViolation("Exited Fullscreen");
-        // Auto re-enter fullscreen after violation
-        setTimeout(() => {
-          if (!isFinished) {
-            enterFullscreen();
-          }
-        }, 1000);
       }
     };
     
@@ -355,6 +349,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Auto re-enter fullscreen after violation (except for fullscreen-related violations)
+      if (reason === "Exited Fullscreen") {
+        setTimeout(() => {
+          if (!isFinished && !isInFullscreen()) {
+            enterFullscreen();
+          }
+        }, 1000);
+      }
     }
   };
 
@@ -362,6 +365,39 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const newAnswers = { ...answers, [questionId]: answer };
     setAnswers(newAnswers);
     updateDoc(sessionDocRef, { answers: newAnswers });
+  };
+  
+  const validateAnswers = () => {
+    const unansweredQuestions: string[] = [];
+    
+    questions.forEach((question, index) => {
+      const answer = answers[question.id];
+      if (question.type === 'mc') {
+        if (answer === undefined || answer === null) {
+          unansweredQuestions.push(`Soal ${index + 1} (Pilihan Ganda)`);
+        }
+      } else if (question.type === 'essay') {
+        if (!answer || answer.trim() === '') {
+          unansweredQuestions.push(`Soal ${index + 1} (Esai)`);
+        }
+      }
+    });
+    
+    return unansweredQuestions;
+  };
+  
+  const handleSubmitAttempt = () => {
+    const unansweredQuestions = validateAnswers();
+    
+    if (unansweredQuestions.length > 0) {
+      const message = `Masih ada ${unansweredQuestions.length} soal yang belum dijawab:\n\n${unansweredQuestions.join('\n')}\n\nApakah Anda yakin ingin menyelesaikan ujian?`;
+      
+      if (confirm(message)) {
+        setShowConfirmModal(true);
+      }
+    } else {
+      setShowConfirmModal(true);
+    }
   };
   
   const finishExam = async (reason = "Selesai") => {
@@ -560,7 +596,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       )}
 
       <button 
-        onClick={() => setShowConfirmModal(true)} 
+        onClick={handleSubmitAttempt} 
         className="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg" 
         disabled={questions.length === 0}
       >
