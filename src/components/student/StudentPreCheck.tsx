@@ -12,16 +12,37 @@ interface DeviceChecks {
   device: boolean | null;
   camera: boolean | null;
   mic: boolean | null;
+  screenCount: boolean | null;
 }
 
 const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState }) => {
   const { studentInfo } = appState;
-  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, mic: null });
+  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, mic: null, screenCount: null });
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // Enhanced mobile detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                     (navigator.maxTouchPoints && navigator.maxTouchPoints > 2) ||
+                     window.screen.width < 1024;
+    
+    // Check screen count
+    const checkScreens = async () => {
+      try {
+        if ('getScreenDetails' in window) {
+          const screenDetails = await (window as any).getScreenDetails();
+          setChecks(c => ({ ...c, screenCount: screenDetails.screens.length === 1 }));
+        } else {
+          // Fallback: assume single screen if API not available
+          setChecks(c => ({ ...c, screenCount: true }));
+        }
+      } catch {
+        setChecks(c => ({ ...c, screenCount: true }));
+      }
+    };
+    
     setChecks(c => ({ ...c, device: !isMobile }));
+    checkScreens();
     
     if (isMobile) return;
     
@@ -38,7 +59,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       });
   }, []);
 
-  const allChecksPassed = checks.device && checks.camera && checks.mic;
+  const allChecksPassed = checks.device && checks.camera && checks.mic && checks.screenCount;
 
   const startExam = async () => {
     const { exam } = appState;
@@ -92,17 +113,26 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       <div className="w-full max-w-lg mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
         <ul className="space-y-3 mb-6">
           {renderCheckItem("Akses dari Desktop", checks.device)}
+          {renderCheckItem("Layar Tunggal", checks.screenCount)}
           {renderCheckItem("Akses Kamera", checks.camera)}
           {renderCheckItem("Akses Mikrofon", checks.mic)}
         </ul>
         
         {checks.device === false && (
-          <p className="text-red-400 text-center">Ujian hanya bisa diakses dari Laptop/Desktop.</p>
+          <p className="text-red-400 text-center mb-4">
+            ❌ Ujian hanya bisa diakses dari Laptop/Desktop dengan layar minimal 1024px.
+          </p>
+        )}
+        
+        {checks.screenCount === false && (
+          <p className="text-red-400 text-center mb-4">
+            ❌ Ujian hanya bisa diakses dengan satu layar. Matikan layar tambahan.
+          </p>
         )}
         
         {(checks.camera === false || checks.mic === false) && (
-          <p className="text-yellow-400 text-center">
-            Mohon izinkan akses kamera dan mikrofon di browser Anda, lalu segarkan halaman ini.
+          <p className="text-yellow-400 text-center mb-4">
+            ⚠️ Mohon izinkan akses kamera dan mikrofon di browser Anda, lalu segarkan halaman ini.
           </p>
         )}
         

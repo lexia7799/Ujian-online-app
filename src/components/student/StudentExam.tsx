@@ -38,6 +38,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const tabCountRef = useRef(1);
+  const lastFocusTime = useRef(Date.now());
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -60,6 +62,80 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   useEffect(() => {
     if (isFinished || isLoading) return;
     
+    // Enhanced security monitoring
+    const handleVisibilityChange = () => {
+      if (document.hidden && !isFinished) {
+        handleViolation("Tab/Window Switch");
+      }
+    };
+    
+    const handleFocus = () => {
+      lastFocusTime.current = Date.now();
+    };
+    
+    const handleBlur = () => {
+      if (!isFinished) {
+        handleViolation("Focus Lost");
+      }
+    };
+    
+    // Detect multiple tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'examTabCount' && !isFinished) {
+        const currentCount = parseInt(localStorage.getItem('examTabCount') || '1');
+        if (currentCount > 1) {
+          handleViolation("Multiple Tabs Detected");
+        }
+      }
+    };
+    
+    // Set tab count
+    const currentTabCount = parseInt(localStorage.getItem('examTabCount') || '0') + 1;
+    localStorage.setItem('examTabCount', currentTabCount.toString());
+    tabCountRef.current = currentTabCount;
+    
+    if (currentTabCount > 1) {
+      handleViolation("Multiple Tabs Detected");
+    }
+    
+    // Prevent right-click and common shortcuts
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      handleViolation("Right Click Attempt");
+    };
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block common cheating shortcuts
+      if (
+        e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 't' || e.key === 'n' || e.key === 'w') ||
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+        (e.ctrlKey && e.shiftKey && e.key === 'J') ||
+        (e.ctrlKey && e.key === 'u') ||
+        e.altKey && e.key === 'Tab'
+      ) {
+        e.preventDefault();
+        handleViolation("Prohibited Shortcut");
+      }
+    };
+    
+    // Monitor screen changes
+    const handleScreenChange = () => {
+      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight) {
+        handleViolation("Screen Configuration Change");
+      }
+    };
+    
+    // Check for developer tools
+    const checkDevTools = () => {
+      const threshold = 160;
+      if (window.outerHeight - window.innerHeight > threshold || window.outerWidth - window.innerWidth > threshold) {
+        handleViolation("Developer Tools Detected");
+      }
+    };
+    
+    const devToolsInterval = setInterval(checkDevTools, 1000);
+    
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -71,19 +147,34 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       });
     }, 1000);
     
-    return () => clearInterval(timer);
-  }, [isFinished, isLoading]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && !isFinished) {
-        handleViolation();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("storage", handleStorageChange);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleScreenChange);
+    
+    return () => {
+      clearInterval(timer);
+      clearInterval(devToolsInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleScreenChange);
+      
+      // Cleanup tab count
+      const newCount = Math.max(0, tabCountRef.current - 1);
+      if (newCount === 0) {
+        localStorage.removeItem('examTabCount');
+      } else {
+        localStorage.setItem('examTabCount', newCount.toString());
       }
     };
-    
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [violations, isFinished]);
+  }, [isFinished, isLoading, violations]);
 
   const playWarningSound = () => {
     if (!audioContextRef.current) return;
@@ -103,14 +194,17 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     oscillator.stop(audioContextRef.current.currentTime + 0.5);
   };
 
-  const handleViolation = () => {
+  const handleViolation = (reason = "Unknown") => {
     const newViolations = violations + 1;
     setViolations(newViolations);
-    updateDoc(sessionDocRef, { violations: newViolations });
+    updateDoc(sessionDocRef, { 
+      violations: newViolations,
+      lastViolation: { reason, timestamp: new Date() }
+    });
     playWarningSound();
     
     if (newViolations >= 3) {
-      finishExam("Diskualifikasi karena Pelanggaran");
+      finishExam(`Diskualifikasi: ${reason}`);
     } else {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
@@ -205,6 +299,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <AlertIcon />
             <h3 className="text-3xl font-bold text-yellow-400 mt-4">PERINGATAN!</h3>
             <p className="text-lg mt-2">Anda terdeteksi melakukan pelanggaran.</p>
+            <p className="text-sm text-red-400 mt-1">Sistem monitoring aktif!</p>
             <p className="text-2xl font-bold mt-2">
               Kesempatan tersisa: <span className="text-white">{3 - violations}</span>
             </p>

@@ -13,6 +13,41 @@ import StudentPreCheck from './components/student/StudentPreCheck';
 import StudentExam from './components/student/StudentExam';
 
 function App() {
+  // Block mobile devices at app level
+  useEffect(() => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                     (navigator.maxTouchPoints && navigator.maxTouchPoints > 2) ||
+                     window.screen.width < 1024;
+    
+    if (isMobile) {
+      document.body.innerHTML = `
+        <div style="
+          display: flex; 
+          justify-content: center; 
+          align-items: center; 
+          height: 100vh; 
+          background: #111827; 
+          color: #ef4444; 
+          font-family: sans-serif;
+          text-align: center;
+          padding: 20px;
+        ">
+          <div>
+            <h1 style="font-size: 2rem; margin-bottom: 1rem;">🚫 Akses Ditolak</h1>
+            <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Platform ujian ini hanya dapat diakses dari:</p>
+            <ul style="list-style: none; padding: 0; font-size: 1.1rem;">
+              <li>💻 Laptop atau Desktop</li>
+              <li>🖥️ Layar minimal 1024px</li>
+              <li>🌐 Browser Desktop</li>
+            </ul>
+            <p style="margin-top: 1rem; color: #fbbf24;">Silakan gunakan perangkat yang sesuai untuk mengikuti ujian.</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+  }, []);
+  
   const [page, setPage] = useState('home');
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
