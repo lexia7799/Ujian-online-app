@@ -88,16 +88,16 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     };
     
     // Column positions and widths for better spacing
-    const colPositions = [14, 24, 50, 70, 95, 115, 135, 155, 175];
-    const colWidths = [8, 24, 18, 23, 18, 18, 18, 18, 20];
+    const colPositions = [14, 22, 50, 68, 88, 108, 125, 140, 155, 175];
+    const colWidths = [6, 26, 16, 18, 18, 15, 13, 13, 18, 20];
     
     // Add table headers
-    const headers = ['No', 'Nama', 'NIM', 'Program Studi', 'Kelas', 'Status', 'Pelanggaran', 'Nilai PG', 'Nilai Akhir'];
+    const headers = ['No', 'Nama', 'NIM', 'Program Studi', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Nilai Akhir'];
     let yPosition = 52;
     
     // Draw header background
     doc.setFillColor(240, 240, 240);
-    doc.rect(14, yPosition - 6, 182, 10, 'F');
+    doc.rect(14, yPosition - 6, 187, 10, 'F');
     
     // Draw header text
     doc.setFontSize(10);
@@ -109,31 +109,61 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     // Draw header border
     doc.setDrawColor(0, 0, 0);
-    doc.rect(14, yPosition - 6, 182, 10);
+    doc.rect(14, yPosition - 6, 187, 10);
     
     yPosition += 8;
+    
+    // Helper function to wrap text
+    const wrapText = (text: string, maxWidth: number, fontSize: number) => {
+      doc.setFontSize(fontSize);
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const textWidth = doc.getTextWidth(testLine);
+        
+        if (textWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      
+      return lines;
+    };
     
     // Draw data rows with alternating colors
     doc.setFont(undefined, 'normal');
     doc.setFontSize(9);
     
     sessions.forEach((session, sessionIndex) => {
+      // Prepare row data with text wrapping for name
+      const nameLines = wrapText(session.studentInfo.name || '', colWidths[1] - 2, 9);
+      const rowHeight = Math.max(12, nameLines.length * 4 + 4);
+      
       // Alternate row colors
       if (sessionIndex % 2 === 0) {
         doc.setFillColor(250, 250, 250);
-        doc.rect(14, yPosition - 4, 182, 12, 'F');
+        doc.rect(14, yPosition - 4, 187, rowHeight, 'F');
       }
       
       // Draw row border
       doc.setDrawColor(200, 200, 200);
-      doc.rect(14, yPosition - 4, 182, 12);
+      doc.rect(14, yPosition - 4, 187, rowHeight);
       
       const rowData = [
         (sessionIndex + 1).toString(),
-        truncateText(session.studentInfo.name || '', 20),
-        truncateText(session.studentInfo.nim || '', 15),
-        truncateText(session.studentInfo.major || '', 18),
-        truncateText(session.studentInfo.className || '', 12),
+        '', // Name will be handled separately with wrapping
+        truncateText(session.studentInfo.nim || '', 12),
+        truncateText(session.studentInfo.major || '', 14),
+        truncateText(session.studentInfo.className || '', 14),
         session.status || '',
         session.violations.toString(),
         session.finalScore?.toFixed(2) ?? 'N/A',
@@ -141,40 +171,51 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       ];
       
       // Check if we need a new page
-      if (yPosition > 270) {
+      if (yPosition + rowHeight > 270) {
         doc.addPage();
         yPosition = 20;
         
         // Redraw header on new page
         doc.setFillColor(240, 240, 240);
-        doc.rect(14, yPosition - 6, 182, 10, 'F');
+        doc.rect(14, yPosition - 6, 187, 10, 'F');
         doc.setFont(undefined, 'bold');
         doc.setFontSize(10);
         headers.forEach((header, index) => {
           doc.text(header, colPositions[index], yPosition);
         });
         doc.setDrawColor(0, 0, 0);
-        doc.rect(14, yPosition - 6, 182, 10);
+        doc.rect(14, yPosition - 6, 187, 10);
         yPosition += 8;
         doc.setFont(undefined, 'normal');
         doc.setFontSize(9);
         
+        // Recalculate row height for new page
+        const newNameLines = wrapText(session.studentInfo.name || '', colWidths[1] - 2, 9);
+        const newRowHeight = Math.max(12, newNameLines.length * 4 + 4);
+        
         // Redraw current row background if needed
         if (sessionIndex % 2 === 0) {
           doc.setFillColor(250, 250, 250);
-          doc.rect(14, yPosition - 4, 182, 12, 'F');
+          doc.rect(14, yPosition - 4, 187, newRowHeight, 'F');
         }
         doc.setDrawColor(200, 200, 200);
-        doc.rect(14, yPosition - 4, 182, 12);
+        doc.rect(14, yPosition - 4, 187, newRowHeight);
       }
       
-      // Draw cell data
+      // Draw cell data (except name)
       doc.setTextColor(0, 0, 0);
       rowData.forEach((cellData, cellIndex) => {
-        doc.text(cellData, colPositions[cellIndex], yPosition + 2);
+        if (cellIndex !== 1) { // Skip name column
+          doc.text(cellData, colPositions[cellIndex], yPosition + 2);
+        }
       });
       
-      yPosition += 12;
+      // Draw wrapped name text
+      nameLines.forEach((line, lineIndex) => {
+        doc.text(line, colPositions[1], yPosition + 2 + (lineIndex * 4));
+      });
+      
+      yPosition += rowHeight;
     });
     
     // Add footer
