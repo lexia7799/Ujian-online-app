@@ -202,12 +202,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
         handleViolation("Exited Fullscreen");
-        // Auto re-enter fullscreen immediately
+        // Auto re-enter fullscreen immediately after violation
         setTimeout(() => {
           if (!isFinished) {
             enterFullscreen();
           }
-        }, 50);
+        }, 100);
       }
     };
     
@@ -264,14 +264,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Handle Escape key specially - prevent default and re-enter fullscreen
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (!isInFullscreen() && !isFinished) {
-          handleViolation("Escape Key Pressed");
-          setTimeout(() => {
-            if (!isFinished) {
-              enterFullscreen();
-            }
-          }, 50);
-        }
+        handleViolation("Escape Key Pressed");
+        // Immediately re-enter fullscreen after ESC
+        setTimeout(() => {
+          if (!isFinished) {
+            enterFullscreen();
+          }
+        }, 50);
       }
     };
     
@@ -369,10 +368,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const handleViolation = (reason = "Unknown") => {
     const newViolations = violations + 1;
     setViolations(newViolations);
-    updateDoc(sessionDocRef, { 
-      violations: newViolations,
-      lastViolation: { reason, timestamp: new Date() }
-    });
     playWarningSound();
     
     if (newViolations >= 3) {
@@ -397,15 +392,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
-      
-      // Auto re-enter fullscreen after violation for fullscreen-related violations
-      if (reason.includes("Fullscreen") || reason.includes("Exited")) {
-        setTimeout(() => {
-          if (!isFinished) {
-            enterFullscreen();
-          }
-        }, 100);
-      }
     }
   };
 
