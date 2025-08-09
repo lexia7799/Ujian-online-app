@@ -9,7 +9,7 @@ interface AddQuestionFormProps {
 const AddQuestionForm: React.FC<AddQuestionFormProps> = ({ examId }) => {
   const [questionText, setQuestionText] = useState('');
   const [questionType, setQuestionType] = useState<'mc' | 'essay'>('mc');
-  const [options, setOptions] = useState(['', '', '', '', '']);
+  const [options, setOptions] = useState(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState(0);
 
   const addQuestion = async (e: React.FormEvent) => {
@@ -30,7 +30,7 @@ const AddQuestionForm: React.FC<AddQuestionFormProps> = ({ examId }) => {
     
     await addDoc(questionsRef, questionData);
     setQuestionText('');
-    setOptions(['', '', '', '', '']);
+    setOptions(['', '', '', '']);
     setCorrectAnswer(0);
   };
 

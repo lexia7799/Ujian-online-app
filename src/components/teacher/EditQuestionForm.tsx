@@ -17,7 +17,7 @@ interface EditQuestionFormProps {
 const EditQuestionForm: React.FC<EditQuestionFormProps> = ({ question, onSave, onCancel }) => {
   const [questionText, setQuestionText] = useState(question.text);
   const [questionType] = useState(question.type);
-  const [options, setOptions] = useState(question.type === 'mc' ? question.options || ['', '', '', '', ''] : ['', '', '', '', '']);
+  const [options, setOptions] = useState(question.type === 'mc' ? question.options || ['', '', '', ''] : ['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState(question.type === 'mc' ? question.correctAnswer || 0 : 0);
 
   const handleSave = (e: React.FormEvent) => {
