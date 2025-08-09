@@ -239,8 +239,8 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     cleanupSession(sessionId);
     
     // Wait a moment then reinitialize
-    setTimeout(() => {
-    await initializeWebRTCForSession(sessionId);
+    setTimeout(async () => {
+      await initializeWebRTCForSession(sessionId);
     }, 1000);
   };
 
