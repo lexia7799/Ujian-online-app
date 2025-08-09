@@ -50,13 +50,21 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Initialize camera for violation snapshots
+    // Initialize camera and canvas for violation snapshots
     const initializeCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          await videoRef.current.play();
+        }
+        
+        // Create canvas for snapshots
+        if (!canvasRef.current) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 480;
+          canvasRef.current = canvas;
         }
       } catch (error) {
         console.error("Failed to initialize camera for snapshots:", error);
@@ -93,24 +101,41 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    if (!videoRef.current) return null;
+    if (!videoRef.current || !canvasRef.current) return null;
     
     try {
-      const canvas = document.createElement('canvas');
+      const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
+      // Wait for video to be ready
+      if (videoRef.current.readyState < 2) {
+        await new Promise(resolve => {
+          const checkReady = () => {
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+              resolve(true);
+            } else {
+              setTimeout(checkReady, 100);
+            }
+          };
+          checkReady();
+        });
+      }
+      
+      const videoWidth = videoRef.current.videoWidth || 640;
+      const videoHeight = videoRef.current.videoHeight || 480;
+      
+      canvas.width = videoWidth;
+      canvas.height = videoHeight;
       
       if (context) {
-        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
+        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
+        const imageData = canvas.toDataURL('image/jpeg', 0.8); // Higher quality
         
         return {
           imageData,
           timestamp: new Date().toISOString(),
           violationType,
-          dimensions: { width: canvas.width, height: canvas.height }
+          dimensions: { width: videoWidth, height: videoHeight }
         };
       }
     } catch (error) {
@@ -181,6 +206,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
+        // Auto re-enter fullscreen immediately
+        setTimeout(() => {
+          if (!isFinished && !isInFullscreen()) {
+            enterFullscreen();
+          }
+        }, 100);
         handleViolation("Exited Fullscreen");
       }
     };
@@ -352,13 +383,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
       
-      // Auto re-enter fullscreen after violation (except for fullscreen-related violations)
-      if (reason === "Exited Fullscreen") {
+      // Auto re-enter fullscreen after violation for fullscreen-related violations
+      if (reason.includes("Fullscreen") || reason.includes("Exited")) {
         setTimeout(() => {
           if (!isFinished && !isInFullscreen()) {
             enterFullscreen();
           }
-        }, 1000);
+        }, 500);
       }
     }
   };
@@ -505,7 +536,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
       {/* Hidden video element for snapshots */}
-      <video ref={videoRef} style={{ display: 'none' }} />
+      <video 
+        ref={videoRef} 
+        style={{ display: 'none' }} 
+        autoPlay 
+        playsInline 
+        muted
+      />
       
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 bg-gray-800 p-4 z-50 border-b border-gray-700">
