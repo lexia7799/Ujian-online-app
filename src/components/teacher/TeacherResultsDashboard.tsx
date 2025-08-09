@@ -81,104 +81,111 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     doc.text(`Kode Ujian: ${exam.code}`, 14, 32);
     doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 14, 42);
     
-    // Helper function to wrap text
-    const wrapText = (text: string, maxWidth: number) => {
-      const words = text.split(' ');
-      const lines = [];
-      let currentLine = '';
-      
-      for (const word of words) {
-        const testLine = currentLine + (currentLine ? ' ' : '') + word;
-        const testWidth = doc.getTextWidth(testLine);
-        
-        if (testWidth > maxWidth && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
-      
-      if (currentLine) {
-        lines.push(currentLine);
-      }
-      
-      return lines;
+    // Helper function to truncate text if too long
+    const truncateText = (text: string, maxLength: number) => {
+      if (text.length <= maxLength) return text;
+      return text.substring(0, maxLength - 3) + '...';
     };
     
-    // Column widths and positions
-    const colWidths = [10, 35, 15, 25, 15, 15, 15, 15, 15]; // Adjusted for new columns
-    const colPositions = [14, 24, 59, 74, 99, 114, 129, 144, 159];
+    // Column positions and widths for better spacing
+    const colPositions = [14, 24, 50, 70, 95, 115, 135, 155, 175];
+    const colWidths = [8, 24, 18, 23, 18, 18, 18, 18, 20];
     
     // Add table headers
     const headers = ['No', 'Nama', 'NIM', 'Program Studi', 'Kelas', 'Status', 'Pelanggaran', 'Nilai PG', 'Nilai Akhir'];
     let yPosition = 52;
     
-    // Draw headers
+    // Draw header background
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, yPosition - 6, 182, 10, 'F');
+    
+    // Draw header text
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
     headers.forEach((header, index) => {
-      const wrappedHeader = wrapText(header, colWidths[index]);
-      wrappedHeader.forEach((line, lineIndex) => {
-        doc.text(line, colPositions[index], yPosition + (lineIndex * 4));
-      });
+      doc.text(header, colPositions[index], yPosition);
     });
     
-    // Draw line under headers
-    doc.line(14, yPosition + 6, 200, yPosition + 6);
-    yPosition += 12;
+    // Draw header border
+    doc.setDrawColor(0, 0, 0);
+    doc.rect(14, yPosition - 6, 182, 10);
     
-    // Draw data rows
+    yPosition += 8;
+    
+    // Draw data rows with alternating colors
     doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
+    
     sessions.forEach((session, sessionIndex) => {
+      // Alternate row colors
+      if (sessionIndex % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(14, yPosition - 4, 182, 12, 'F');
+      }
+      
+      // Draw row border
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(14, yPosition - 4, 182, 12);
+      
       const rowData = [
         (sessionIndex + 1).toString(),
-        session.studentInfo.name || '',
-        session.studentInfo.nim || '',
-        session.studentInfo.major || '',
-        session.studentInfo.className || '',
+        truncateText(session.studentInfo.name || '', 20),
+        truncateText(session.studentInfo.nim || '', 15),
+        truncateText(session.studentInfo.major || '', 18),
+        truncateText(session.studentInfo.className || '', 12),
         session.status || '',
         session.violations.toString(),
         session.finalScore?.toFixed(2) ?? 'N/A',
         calculateTotalScore(session)
       ];
       
-      // Calculate row height based on wrapped text
-      let maxLines = 1;
-      const wrappedCells = rowData.map((cell, cellIndex) => {
-        const wrapped = wrapText(cell, colWidths[cellIndex]);
-        maxLines = Math.max(maxLines, wrapped.length);
-        return wrapped;
-      });
-      
-      const rowHeight = maxLines * 4 + 2;
-      
-      if (yPosition + rowHeight > 270) { // Check if we need a new page
+      // Check if we need a new page
+      if (yPosition > 270) {
         doc.addPage();
         yPosition = 20;
         
-        // Redraw headers on new page
+        // Redraw header on new page
+        doc.setFillColor(240, 240, 240);
+        doc.rect(14, yPosition - 6, 182, 10, 'F');
         doc.setFont(undefined, 'bold');
+        doc.setFontSize(10);
         headers.forEach((header, index) => {
-          const wrappedHeader = wrapText(header, colWidths[index]);
-          wrappedHeader.forEach((line, lineIndex) => {
-            doc.text(line, colPositions[index], yPosition + (lineIndex * 4));
-          });
+          doc.text(header, colPositions[index], yPosition);
         });
-        doc.line(14, yPosition + 6, 200, yPosition + 6);
-        yPosition += 12;
+        doc.setDrawColor(0, 0, 0);
+        doc.rect(14, yPosition - 6, 182, 10);
+        yPosition += 8;
         doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        
+        // Redraw current row background if needed
+        if (sessionIndex % 2 === 0) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(14, yPosition - 4, 182, 12, 'F');
+        }
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(14, yPosition - 4, 182, 12);
       }
       
-      // Draw wrapped text for each cell
-      wrappedCells.forEach((wrappedCell, cellIndex) => {
-        wrappedCell.forEach((line, lineIndex) => {
-          doc.text(line, colPositions[cellIndex], yPosition + (lineIndex * 4));
-        });
+      // Draw cell data
+      doc.setTextColor(0, 0, 0);
+      rowData.forEach((cellData, cellIndex) => {
+        doc.text(cellData, colPositions[cellIndex], yPosition + 2);
       });
       
-      yPosition += rowHeight;
+      yPosition += 12;
     });
+    
+    // Add footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Halaman ${i} dari ${pageCount}`, 14, 285);
+      doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 140, 285);
+    }
     
     // Save the PDF
     doc.save(`Hasil_Ujian_${exam.code}_${new Date().toISOString().split('T')[0]}.pdf`);
