@@ -44,76 +44,40 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
   const maxFullscreenRetries = 3;
-  const isCapturingSnapshot = useRef(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
 
   useEffect(() => {
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Initialize camera immediately for violation snapshots
+    // Initialize camera for violation photos
     const initializeCamera = async () => {
       try {
-        console.log("🎥 Initializing camera for violation monitoring...");
-        
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
-            width: { ideal: 1280, max: 1920, min: 640 },
-            height: { ideal: 720, max: 1080, min: 480 },
-            facingMode: 'user',
-            frameRate: { ideal: 30, min: 15 }
+            width: 640,
+            height: 480,
+            facingMode: 'user'
           },
           audio: false
         });
         
         streamRef.current = stream;
-        console.log("✅ Camera stream obtained successfully");
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.muted = true;
-          videoRef.current.playsInline = true;
-          videoRef.current.autoplay = true;
           
-          // Wait for video to be ready
-          const waitForVideo = () => {
-            return new Promise<void>((resolve) => {
-              const checkReady = () => {
-                if (videoRef.current && 
-                    videoRef.current.videoWidth > 0 && 
-                    videoRef.current.videoHeight > 0 &&
-                    videoRef.current.readyState >= 2) {
-                  console.log(`✅ Video ready: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
-                  setIsCameraReady(true);
-                  setCameraError(null);
-                  resolve();
-                } else {
-                  setTimeout(checkReady, 100);
-                }
-              };
-              checkReady();
-            });
+          videoRef.current.onloadedmetadata = () => {
+            setIsCameraReady(true);
           };
-          
-          // Start video and wait for it to be ready
-          try {
-            await videoRef.current.play();
-            await waitForVideo();
-          } catch (error) {
-            console.error("❌ Video play failed:", error);
-            setIsCameraReady(false);
-            setCameraError("Video playback failed");
-          }
         }
       } catch (error) {
-        console.error("❌ Camera access failed:", error);
-        setCameraError("Camera access denied - violation photos will not be available");
-        setIsCameraReady(false);
+        console.error("Camera access failed:", error);
       }
     };
     
@@ -144,118 +108,41 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setIsFullscreenSupported(checkFullscreenSupport());
     
     const fetchQuestions = async () => {
-      try {
         const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
         const querySnapshot = await getDocs(questionsRef);
-        setQuestions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
       } catch (error) {
         console.error("Gagal memuat soal:", error);
       } finally {
         setIsLoading(false);
-      }
     };
     
     fetchQuestions();
   }, [exam.id]);
 
-  // Function to capture snapshot on violation
-  const captureViolationSnapshot = async (violationType: string) => {
-    console.log(`📸 Attempting to capture violation snapshot for: ${violationType}`);
-    
-    if (isCapturingSnapshot.current) {
-      console.log("⏳ Already capturing snapshot, skipping...");
+  // Simple photo capture function
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
       return null;
     }
-    
-    if (!videoRef.current || !isCameraReady) {
-      console.log("❌ Cannot capture snapshot - camera not ready");
-      console.log("Video element:", !!videoRef.current);
-      console.log("Camera ready:", isCameraReady);
-      return null;
-    }
-    
-    isCapturingSnapshot.current = true;
     
     try {
       const video = videoRef.current;
-      
-      // Comprehensive video readiness check
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        console.log("❌ Video dimensions not available:", video.videoWidth, "x", video.videoHeight);
-        isCapturingSnapshot.current = false;
-        return null;
-      }
-      
-      if (video.readyState < 2) {
-        console.log("❌ Video not ready, readyState:", video.readyState);
-        isCapturingSnapshot.current = false;
-        return null;
-      }
-      
-      // Wait a moment for a fresh frame
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      console.log(`📸 Capturing snapshot: ${video.videoWidth}x${video.videoHeight}`);
-      
-      const canvas = document.createElement('canvas');
+      const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       
       if (!context) {
-        console.log("❌ Cannot get canvas context");
-        isCapturingSnapshot.current = false;
         return null;
       }
       
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // Draw current video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Check if image is not blank/black
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = imageData.data;
-      let nonBlackPixels = 0;
-      
-      // Check for non-black pixels
-      for (let i = 0; i < pixels.length; i += 4) {
-        const r = pixels[i];
-        const g = pixels[i + 1];
-        const b = pixels[i + 2];
-        if (r > 10 || g > 10 || b > 10) {
-          nonBlackPixels++;
-        }
-      }
-      
-      const totalPixels = canvas.width * canvas.height;
-      const nonBlackPercentage = (nonBlackPixels / totalPixels) * 100;
-      
-      console.log(`📊 Image analysis: ${nonBlackPercentage.toFixed(2)}% non-black pixels`);
-      
-      if (nonBlackPercentage < 1) {
-        console.log("⚠️ Image appears to be mostly black, retrying...");
-        // Wait longer and try again
-        await new Promise(resolve => setTimeout(resolve, 500));
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      }
-      
-      // Convert to base64 with high quality
-      const base64Image = canvas.toDataURL('image/jpeg', 0.95);
-      
-      console.log("✅ Snapshot captured successfully, size:", Math.round(base64Image.length / 1024), "KB");
-      
-      isCapturingSnapshot.current = false;
-      return {
-        imageData: base64Image,
-        timestamp: new Date().toISOString(),
-        violationType,
-        dimensions: { width: canvas.width, height: canvas.height },
-        quality: nonBlackPercentage
-      };
+      return canvas.toDataURL('image/jpeg', 0.8);
       
     } catch (error) {
-      console.error("❌ Failed to capture violation snapshot:", error);
-      isCapturingSnapshot.current = false;
+      console.error("Failed to capture photo:", error);
       return null;
     }
   };
@@ -479,43 +366,31 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setViolations(newViolations);
     setViolationReason(reason);
     
-    console.log(`🚨 Violation ${newViolations} detected: ${reason}`);
+    // Capture photo immediately
+    const photoData = capturePhoto();
     
-    // Immediately capture snapshot on violation
-    captureViolationSnapshot(reason).then(snapshot => {
-      const violationData = {
-        violations: newViolations,
-        lastViolation: { 
-          reason, 
-          timestamp: new Date(),
-          hasSnapshot: !!snapshot
-        }
-      };
-      
-      if (snapshot) {
-        console.log(`💾 Saving violation snapshot ${newViolations}:`, snapshot.violationType);
-        violationData[`violationSnapshot_${newViolations}`] = snapshot;
-      } else {
-        console.log(`⚠️ No snapshot captured for violation ${newViolations}: ${reason}`);
+    // Prepare violation data
+    const violationData: any = {
+      violations: newViolations,
+      lastViolation: { 
+        reason, 
+        timestamp: new Date(),
+        hasSnapshot: !!photoData
       }
-      
-      updateDoc(sessionDocRef, violationData).then(() => {
-        console.log("✅ Violation data saved successfully");
-      }).catch(error => {
-        console.error("❌ Failed to save violation data:", error);
-      });
-    }).catch(error => {
-      console.error("❌ Error in violation handling:", error);
-      // Save violation data even if snapshot fails
-      const violationData = {
-        violations: newViolations,
-        lastViolation: { 
-          reason, 
-          timestamp: new Date(),
-          hasSnapshot: false
-        }
+    };
+    
+    // Add photo if captured
+    if (photoData) {
+      violationData[`violationSnapshot_${newViolations}`] = {
+        imageData: photoData,
+        timestamp: new Date().toISOString(),
+        violationType: reason
       };
-      updateDoc(sessionDocRef, violationData);
+    }
+    
+    // Save to Firebase
+    updateDoc(sessionDocRef, violationData).catch(error => {
+      console.error("Failed to save violation data:", error);
     });
     
     playWarningSound();
@@ -753,32 +628,29 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         muted
         style={{ 
           position: 'absolute',
-          top: '10px',
-          right: '10px',
-          width: '160px',
-          height: '120px',
-          opacity: 0.1,
-          zIndex: 1000,
+          top: '-1000px',
+          left: '-1000px',
+          width: '320px',
+          height: '240px',
+          pointerEvents: 'none'
+        }}
+      />
+      
+      {/* Hidden canvas for photo capture */}
+      <canvas 
+        ref={canvasRef}
+        style={{ 
+          position: 'absolute',
+          top: '-1000px',
+          left: '-1000px',
           pointerEvents: 'none'
         }}
       />
       
       {/* Camera status indicator */}
-      {!isCameraReady && (
-        <div className="fixed top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-md text-sm z-50">
-          Initializing Camera...
-        </div>
-      )}
-      
-      {cameraError && (
-        <div className="fixed top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-md text-sm z-50">
-          Camera Error
-        </div>
-      )}
-      
       {isCameraReady && (
-        <div className="fixed top-4 left-4 bg-green-600 text-white px-3 py-1 rounded-md text-sm z-50">
-          📸 Camera Ready
+        <div className="fixed top-4 right-4 bg-green-600 text-white px-2 py-1 rounded text-xs z-50">
+          📷 Camera Ready
         </div>
       )}
 
