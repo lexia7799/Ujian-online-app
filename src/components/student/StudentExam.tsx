@@ -488,4 +488,140 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               Nilai Pilihan Ganda Anda: <span className="text-green-400">{finalScore?.toFixed(2)}</span>
             </p>
             <p className="text-lg text-gray-400 mt-2">
-              Nilai esai (jika ada) akan diperiksa ol
+              Nilai esai (jika ada) akan diperiksa oleh pengajar.
+            </p>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white p-4">
+      {/* Hidden video element for snapshots */}
+      <video ref={videoRef} style={{ display: 'none' }} />
+      
+      {/* Header */}
+      <div className="fixed top-0 left-0 right-0 bg-gray-800 p-4 z-50 border-b border-gray-700">
+        <div className="flex justify-between items-center max-w-6xl mx-auto">
+          <div>
+            <h1 className="text-xl font-bold">{exam.title}</h1>
+            <p className="text-sm text-gray-400">{studentInfo.name} - {studentInfo.nim}</p>
+          </div>
+          <div className="flex items-center space-x-6">
+            <div className="text-center">
+              <div className="text-2xl font-mono font-bold text-yellow-400">
+                {formatTime(timeLeft)}
+              </div>
+              <div className="text-xs text-gray-400">Waktu Tersisa</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-2xl font-bold ${violations >= 2 ? 'text-red-400' : violations >= 1 ? 'text-yellow-400' : 'text-green-400'}`}>
+                {violations}/3
+              </div>
+              <div className="text-xs text-gray-400">Pelanggaran</div>
+            </div>
+            <button
+              onClick={handleSubmitAttempt}
+              className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Selesai
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="pt-24 pb-8 max-w-4xl mx-auto">
+        {questions.map((question, index) => (
+          <div key={question.id} className="mb-8 bg-gray-800 rounded-lg p-6">
+            <div className="flex items-start space-x-4">
+              <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold flex-shrink-0">
+                {index + 1}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold mb-4">{question.text}</h3>
+                
+                {question.type === 'mc' ? (
+                  <div className="space-y-3">
+                    {question.options?.map((option, optionIndex) => (
+                      <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors">
+                        <input
+                          type="radio"
+                          name={question.id}
+                          value={optionIndex}
+                          checked={answers[question.id] === optionIndex}
+                          onChange={(e) => handleAnswerChange(question.id, parseInt(e.target.value))}
+                          className="w-4 h-4 text-blue-600"
+                        />
+                        <span className="text-gray-300">{String.fromCharCode(65 + optionIndex)}. {option}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <textarea
+                    value={answers[question.id] || ''}
+                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                    placeholder="Tulis jawaban Anda di sini..."
+                    className="w-full h-32 p-4 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Violation Modal */}
+      {showViolationModal && (
+        <Modal isOpen={showViolationModal} onClose={() => setShowViolationModal(false)}>
+          <div className="text-center">
+            <AlertIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-red-500 mb-4">Peringatan!</h2>
+            <p className="text-gray-300 mb-4">
+              Pelanggaran terdeteksi. Anda memiliki {3 - violations} peringatan tersisa.
+            </p>
+            <p className="text-sm text-gray-400">
+              Jika Anda melakukan 3 pelanggaran, ujian akan dihentikan secara otomatis.
+            </p>
+          </div>
+        </Modal>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <Modal isOpen={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-yellow-500 mb-4">Konfirmasi</h2>
+            <p className="text-gray-300 mb-6">
+              Apakah Anda yakin ingin menyelesaikan ujian? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="flex space-x-4 justify-center">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => finishExam("Selesai", true)}
+                className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                Ya, Selesai
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+export default StudentExam;
