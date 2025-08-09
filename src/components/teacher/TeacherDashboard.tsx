@@ -12,7 +12,7 @@ interface TeacherDashboardProps {
   appState: any;
 }
 
-const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack, appState }) => {
   const [view, setView] = useState('search');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
