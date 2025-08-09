@@ -108,12 +108,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setIsFullscreenSupported(checkFullscreenSupport());
     
     const fetchQuestions = async () => {
+      try {
         const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
         const querySnapshot = await getDocs(questionsRef);
+        setQuestions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
       } catch (error) {
         console.error("Gagal memuat soal:", error);
       } finally {
         setIsLoading(false);
+      }
     };
     
     fetchQuestions();
