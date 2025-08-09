@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, updateDoc, doc, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import { AlertIcon } from '../ui/Icons';
 import Modal from '../ui/Modal';
@@ -36,15 +36,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [unansweredQuestions, setUnansweredQuestions] = useState<number[]>([]);
-  
-  // WebRTC streaming state
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [webrtcInitialized, setWebrtcInitialized] = useState(false);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const signalingUnsubscribeRef = useRef<(() => void) | null>(null);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -80,147 +71,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     };
     
     fetchQuestions();
-    
-    // Initialize WebRTC immediately after questions are loaded
-    if (!webrtcInitialized) {
-      initializeWebRTC();
-    }
-    
-    return () => {
-      // Cleanup WebRTC on unmount
-      if (signalingUnsubscribeRef.current) {
-        signalingUnsubscribeRef.current();
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-    };
   }, [exam.id]);
-
-  // Initialize WebRTC for video streaming
-  const initializeWebRTC = async () => {
-    if (webrtcInitialized) return;
-    
-    try {
-      console.log('🚀 Student: Initializing WebRTC...');
-      setWebrtcInitialized(true);
-      
-      // 1. Get user media first
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 320 }, 
-          height: { ideal: 240 },
-          frameRate: { ideal: 10 }
-        }, 
-        audio: true 
-      });
-      
-      console.log('📹 Student: Camera access granted');
-      setLocalStream(stream);
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      // 2. Create peer connection with simpler config
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
-      });
-      
-      peerConnectionRef.current = pc;
-      console.log('🔗 Student: Peer connection created');
-      
-      // 3. Add stream tracks to peer connection
-      stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
-        console.log(`➕ Student: Added ${track.kind} track`);
-      });
-
-      // 4. Set up event handlers
-      pc.onconnectionstatechange = () => {
-        console.log('🔗 Student: Connection state:', pc.connectionState);
-      };
-      
-      pc.oniceconnectionstatechange = () => {
-        console.log('🧊 Student: ICE state:', pc.iceConnectionState);
-      };
-
-      // 5. Handle ICE candidates
-      pc.onicecandidate = async (event) => {
-        if (event.candidate) {
-          console.log('🧊 Student: Sending ICE candidate to teacher');
-          try {
-            const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
-            await addDoc(signalingRef, {
-              type: 'ice-candidate',
-              candidate: event.candidate,
-              from: 'student',
-              timestamp: new Date()
-            });
-          } catch (error) {
-            console.error('❌ Student: Error sending ICE candidate:', error);
-          }
-        }
-      };
-
-      // 6. Listen for signaling messages from teacher
-      const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
-      const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            
-            if (data.from === 'teacher') {
-              console.log('📨 Student: Received', data.type, 'from teacher');
-              
-              try {
-                if (data.type === 'offer') {
-                  console.log('📝 Student: Processing offer');
-                  await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                  
-                  const answer = await pc.createAnswer();
-                  await pc.setLocalDescription(answer);
-                  console.log('📤 Student: Sending answer to teacher');
-                  
-                  await addDoc(signalingRef, {
-                    type: 'answer',
-                    answer: answer,
-                    from: 'student',
-                    timestamp: new Date()
-                  });
-                  
-                } else if (data.type === 'ice-candidate') {
-                  console.log('🧊 Student: Adding ICE candidate from teacher');
-                  await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-              } catch (error) {
-                console.error('❌ Student: Error processing signaling:', error);
-              }
-            }
-            
-            // Clean up processed messages
-            try {
-              await deleteDoc(change.doc.ref);
-            } catch (error) {
-              console.error('⚠️ Student: Error cleaning up signaling:', error);
-            }
-          }
-        });
-      });
-      
-      signalingUnsubscribeRef.current = unsubscribe;
-      console.log('✅ Student: WebRTC setup complete, waiting for teacher');
-      
-    } catch (error) {
-      console.error('❌ Student: WebRTC initialization failed:', error);
-      setWebrtcInitialized(false);
-    }
-  };
 
   // Fullscreen functions
   const enterFullscreen = async () => {
@@ -407,14 +258,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       } else {
         localStorage.setItem('examTabCount', newCount.toString());
       }
-      
-      // Cleanup WebRTC
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      if (peerConnection) {
-        peerConnection.close();
-      }
     };
   }, [isFinished, isLoading, violations]);
 
@@ -459,45 +302,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     updateDoc(sessionDocRef, { answers: newAnswers });
   };
   
-  const validateAllAnswersCompleted = () => {
-    const unanswered: number[] = [];
-    
-    questions.forEach((question, index) => {
-      const answer = answers[question.id];
-      
-      if (question.type === 'mc') {
-        // For multiple choice, answer should be a number (0, 1, 2, or 3)
-        if (answer === undefined || answer === null) {
-          unanswered.push(index + 1);
-        }
-      } else if (question.type === 'essay') {
-        // For essay, answer should be a non-empty string
-        if (!answer || answer.toString().trim() === '') {
-          unanswered.push(index + 1);
-        }
-      }
-    });
-    
-    return unanswered;
-  };
-  
-  const handleFinishExamClick = () => {
-    const unanswered = validateAllAnswersCompleted();
-    
-    if (unanswered.length > 0) {
-      setUnansweredQuestions(unanswered);
-      setShowValidationModal(true);
-      return;
-    }
-    
-    setShowConfirmModal(true);
-  };
-  
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
     setIsFinished(true);
     setShowConfirmModal(false);
-    setShowValidationModal(false);
     
     // Exit fullscreen when exam is finished
     try {
@@ -601,27 +409,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <p>Apakah Anda yakin ingin menyelesaikan ujian? Anda tidak dapat kembali setelah ini.</p>
       </Modal>
 
-      <Modal 
-        isOpen={showValidationModal} 
-        title="Soal Belum Dijawab!" 
-        onCancel={() => setShowValidationModal(false)} 
-        cancelText="Kembali dan Lengkapi"
-        confirmText="Tetap Selesaikan"
-        onConfirm={() => {
-          setShowValidationModal(false);
-          setShowConfirmModal(true);
-        }}
-        confirmColor="red"
-      >
-        <p className="mb-3">Anda belum menjawab beberapa soal:</p>
-        <div className="bg-gray-700 p-3 rounded-md mb-3">
-          <p className="font-bold text-yellow-400">Soal yang belum dijawab:</p>
-          <p className="text-white">{unansweredQuestions.join(', ')}</p>
-        </div>
-        <p className="text-sm text-gray-300">
-          Disarankan untuk menjawab semua soal sebelum menyelesaikan ujian.
-        </p>
-      </Modal>
       {showViolationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="bg-gray-800 border-2 border-yellow-500 p-8 rounded-lg text-center shadow-2xl">
@@ -640,15 +427,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div>
           <h2 className="text-xl font-bold">{exam.name}</h2>
           <p className="text-sm text-gray-400">{studentInfo.name}</p>
-        </div>
-        <div className="hidden">
-          <video 
-            ref={localVideoRef} 
-            autoPlay 
-            playsInline 
-            muted 
-            className="w-32 h-24 bg-gray-900 rounded-md"
-          />
         </div>
         <div className="text-right">
           <div className="text-2xl font-mono bg-gray-900 px-4 py-2 rounded-lg">
@@ -711,7 +489,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       )}
 
       <button 
-        onClick={handleFinishExamClick} 
+        onClick={() => setShowConfirmModal(true)} 
         className="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg" 
         disabled={questions.length === 0}
       >
