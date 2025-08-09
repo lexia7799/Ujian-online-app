@@ -9,6 +9,7 @@ interface TeacherDashboardProps {
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
   canGoBack: boolean;
+  appState: any;
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
@@ -20,6 +21,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   const [isVerified, setIsVerified] = useState(false);
   const [inputPassword, setInputPassword] = useState('');
   const [verifiedExams, setVerifiedExams] = useState<{[key: string]: any}>({});
+
+  // Check if we're coming back from a verified exam feature
+  useEffect(() => {
+    if (appState.verifiedExam) {
+      setFoundExam(appState.verifiedExam);
+      setIsVerified(true);
+      setSearchCode(appState.verifiedExam.code);
+      setVerifiedExams(prev => ({
+        ...prev,
+        [appState.verifiedExam.code]: appState.verifiedExam
+      }));
+    }
+  }, [appState.verifiedExam]);
 
   const handleSearchExam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +89,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
       ...prev,
       [examData.code]: examData
     }));
-    navigateTo(page, { exam: examData });
+    navigateTo(page, { exam: examData, fromVerifiedDashboard: true });
   };
   return (
     <div>

@@ -32,6 +32,14 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
+  const handleBackToVerifiedDashboard = () => {
+    if (appState.fromVerifiedDashboard) {
+      navigateTo('teacher_dashboard_verified', { exam, verifiedExam: exam });
+    } else {
+      navigateBack();
+    }
+  };
+
   useEffect(() => {
     if (!exam?.id) return;
     
@@ -249,7 +257,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   return (
     <div>
       <button 
-        onClick={navigateBack} 
+        onClick={handleBackToVerifiedDashboard} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali

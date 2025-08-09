@@ -109,6 +109,8 @@ function App() {
     switch (page) {
       case 'teacher_dashboard':
         return <TeacherDashboard {...props} />;
+      case 'teacher_dashboard_verified':
+        return <TeacherDashboard {...props} />;
       case 'question_manager':
         return <QuestionManager {...props} />;
       case 'student_join':
