@@ -256,7 +256,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          finishExam("Waktu Habis");
+          finishExam("Waktu Habis", false);
           return 0;
         }
         return prev - 1;
@@ -328,7 +328,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     playWarningSound();
     
     if (newViolations >= 3) {
-      finishExam(`Diskualifikasi: ${reason}`);
+      finishExam(`Diskualifikasi: ${reason}`, false);
     } else {
       // Capture snapshot on violation
       captureViolationSnapshot(reason).then(snapshot => {
@@ -400,24 +400,26 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
   };
   
-  const finishExam = async (reason = "Selesai") => {
+  const finishExam = async (reason = "Selesai", userInitiated = false) => {
     if (isFinished) return;
     setIsFinished(true);
     setShowConfirmModal(false);
     
-    // Exit fullscreen when exam is finished
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen();
-      } else if ((document as any).mozCancelFullScreen) {
-        await (document as any).mozCancelFullScreen();
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen();
+    // Only exit fullscreen when user-initiated to avoid browser security restrictions
+    if (userInitiated) {
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      } catch (error) {
+        console.error("Failed to exit fullscreen:", error);
       }
-    } catch (error) {
-      console.error("Failed to exit fullscreen:", error);
     }
     
     let score = 0;
@@ -486,124 +488,4 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               Nilai Pilihan Ganda Anda: <span className="text-green-400">{finalScore?.toFixed(2)}</span>
             </p>
             <p className="text-lg text-gray-400 mt-2">
-              Nilai esai (jika ada) akan diperiksa oleh dosen.
-            </p>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <Modal 
-        isOpen={showConfirmModal} 
-        title="Selesaikan Ujian?" 
-        onCancel={() => setShowConfirmModal(false)} 
-        onConfirm={() => finishExam("Selesai")} 
-        confirmText="Ya, Selesaikan" 
-        confirmColor="green"
-      >
-        <p>Apakah Anda yakin ingin menyelesaikan ujian? Anda tidak dapat kembali setelah ini.</p>
-      </Modal>
-
-      {showViolationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="bg-gray-800 border-2 border-yellow-500 p-8 rounded-lg text-center shadow-2xl">
-            <AlertIcon />
-            <h3 className="text-3xl font-bold text-yellow-400 mt-4">PERINGATAN!</h3>
-            <p className="text-lg mt-2">Anda terdeteksi melakukan pelanggaran.</p>
-            <p className="text-sm text-red-400 mt-1">Sistem monitoring aktif!</p>
-            <p className="text-2xl font-bold mt-2">
-              Kesempatan tersisa: <span className="text-white">{3 - violations}</span>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Hidden video element for violation snapshots */}
-      <video 
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ display: 'none' }}
-      />
-
-      <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold">{exam.name}</h2>
-          <p className="text-sm text-gray-400">{studentInfo.name}</p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-mono bg-gray-900 px-4 py-2 rounded-lg">
-            {Math.floor(timeLeft / 3600).toString().padStart(2, '0')}:
-            {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
-            {(timeLeft % 60).toString().padStart(2, '0')}
-          </div>
-          <div className="text-sm text-red-500 mt-1">Pelanggaran: {violations}/3</div>
-        </div>
-      </div>
-
-      {questions.length === 0 ? (
-        <div className="text-center p-8 mt-8 bg-gray-800 rounded-lg">
-          <h3 className="text-2xl font-bold text-yellow-400 mb-4">Ujian Belum Siap</h3>
-          <p className="text-gray-300">
-            Tidak ada soal yang tersedia untuk ujian ini. Silakan hubungi dosen atau pengawas ujian Anda.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-8 space-y-6">
-          {questions.map((q, index) => (
-            <div key={q.id} className="bg-gray-800 p-6 rounded-lg">
-              <p className="font-semibold text-lg mb-4">{index + 1}. {q.text}</p>
-              
-              {q.type === 'mc' && q.options && (
-                <div className="space-y-3">
-                  {q.options.map((opt, i) => (
-                    <label 
-                      key={i} 
-                      className={`block p-3 rounded-md cursor-pointer transition-colors ${
-                        answers[q.id] === i 
-                          ? 'bg-indigo-600' 
-                          : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                    >
-                      <input 
-                        type="radio" 
-                        name={q.id} 
-                        checked={answers[q.id] === i} 
-                        onChange={() => handleAnswerChange(q.id, i)} 
-                        className="hidden" 
-                      />
-                      <span className="ml-2">{String.fromCharCode(65 + i)}. {opt}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              
-              {q.type === 'essay' && (
-                <textarea 
-                  value={answers[q.id] || ''} 
-                  onChange={(e) => handleAnswerChange(q.id, e.target.value)} 
-                  placeholder="Ketik jawaban esai Anda di sini..." 
-                  className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 h-32"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <button 
-        onClick={handleSubmitAttempt} 
-        className="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg" 
-        disabled={questions.length === 0}
-      >
-        Selesaikan Ujian
-      </button>
-    </div>
-  );
-};
-
-export default StudentExam;
+              Nilai esai (jika ada) akan diperiksa ol
