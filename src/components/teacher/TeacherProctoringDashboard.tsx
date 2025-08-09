@@ -79,7 +79,20 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       >
         {selectedSnapshot && (
           <div className="text-center">
-            <img src={selectedSnapshot.imageData} alt="Violation Snapshot" className="w-full max-w-md mx-auto rounded-lg mb-4" />
+            <div className="w-full max-w-md mx-auto mb-4">
+              <img 
+                src={selectedSnapshot.imageData} 
+                alt="Violation Snapshot" 
+                className="w-full h-auto rounded-lg border border-gray-600"
+                onError={(e) => {
+                  console.error("Failed to load image:", selectedSnapshot.imageData);
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log("Image loaded successfully");
+                }}
+              />
+            </div>
             <p className="text-sm text-gray-400">Jenis: {selectedSnapshot.violationType}</p>
             <p className="text-sm text-gray-400">Waktu: {new Date(selectedSnapshot.timestamp).toLocaleString('id-ID')}</p>
           </div>
@@ -118,13 +131,42 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               <div className="w-full aspect-video bg-gray-900 flex items-center justify-center">
                 {session.violations > 0 ? (
                   <div className="text-center p-4">
-                    <div className="text-yellow-400 mb-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
-                    <p className="text-xs text-gray-400">Klik tombol untuk lihat foto</p>
+                    {(session.violationSnapshot_1 || session.violationSnapshot_2) ? (
+                      <div>
+                        {session.violationSnapshot_1 && (
+                          <img 
+                            src={session.violationSnapshot_1.imageData} 
+                            alt="Preview Violation" 
+                            className="w-full h-full object-cover rounded"
+                            onError={(e) => {
+                              console.error("Failed to load preview image");
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        {!session.violationSnapshot_1 && session.violationSnapshot_2 && (
+                          <img 
+                            src={session.violationSnapshot_2.imageData} 
+                            alt="Preview Violation" 
+                            className="w-full h-full object-cover rounded"
+                            onError={(e) => {
+                              console.error("Failed to load preview image");
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-yellow-400 mb-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
+                        <p className="text-xs text-gray-400">Foto tidak tersedia</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center p-4">

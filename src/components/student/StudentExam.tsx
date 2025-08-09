@@ -46,6 +46,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
   const maxFullscreenRetries = 3;
+  const isInitialFullscreenEntry = useRef(true);
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -134,6 +135,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         await (elem as any).msRequestFullscreen();
       }
       fullscreenRetryCount.current = 0;
+      // Mark that initial fullscreen entry is complete
+      if (isInitialFullscreenEntry.current) {
+        setTimeout(() => {
+          isInitialFullscreenEntry.current = false;
+        }, 2000); // Give 2 seconds grace period
+      }
     } catch (error) {
       console.error("Failed to enter fullscreen:", error);
       fullscreenRetryCount.current++;
@@ -181,7 +188,16 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
-        handleViolation("Exited Fullscreen");
+        // Only trigger violation after initial fullscreen entry
+        if (!isInitialFullscreenEntry.current) {
+          handleViolation("Exited Fullscreen");
+        }
+        // Always try to re-enter fullscreen
+        setTimeout(() => {
+          if (!isFinished && !isInFullscreen()) {
+            enterFullscreen();
+          }
+        }, 500);
       }
     };
     
@@ -358,7 +374,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           if (!isFinished && !isInFullscreen()) {
             enterFullscreen();
           }
-        }, 1000);
+        }, 500);
       }
     }
   };
