@@ -19,13 +19,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   const [error, setError] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [inputPassword, setInputPassword] = useState('');
-  const [verifiedExams, setVerifiedExams] = useState<{[key: string]: any}>({});
 
   const handleSearchExam = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     setFoundExam(null);
+    setIsVerified(false);
     setInputPassword('');
     
     const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
@@ -37,15 +37,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
         setError('Ujian dengan kode tersebut tidak ditemukan.');
       } else {
         const examDoc = querySnapshot.docs[0];
-        const examData = { id: examDoc.id, ...examDoc.data() };
-        setFoundExam(examData);
-        
-        // Check if this exam was already verified
-        if (verifiedExams[examData.code]) {
-          setIsVerified(true);
-        } else {
-          setIsVerified(false);
-        }
+        setFoundExam({ id: examDoc.id, ...examDoc.data() });
       }
     } catch (err) {
       setError('Gagal mencari ujian. Coba lagi.');
@@ -59,24 +51,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     if (inputPassword === foundExam.password) {
       setIsVerified(true);
       setError('');
-      // Store verified exam in state
-      setVerifiedExams(prev => ({
-        ...prev,
-        [foundExam.code]: foundExam
-      }));
     } else {
       setError('Password salah.');
     }
   };
 
-  const handleNavigateToExamFeature = (page: string, examData: any) => {
-    // Store the current verified state before navigating
-    setVerifiedExams(prev => ({
-      ...prev,
-      [examData.code]: examData
-    }));
-    navigateTo(page, { exam: examData });
-  };
   return (
     <div>
       {canGoBack && (
@@ -158,19 +137,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button 
-                  onClick={() => handleNavigateToExamFeature('teacher_results', foundExam)} 
+                  onClick={() => navigateTo('teacher_results', { exam: foundExam })} 
                   className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Lihat Hasil
                 </button>
                 <button 
-                  onClick={() => handleNavigateToExamFeature('teacher_proctoring', foundExam)} 
+                  onClick={() => navigateTo('teacher_proctoring', { exam: foundExam })} 
                   className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Awasi Ujian
                 </button>
                 <button 
-                  onClick={() => handleNavigateToExamFeature('question_manager', foundExam)} 
+                  onClick={() => navigateTo('question_manager', { exam: foundExam })} 
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Kelola Soal

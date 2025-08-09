@@ -109,30 +109,14 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
             >
               <div className="w-full aspect-video bg-gray-900 flex items-center justify-center">
                 {session.violations > 0 ? (
-                  <div className="w-full h-full relative">
-                    {/* Show latest violation snapshot */}
-                    {session.violationSnapshot_2 ? (
-                      <img 
-                        src={session.violationSnapshot_2.imageData} 
-                        alt="Latest Violation" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : session.violationSnapshot_1 ? (
-                      <img 
-                        src={session.violationSnapshot_1.imageData} 
-                        alt="Latest Violation" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-center p-4 flex flex-col justify-center h-full bg-yellow-900">
-                        <p className="text-sm text-yellow-300 font-bold">Pelanggaran Terdeteksi</p>
-                        <p className="text-xs text-yellow-400 mt-1">Foto akan muncul setelah pelanggaran berikutnya</p>
-                      </div>
-                    )}
-                    {/* Overlay for violation count */}
-                    <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      {session.violations} Pelanggaran
+                  <div className="text-center p-4">
+                    <div className="text-yellow-400 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
                     </div>
+                    <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
+                    <p className="text-xs text-gray-400">Klik tombol untuk lihat foto</p>
                   </div>
                 ) : (
                   <div className="text-center p-4">
@@ -174,17 +158,17 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                     {session.violationSnapshot_1 && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name)}
-                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-2 px-2 rounded"
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        📸 Foto Pelanggaran 1
+                        Lihat Foto Pelanggaran 1
                       </button>
                     )}
                     {session.violationSnapshot_2 && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name)}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-2 rounded"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        📸 Foto Pelanggaran 2
+                        Lihat Foto Pelanggaran 2
                       </button>
                     )}
                   </div>

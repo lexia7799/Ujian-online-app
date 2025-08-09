@@ -62,23 +62,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
   const allChecksPassed = checks.device && checks.camera && checks.mic && checks.screenCount;
 
   const startExam = async () => {
-    // Request fullscreen on user action to avoid permission errors
-    try {
-      const elem = document.documentElement;
-      if (elem.requestFullscreen) {
-        await elem.requestFullscreen();
-      } else if ((elem as any).webkitRequestFullscreen) {
-        await (elem as any).webkitRequestFullscreen();
-      } else if ((elem as any).mozRequestFullScreen) {
-        await (elem as any).mozRequestFullScreen();
-      } else if ((elem as any).msRequestFullscreen) {
-        await (elem as any).msRequestFullscreen();
-      }
-    } catch (error) {
-      console.error("Failed to enter fullscreen:", error);
-      // Continue with exam even if fullscreen fails
-    }
-    
     const { exam } = appState;
     const sessionRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     
