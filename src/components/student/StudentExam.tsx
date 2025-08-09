@@ -1,0 +1,291 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db, appId } from '../../config/firebase';
+import { AlertIcon } from '../ui/Icons';
+import Modal from '../ui/Modal';
+
+interface Question {
+  id: string;
+  text: string;
+  type: 'mc' | 'essay';
+  options?: string[];
+  correctAnswer?: number;
+}
+
+interface StudentExamProps {
+  appState: any;
+}
+
+const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
+  const { exam, studentInfo, sessionId } = appState;
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [answers, setAnswers] = useState<{ [key: string]: any }>({});
+  
+  const calculateTimeLeft = () => {
+    const endTime = new Date(exam.endTime).getTime();
+    const now = new Date().getTime();
+    const diff = (endTime - now) / 1000;
+    return diff > 0 ? Math.round(diff) : 0;
+  };
+  
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+  const [violations, setViolations] = useState(0);
+  const [showViolationModal, setShowViolationModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
+  const [finalScore, setFinalScore] = useState<number | null>(null);
+  
+  const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    const fetchQuestions = async () => {
+      try {
+        const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
+        const querySnapshot = await getDocs(questionsRef);
+        setQuestions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
+      } catch (error) {
+        console.error("Gagal memuat soal:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchQuestions();
+  }, [exam.id]);
+
+  useEffect(() => {
+    if (isFinished || isLoading) return;
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishExam("Waktu Habis");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [isFinished, isLoading]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && !isFinished) {
+        handleViolation();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [violations, isFinished]);
+
+  const playWarningSound = () => {
+    if (!audioContextRef.current) return;
+    
+    const oscillator = audioContextRef.current.createOscillator();
+    const gainNode = audioContextRef.current.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContextRef.current.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime);
+    gainNode.gain.setValueAtTime(1, audioContextRef.current.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContextRef.current.currentTime + 1);
+    
+    oscillator.start(audioContextRef.current.currentTime);
+    oscillator.stop(audioContextRef.current.currentTime + 0.5);
+  };
+
+  const handleViolation = () => {
+    const newViolations = violations + 1;
+    setViolations(newViolations);
+    updateDoc(sessionDocRef, { violations: newViolations });
+    playWarningSound();
+    
+    if (newViolations >= 3) {
+      finishExam("Diskualifikasi karena Pelanggaran");
+    } else {
+      setShowViolationModal(true);
+      setTimeout(() => setShowViolationModal(false), 3000);
+    }
+  };
+
+  const handleAnswerChange = (questionId: string, answer: any) => {
+    const newAnswers = { ...answers, [questionId]: answer };
+    setAnswers(newAnswers);
+    updateDoc(sessionDocRef, { answers: newAnswers });
+  };
+  
+  const finishExam = async (reason = "Selesai") => {
+    if (isFinished) return;
+    setIsFinished(true);
+    setShowConfirmModal(false);
+    
+    let score = 0;
+    let status = 'finished';
+    
+    if (reason.startsWith("Diskualifikasi")) {
+      score = 0;
+      status = 'disqualified';
+    } else {
+      const mcQuestions = questions.filter(q => q.type === 'mc');
+      mcQuestions.forEach(q => {
+        if (q.correctAnswer === answers[q.id]) {
+          score++;
+        }
+      });
+      score = mcQuestions.length > 0 ? (score / mcQuestions.length) * 100 : 0;
+    }
+    
+    setFinalScore(score);
+    await updateDoc(sessionDocRef, { 
+      status, 
+      finishTime: new Date(), 
+      finalScore: score, 
+      answers 
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-center p-8">Memuat soal ujian...</div>;
+  }
+
+  if (isFinished) {
+    return (
+      <div className="text-center h-screen flex flex-col justify-center items-center -mt-16">
+        {finalScore === 0 && violations >= 3 ? (
+          <>
+            <h2 className="text-4xl font-bold text-red-500 mb-4">Ujian Dihentikan!</h2>
+            <p className="text-xl text-gray-300">
+              Anda telah melebihi batas pelanggaran yang diizinkan.
+            </p>
+            <p className="text-2xl font-bold mt-4">
+              Nilai Anda: <span className="text-red-500">0</span>
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-4xl font-bold text-green-400 mb-4">Ujian Selesai!</h2>
+            <p className="text-xl text-gray-300">Terima kasih telah menyelesaikan ujian.</p>
+            <p className="text-2xl font-bold mt-4">
+              Nilai Pilihan Ganda Anda: <span className="text-green-400">{finalScore?.toFixed(2)}</span>
+            </p>
+            <p className="text-lg text-gray-400 mt-2">
+              Nilai esai (jika ada) akan diperiksa oleh dosen.
+            </p>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Modal 
+        isOpen={showConfirmModal} 
+        title="Selesaikan Ujian?" 
+        onCancel={() => setShowConfirmModal(false)} 
+        onConfirm={() => finishExam("Selesai")} 
+        confirmText="Ya, Selesaikan" 
+        confirmColor="green"
+      >
+        <p>Apakah Anda yakin ingin menyelesaikan ujian? Anda tidak dapat kembali setelah ini.</p>
+      </Modal>
+
+      {showViolationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+          <div className="bg-gray-800 border-2 border-yellow-500 p-8 rounded-lg text-center shadow-2xl">
+            <AlertIcon />
+            <h3 className="text-3xl font-bold text-yellow-400 mt-4">PERINGATAN!</h3>
+            <p className="text-lg mt-2">Anda terdeteksi melakukan pelanggaran.</p>
+            <p className="text-2xl font-bold mt-2">
+              Kesempatan tersisa: <span className="text-white">{3 - violations}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold">{exam.name}</h2>
+          <p className="text-sm text-gray-400">{studentInfo.name}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-mono bg-gray-900 px-4 py-2 rounded-lg">
+            {Math.floor(timeLeft / 3600).toString().padStart(2, '0')}:
+            {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
+            {(timeLeft % 60).toString().padStart(2, '0')}
+          </div>
+          <div className="text-sm text-red-500 mt-1">Pelanggaran: {violations}/3</div>
+        </div>
+      </div>
+
+      {questions.length === 0 ? (
+        <div className="text-center p-8 mt-8 bg-gray-800 rounded-lg">
+          <h3 className="text-2xl font-bold text-yellow-400 mb-4">Ujian Belum Siap</h3>
+          <p className="text-gray-300">
+            Tidak ada soal yang tersedia untuk ujian ini. Silakan hubungi dosen atau pengawas ujian Anda.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-8 space-y-6">
+          {questions.map((q, index) => (
+            <div key={q.id} className="bg-gray-800 p-6 rounded-lg">
+              <p className="font-semibold text-lg mb-4">{index + 1}. {q.text}</p>
+              
+              {q.type === 'mc' && q.options && (
+                <div className="space-y-3">
+                  {q.options.map((opt, i) => (
+                    <label 
+                      key={i} 
+                      className={`block p-3 rounded-md cursor-pointer transition-colors ${
+                        answers[q.id] === i 
+                          ? 'bg-indigo-600' 
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                    >
+                      <input 
+                        type="radio" 
+                        name={q.id} 
+                        checked={answers[q.id] === i} 
+                        onChange={() => handleAnswerChange(q.id, i)} 
+                        className="hidden" 
+                      />
+                      <span className="ml-2">{String.fromCharCode(65 + i)}. {opt}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              
+              {q.type === 'essay' && (
+                <textarea 
+                  value={answers[q.id] || ''} 
+                  onChange={(e) => handleAnswerChange(q.id, e.target.value)} 
+                  placeholder="Ketik jawaban esai Anda di sini..." 
+                  className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 h-32"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button 
+        onClick={() => setShowConfirmModal(true)} 
+        className="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg" 
+        disabled={questions.length === 0}
+      >
+        Selesaikan Ujian
+      </button>
+    </div>
+  );
+};
+
+export default StudentExam;

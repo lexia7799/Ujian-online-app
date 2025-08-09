@@ -1,0 +1,75 @@
+import React, { useState } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db, appId } from '../../config/firebase';
+
+interface StudentJoinProps {
+  navigateTo: (page: string, data?: any) => void;
+}
+
+const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo }) => {
+  const [examCode, setExamCode] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    if (!examCode.trim()) {
+      setError('Kode ujian tidak boleh kosong.');
+      setIsLoading(false);
+      return;
+    }
+    
+    const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
+    const q = query(examsRef, where("code", "==", examCode.toUpperCase()));
+    
+    try {
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        setError('Kode ujian tidak ditemukan atau tidak valid.');
+      } else {
+        const examDoc = querySnapshot.docs[0];
+        navigateTo('student_identity', { exam: { id: examDoc.id, ...examDoc.data() } });
+      }
+    } catch (err) {
+      setError('Terjadi kesalahan saat validasi kode.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-3xl font-bold mb-6 text-center">Gabung Ujian</h2>
+      <div className="w-full max-w-sm mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
+        <form onSubmit={handleJoin}>
+          <div className="mb-4">
+            <label htmlFor="examCode" className="block text-gray-300 text-sm font-bold mb-2">
+              Masukkan Kode Ujian
+            </label>
+            <input 
+              id="examCode" 
+              type="text" 
+              value={examCode} 
+              onChange={(e) => setExamCode(e.target.value)} 
+              placeholder="e.g., A7B3K2" 
+              className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase" 
+            />
+          </div>
+          {error && <p className="text-red-500 text-xs italic mb-4">{error}</p>}
+          <button 
+            type="submit" 
+            disabled={isLoading} 
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:bg-indigo-400"
+          >
+            {isLoading ? 'Memvalidasi...' : 'Lanjutkan'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default StudentJoin;

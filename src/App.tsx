@@ -1,0 +1,95 @@
+import React, { useState, useEffect } from 'react';
+import { User, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { auth } from './config/firebase';
+import HomePage from './pages/HomePage';
+import TeacherDashboard from './components/teacher/TeacherDashboard';
+import QuestionManager from './components/teacher/QuestionManager';
+import TeacherProctoringDashboard from './components/teacher/TeacherProctoringDashboard';
+import TeacherResultsDashboard from './components/teacher/TeacherResultsDashboard';
+import StudentJoin from './components/student/StudentJoin';
+import StudentIdentity from './components/student/StudentIdentity';
+import StudentExamStatusCheck from './components/student/StudentExamStatusCheck';
+import StudentPreCheck from './components/student/StudentPreCheck';
+import StudentExam from './components/student/StudentExam';
+
+function App() {
+  const [page, setPage] = useState('home');
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [appState, setAppState] = useState<any>({});
+
+  useEffect(() => {
+    const authenticateUser = async () => {
+      try {
+        if (typeof (window as any).__initial_auth_token !== 'undefined' && (window as any).__initial_auth_token) {
+          await signInWithCustomToken(auth, (window as any).__initial_auth_token);
+        } else { 
+          await signInAnonymously(auth); 
+        }
+      } catch (error) { 
+        console.error("Autentikasi gagal:", error); 
+      }
+    };
+    
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        authenticateUser();
+      } else {
+        setUser(currentUser);
+      }
+      setAuthReady(true);
+    });
+    
+    return () => unsubscribe();
+  }, []);
+
+  const navigateTo = (pageName: string, data = {}) => {
+    setPage(pageName);
+    setAppState(currentState => ({ ...currentState, ...data }));
+  };
+
+  if (!authReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        Memuat Autentikasi...
+      </div>
+    );
+  }
+
+  const renderPage = () => {
+    const props = { navigateTo, appState, user };
+    
+    switch (page) {
+      case 'teacher_dashboard':
+        return <TeacherDashboard {...props} />;
+      case 'question_manager':
+        return <QuestionManager {...props} />;
+      case 'student_join':
+        return <StudentJoin {...props} />;
+      case 'student_identity':
+        return <StudentIdentity {...props} />;
+      case 'student_status_check':
+        return <StudentExamStatusCheck {...props} />;
+      case 'student_precheck':
+        return <StudentPreCheck {...props} />;
+      case 'student_exam':
+        return <StudentExam {...props} />;
+      case 'teacher_proctoring':
+        return <TeacherProctoringDashboard {...props} />;
+      case 'teacher_results':
+        return <TeacherResultsDashboard {...props} />;
+      default:
+        return <HomePage {...props} />;
+    }
+  };
+
+  return (
+    <div className="bg-gray-900 text-gray-100 min-h-screen font-sans">
+      <div className="container mx-auto p-4 md:p-8">
+        {renderPage()}
+      </div>
+    </div>
+  );
+}
+
+export default App;
