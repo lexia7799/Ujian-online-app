@@ -41,12 +41,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   // WebRTC streaming state
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
-  const [isWebRTCReady, setIsWebRTCReady] = useState(false);
+  const [webrtcInitialized, setWebrtcInitialized] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const signalingUnsubscribeRef = useRef<(() => void) | null>(null);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
-  const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
   const audioContextRef = useRef<AudioContext | null>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
@@ -81,111 +81,111 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     fetchQuestions();
     
-    // Initialize WebRTC after a short delay to ensure everything is ready
-    const webrtcTimer = setTimeout(() => {
+    // Initialize WebRTC immediately after questions are loaded
+    if (!webrtcInitialized) {
       initializeWebRTC();
-    }, 2000);
+    }
     
-    return () => clearTimeout(webrtcTimer);
+    return () => {
+      // Cleanup WebRTC on unmount
+      if (signalingUnsubscribeRef.current) {
+        signalingUnsubscribeRef.current();
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+    };
   }, [exam.id]);
 
   // Initialize WebRTC for video streaming
   const initializeWebRTC = async () => {
+    if (webrtcInitialized) return;
+    
     try {
-      console.log('🚀 Student: Starting WebRTC initialization...');
+      console.log('🚀 Student: Initializing WebRTC...');
+      setWebrtcInitialized(true);
       
-      // Get user media (camera and microphone)
+      // 1. Get user media first
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 },
-          frameRate: { ideal: 15 }
+          width: { ideal: 320 }, 
+          height: { ideal: 240 },
+          frameRate: { ideal: 10 }
         }, 
         audio: true 
       });
       
-      console.log('📹 Student: Got user media stream:', stream);
+      console.log('📹 Student: Camera access granted');
       setLocalStream(stream);
+      
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        console.log('📹 Student: Local video element updated');
       }
 
-      // Create peer connection
+      // 2. Create peer connection with simpler config
       const pc = new RTCPeerConnection({
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
+          { urls: 'stun:stun.l.google.com:19302' }
         ]
       });
-
-      console.log('🔗 Student: Created peer connection');
       
-      // Set up connection state monitoring
-      pc.onconnectionstatechange = () => {
-        console.log('🔗 Student: Connection state changed to:', pc.connectionState);
-        if (pc.connectionState === 'connected') {
-          console.log('✅ Student: Successfully connected to teacher');
-          setIsWebRTCReady(true);
-        } else if (pc.connectionState === 'failed') {
-          console.log('❌ Student: Connection to teacher failed');
-          setIsWebRTCReady(false);
-        } else if (pc.connectionState === 'disconnected') {
-          console.log('⚠️ Student: Connection disconnected');
-          setIsWebRTCReady(false);
-        }
-      };
+      peerConnectionRef.current = pc;
+      console.log('🔗 Student: Peer connection created');
       
-      // Set up ICE connection state monitoring
-      pc.oniceconnectionstatechange = () => {
-        console.log('🧊 Student: ICE connection state:', pc.iceConnectionState);
-      };
-
-      // Add local stream to peer connection
+      // 3. Add stream tracks to peer connection
       stream.getTracks().forEach(track => {
-        console.log('➕ Student: Adding track to peer connection:', track.kind);
         pc.addTrack(track, stream);
+        console.log(`➕ Student: Added ${track.kind} track`);
       });
 
-      // Handle ICE candidates
+      // 4. Set up event handlers
+      pc.onconnectionstatechange = () => {
+        console.log('🔗 Student: Connection state:', pc.connectionState);
+      };
+      
+      pc.oniceconnectionstatechange = () => {
+        console.log('🧊 Student: ICE state:', pc.iceConnectionState);
+      };
+
+      // 5. Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          console.log('🧊 Student: Sending ICE candidate');
+          console.log('🧊 Student: Sending ICE candidate to teacher');
           try {
-          await addDoc(signalingRef, {
-            type: 'ice-candidate',
-            candidate: event.candidate.toJSON(),
-            from: 'student',
-            timestamp: new Date()
-          });
-            console.log('✅ Student: ICE candidate sent successfully');
+            const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
+            await addDoc(signalingRef, {
+              type: 'ice-candidate',
+              candidate: event.candidate,
+              from: 'student',
+              timestamp: new Date()
+            });
           } catch (error) {
-            console.error('❌ Student: Failed to send ICE candidate:', error);
+            console.error('❌ Student: Error sending ICE candidate:', error);
           }
         }
       };
 
-      setPeerConnection(pc);
-      console.log('🔗 Student: Peer connection setup complete');
-
-      // Listen for signaling messages from teacher
-      console.log('👂 Student: Starting to listen for signaling messages...');
+      // 6. Listen for signaling messages from teacher
+      const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
       const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
             const data = change.doc.data();
-            console.log('📨 Student: Received signaling message:', data.type, 'from:', data.from);
             
             if (data.from === 'teacher') {
+              console.log('📨 Student: Received', data.type, 'from teacher');
+              
               try {
                 if (data.type === 'offer') {
-                  console.log('📝 Student: Processing offer from teacher');
+                  console.log('📝 Student: Processing offer');
                   await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                  console.log('✅ Student: Remote description set');
                   
                   const answer = await pc.createAnswer();
                   await pc.setLocalDescription(answer);
-                  console.log('📤 Student: Created answer, sending to teacher');
+                  console.log('📤 Student: Sending answer to teacher');
                   
                   await addDoc(signalingRef, {
                     type: 'answer',
@@ -193,32 +193,32 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                     from: 'student',
                     timestamp: new Date()
                   });
-                  console.log('✅ Student: Answer sent successfully');
+                  
                 } else if (data.type === 'ice-candidate') {
-                  console.log('🧊 Student: Processing ICE candidate');
+                  console.log('🧊 Student: Adding ICE candidate from teacher');
                   await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                  console.log('✅ Student: ICE candidate added successfully');
                 }
               } catch (error) {
-                console.error('❌ Student: Error processing signaling message:', error);
+                console.error('❌ Student: Error processing signaling:', error);
               }
             }
             
-            // Clean up processed signaling messages
+            // Clean up processed messages
             try {
               await deleteDoc(change.doc.ref);
             } catch (error) {
-              console.error('⚠️ Student: Failed to delete signaling message:', error);
+              console.error('⚠️ Student: Error cleaning up signaling:', error);
             }
           }
         });
       });
-
-      console.log('✅ Student: WebRTC initialization complete');
-      return unsubscribe;
+      
+      signalingUnsubscribeRef.current = unsubscribe;
+      console.log('✅ Student: WebRTC setup complete, waiting for teacher');
+      
     } catch (error) {
-      console.error('❌ Student: Failed to initialize WebRTC:', error);
-      setIsWebRTCReady(false);
+      console.error('❌ Student: WebRTC initialization failed:', error);
+      setWebrtcInitialized(false);
     }
   };
 

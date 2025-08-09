@@ -22,10 +22,11 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
   const { exam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessions, setActiveSessions] = useState<Session[]>([]);
-  const [peerConnections, setPeerConnections] = useState<{ [key: string]: RTCPeerConnection }>({});
   const [remoteStreams, setRemoteStreams] = useState<{ [key: string]: MediaStream }>({});
   const [connectionStates, setConnectionStates] = useState<{ [key: string]: string }>({});
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+  const peerConnectionsRef = useRef<{ [key: string]: RTCPeerConnection }>({});
+  const signalingUnsubscribesRef = useRef<{ [key: string]: () => void }>({});
 
   useEffect(() => {
     if (!exam?.id) return;
@@ -38,119 +39,154 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       // Filter only active sessions (started, not finished or disqualified)
       const activeOnly = allSessions.filter(session => session.status === 'started');
       setActiveSessions(activeOnly);
+      
+      // Initialize WebRTC for new active sessions
+      activeOnly.forEach(session => {
+        if (!peerConnectionsRef.current[session.id] && !connectionStates[session.id]) {
+          console.log(`🔄 Teacher: Initializing WebRTC for session: ${session.id}`);
+          initializeWebRTCForSession(session.id);
+        }
+      });
+      
+      // Cleanup inactive sessions
+      Object.keys(peerConnectionsRef.current).forEach(sessionId => {
+        if (!activeOnly.find(s => s.id === sessionId)) {
+          console.log(`🧹 Teacher: Cleaning up session: ${sessionId}`);
+          cleanupSession(sessionId);
+        }
+      });
     });
     
     return () => unsubSessions();
   }, [exam?.id]);
 
+  const cleanupSession = (sessionId: string) => {
+    if (peerConnectionsRef.current[sessionId]) {
+      peerConnectionsRef.current[sessionId].close();
+      delete peerConnectionsRef.current[sessionId];
+    }
+    
+    if (signalingUnsubscribesRef.current[sessionId]) {
+      signalingUnsubscribesRef.current[sessionId]();
+      delete signalingUnsubscribesRef.current[sessionId];
+    }
+    
+    setRemoteStreams(prev => {
+      const newStreams = { ...prev };
+      delete newStreams[sessionId];
+      return newStreams;
+    });
+    
+    setConnectionStates(prev => {
+      const newStates = { ...prev };
+      delete newStates[sessionId];
+      return newStates;
+    });
+  };
+
   // Initialize WebRTC connection for each session
   const initializeWebRTCForSession = async (sessionId: string) => {
-    console.log(`🚀 Teacher: Initializing WebRTC for session: ${sessionId}`);
+    if (peerConnectionsRef.current[sessionId]) {
+      console.log(`⚠️ Teacher: Connection already exists for session: ${sessionId}`);
+      return;
+    }
     
     try {
+      console.log(`🚀 Teacher: Starting WebRTC for session: ${sessionId}`);
+      setConnectionStates(prev => ({ ...prev, [sessionId]: 'connecting' }));
+      
+      // 1. Create peer connection
       const pc = new RTCPeerConnection({
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
+          { urls: 'stun:stun.l.google.com:19302' }
         ]
       });
-
-      console.log(`📡 Teacher: Created peer connection for session: ${sessionId}`);
+      
+      peerConnectionsRef.current[sessionId] = pc;
       const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
 
-      // Handle incoming stream
+      // 2. Handle incoming stream from student
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
-        console.log(`📹 Teacher: Received stream for session ${sessionId}`, remoteStream);
+        console.log(`📹 Teacher: Received stream from session ${sessionId}`);
         setRemoteStreams(prev => ({ ...prev, [sessionId]: remoteStream }));
-        console.log(`✅ Teacher: Stream set for session ${sessionId}`);
+        setConnectionStates(prev => ({ ...prev, [sessionId]: 'connected' }));
         
-        // Set video source with a small delay to ensure element is ready
+        // Update video element
         setTimeout(() => {
           if (videoRefs.current[sessionId]) {
             videoRefs.current[sessionId]!.srcObject = remoteStream;
-            console.log(`📺 Teacher: Video element updated for session ${sessionId}`);
+            console.log(`📺 Teacher: Video updated for session ${sessionId}`);
           }
-        }, 100);
+        }, 200);
       };
 
-      // Handle ICE candidates
+      // 3. Handle ICE candidates from student
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          console.log(`🧊 Teacher: Sending ICE candidate for session ${sessionId}`);
+          console.log(`🧊 Teacher: Sending ICE candidate to session ${sessionId}`);
           try {
             await addDoc(signalingRef, {
               type: 'ice-candidate',
-              candidate: event.candidate.toJSON(),
+              candidate: event.candidate,
               from: 'teacher',
               timestamp: new Date()
             });
-            console.log(`✅ Teacher: ICE candidate sent for session ${sessionId}`);
           } catch (error) {
-            console.error(`❌ Teacher: Failed to send ICE candidate for session ${sessionId}:`, error);
+            console.error(`❌ Teacher: Error sending ICE candidate for ${sessionId}:`, error);
           }
         }
       };
 
-      // Handle connection state changes
+      // 4. Monitor connection states
       pc.onconnectionstatechange = () => {
-        console.log(`🔗 Teacher: Connection state for session ${sessionId}:`, pc.connectionState);
+        console.log(`🔗 Teacher: Connection state for ${sessionId}:`, pc.connectionState);
         setConnectionStates(prev => ({ ...prev, [sessionId]: pc.connectionState }));
-        
-        if (pc.connectionState === 'connected') {
-          console.log(`✅ Teacher: Successfully connected to session ${sessionId}`);
-        } else if (pc.connectionState === 'failed') {
-          console.log(`❌ Teacher: Connection failed for session ${sessionId}`);
-        } else if (pc.connectionState === 'disconnected') {
-          console.log(`⚠️ Teacher: Connection disconnected for session ${sessionId}`);
-        }
       };
       
-      // Handle ICE connection state changes
       pc.oniceconnectionstatechange = () => {
-        console.log(`🧊 Teacher: ICE connection state for session ${sessionId}:`, pc.iceConnectionState);
+        console.log(`🧊 Teacher: ICE state for ${sessionId}:`, pc.iceConnectionState);
       };
 
-      // Listen for signaling messages from student
-      console.log(`👂 Teacher: Starting to listen for signaling messages from session ${sessionId}`);
+      // 5. Listen for signaling messages from student
       const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
             const data = change.doc.data();
-            console.log(`📨 Teacher: Received signaling message for session ${sessionId}:`, data.type, 'from:', data.from);
             
             if (data.from === 'student') {
+              console.log(`📨 Teacher: Received ${data.type} from session ${sessionId}`);
+              
               try {
                 if (data.type === 'answer') {
-                  console.log(`📝 Teacher: Processing answer from session ${sessionId}`);
+                  console.log(`📝 Teacher: Processing answer from ${sessionId}`);
                   await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                  console.log(`✅ Teacher: Remote description set for session ${sessionId}`);
                 } else if (data.type === 'ice-candidate') {
-                  console.log(`🧊 Teacher: Processing ICE candidate from session ${sessionId}`);
+                  console.log(`🧊 Teacher: Adding ICE candidate from ${sessionId}`);
                   await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                  console.log(`✅ Teacher: ICE candidate added for session ${sessionId}`);
                 }
               } catch (error) {
-                console.error(`❌ Teacher: Error processing signaling message for session ${sessionId}:`, error);
+                console.error(`❌ Teacher: Error processing signaling for ${sessionId}:`, error);
               }
             }
             
-            // Clean up processed signaling messages
+            // Clean up processed messages
             try {
               await deleteDoc(change.doc.ref);
             } catch (error) {
-              console.error(`⚠️ Teacher: Failed to delete signaling message for session ${sessionId}:`, error);
+              console.error(`⚠️ Teacher: Error cleaning up signaling for ${sessionId}:`, error);
             }
           }
         });
       });
+      
+      signalingUnsubscribesRef.current[sessionId] = unsubscribe;
 
-      // Create and send offer
-      console.log(`📤 Teacher: Creating offer for session ${sessionId}`);
+      // 6. Create and send offer to student
+      console.log(`📤 Teacher: Creating offer for ${sessionId}`);
       
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      console.log(`📝 Teacher: Local description set for session ${sessionId}`);
       
       await addDoc(signalingRef, {
         type: 'offer',
@@ -159,58 +195,20 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         timestamp: new Date()
       });
       
-      console.log(`✅ Teacher: Offer sent for session ${sessionId}`);
-
-      setPeerConnections(prev => ({ ...prev, [sessionId]: pc }));
+      console.log(`✅ Teacher: Offer sent to ${sessionId}`);
       
-      return unsubscribe;
     } catch (error) {
-      console.error(`❌ Teacher: Failed to initialize WebRTC for session ${sessionId}:`, error);
+      console.error(`❌ Teacher: WebRTC initialization failed for ${sessionId}:`, error);
       setConnectionStates(prev => ({ ...prev, [sessionId]: 'failed' }));
     }
   };
 
-  useEffect(() => {
-    console.log(`👥 Teacher: Active sessions count: ${activeSessions.length}`);
-    
-    activeSessions.forEach(async (session) => {
-      // Initialize WebRTC connection if not already established
-      if (!peerConnections[session.id]) {
-        console.log(`🔄 Teacher: Initializing connection for new session: ${session.id}`);
-        await initializeWebRTCForSession(session.id);
-      }
-    });
-    
-    console.log(`🔗 Teacher: Current peer connections:`, Object.keys(peerConnections));
-    
-    // Cleanup connections for sessions that no longer exist
-    Object.keys(peerConnections).forEach(sessionId => {
-      if (!activeSessions.find(s => s.id === sessionId)) {
-        console.log(`🧹 Teacher: Cleaning up connection for inactive session: ${sessionId}`);
-        peerConnections[sessionId].close();
-        setPeerConnections(prev => {
-          const newConnections = { ...prev };
-          delete newConnections[sessionId];
-          return newConnections;
-        });
-        setRemoteStreams(prev => {
-          const newStreams = { ...prev };
-          delete newStreams[sessionId];
-          return newStreams;
-        });
-        setConnectionStates(prev => {
-          const newStates = { ...prev };
-          delete newStates[sessionId];
-          return newStates;
-        });
-      }
-    });
-  }, [activeSessions]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      Object.values(peerConnections).forEach(pc => pc.close());
+      Object.keys(peerConnectionsRef.current).forEach(sessionId => {
+        cleanupSession(sessionId);
+      });
     };
   }, []);
 
@@ -237,29 +235,13 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
   };
 
   const retryConnection = async (sessionId: string) => {
-    // Close existing connection
-    if (peerConnections[sessionId]) {
-      console.log(`🔄 Teacher: Retrying connection for session: ${sessionId}`);
-      peerConnections[sessionId].close();
-      setPeerConnections(prev => {
-        const newConnections = { ...prev };
-        delete newConnections[sessionId];
-        return newConnections;
-      });
-      setConnectionStates(prev => {
-        const newStates = { ...prev };
-        delete newStates[sessionId];
-        return newStates;
-      });
-      setRemoteStreams(prev => {
-        const newStreams = { ...prev };
-        delete newStreams[sessionId];
-        return newStreams;
-      });
-    }
+    console.log(`🔄 Teacher: Retrying connection for ${sessionId}`);
+    cleanupSession(sessionId);
     
-    // Reinitialize connection
+    // Wait a moment then reinitialize
+    setTimeout(() => {
     await initializeWebRTCForSession(sessionId);
+    }, 1000);
   };
 
   if (!exam) {
