@@ -88,16 +88,16 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     };
     
     // Column positions and widths for better spacing
-    const colPositions = [14, 20, 55, 75, 95, 115, 135, 150, 165, 180];
-    const colWidths = [4, 33, 18, 18, 18, 18, 13, 13, 13, 15];
+    const colPositions = [14, 20, 55, 75, 95, 115, 140, 160, 175, 190];
+    const colWidths = [4, 33, 18, 18, 18, 23, 18, 13, 13, 15];
     
     // Add table headers
-    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Nilai Akhir'];
+    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Akhir'];
     let yPosition = 52;
     
     // Draw header background
     doc.setFillColor(240, 240, 240);
-    doc.rect(14, yPosition - 6, 187, 10, 'F');
+    doc.rect(14, yPosition - 6, 191, 10, 'F');
     
     // Draw header text
     doc.setFontSize(10);
@@ -109,7 +109,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     // Draw header border
     doc.setDrawColor(0, 0, 0);
-    doc.rect(14, yPosition - 6, 181, 10);
+    doc.rect(14, yPosition - 6, 191, 10);
     
     yPosition += 8;
     
@@ -151,12 +151,12 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       // Alternate row colors
       if (sessionIndex % 2 === 0) {
         doc.setFillColor(250, 250, 250);
-        doc.rect(14, yPosition - 4, 181, rowHeight, 'F');
+        doc.rect(14, yPosition - 4, 191, rowHeight, 'F');
       }
       
       // Draw row border
       doc.setDrawColor(200, 200, 200);
-      doc.rect(14, yPosition - 4, 181, rowHeight);
+      doc.rect(14, yPosition - 4, 191, rowHeight);
       
       const rowData = [
         (sessionIndex + 1).toString(),
@@ -177,14 +177,14 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         
         // Redraw header on new page
         doc.setFillColor(240, 240, 240);
-        doc.rect(14, yPosition - 6, 181, 10, 'F');
+        doc.rect(14, yPosition - 6, 191, 10, 'F');
         doc.setFont(undefined, 'bold');
         doc.setFontSize(10);
         headers.forEach((header, index) => {
           doc.text(header, colPositions[index], yPosition);
         });
         doc.setDrawColor(0, 0, 0);
-        doc.rect(14, yPosition - 6, 181, 10);
+        doc.rect(14, yPosition - 6, 191, 10);
         yPosition += 8;
         doc.setFont(undefined, 'normal');
         doc.setFontSize(9);
@@ -196,10 +196,10 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         // Redraw current row background if needed
         if (sessionIndex % 2 === 0) {
           doc.setFillColor(250, 250, 250);
-          doc.rect(14, yPosition - 4, 181, newRowHeight, 'F');
+          doc.rect(14, yPosition - 4, 191, newRowHeight, 'F');
         }
         doc.setDrawColor(200, 200, 200);
-        doc.rect(14, yPosition - 4, 181, newRowHeight);
+        doc.rect(14, yPosition - 4, 191, newRowHeight);
       }
       
       // Draw cell data (except name)
