@@ -39,6 +39,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
@@ -46,6 +47,21 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Initialize camera for violation snapshots
+    const initializeCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      } catch (error) {
+        console.error("Failed to initialize camera for snapshots:", error);
+      }
+    };
+    
+    initializeCamera();
     
     // Check fullscreen support
     const checkFullscreenSupport = () => {
@@ -72,6 +88,35 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     fetchQuestions();
   }, [exam.id]);
+
+  // Function to capture snapshot on violation
+  const captureViolationSnapshot = async (violationType: string) => {
+    if (!videoRef.current) return null;
+    
+    try {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      
+      if (context) {
+        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
+        
+        return {
+          imageData,
+          timestamp: new Date().toISOString(),
+          violationType,
+          dimensions: { width: canvas.width, height: canvas.height }
+        };
+      }
+    } catch (error) {
+      console.error("Failed to capture violation snapshot:", error);
+    }
+    
+    return null;
+  };
 
   // Fullscreen functions
   const enterFullscreen = async () => {
@@ -291,6 +336,23 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     if (newViolations >= 3) {
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
+      // Capture snapshot on violation
+      captureViolationSnapshot(reason).then(snapshot => {
+        if (snapshot) {
+          const violationData = {
+            violations: newViolations,
+            lastViolation: { reason, timestamp: new Date() },
+            [`violationSnapshot_${newViolations}`]: snapshot
+          };
+          updateDoc(sessionDocRef, violationData);
+        } else {
+          updateDoc(sessionDocRef, { 
+            violations: newViolations,
+            lastViolation: { reason, timestamp: new Date() }
+          });
+        }
+      });
+      
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
     }
@@ -422,6 +484,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         </div>
       )}
+
+      {/* Hidden video element for violation snapshots */}
+      <video 
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{ display: 'none' }}
+      />
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
         <div>

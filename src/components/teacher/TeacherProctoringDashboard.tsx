@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
+import Modal from '../ui/Modal';
 
 interface Session {
   id: string;
@@ -10,6 +11,16 @@ interface Session {
   };
   status: string;
   violations: number;
+  violationSnapshot_1?: {
+    imageData: string;
+    timestamp: string;
+    violationType: string;
+  };
+  violationSnapshot_2?: {
+    imageData: string;
+    timestamp: string;
+    violationType: string;
+  };
 }
 
 interface TeacherProctoringDashboardProps {
@@ -21,7 +32,12 @@ interface TeacherProctoringDashboardProps {
 const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
-  const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+  const [selectedSnapshot, setSelectedSnapshot] = useState<{
+    imageData: string;
+    timestamp: string;
+    violationType: string;
+    studentName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!exam?.id) return;
@@ -34,28 +50,12 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     return () => unsubSessions();
   }, [exam?.id]);
 
-  useEffect(() => {
-    sessions.forEach(session => {
-      if (videoRefs.current[session.id] && !videoRefs.current[session.id]?.srcObject) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 320;
-        canvas.height = 240;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#111827';
-          ctx.fillRect(0, 0, 320, 240);
-          ctx.fillStyle = 'white';
-          ctx.font = '16px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Live Feed (Placeholder)', 160, 120);
-          ctx.fillText(`(${session.studentInfo.name})`, 160, 140);
-        }
-        if (videoRefs.current[session.id]) {
-          videoRefs.current[session.id]!.srcObject = canvas.captureStream();
-        }
-      }
+  const viewSnapshot = (snapshot: any, studentName: string) => {
+    setSelectedSnapshot({
+      ...snapshot,
+      studentName
     });
-  }, [sessions]);
+  };
 
   if (!exam) {
     return <div className="text-center p-8">Memuat data ujian...</div>;
@@ -63,6 +63,21 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
 
   return (
     <div>
+      <Modal 
+        isOpen={!!selectedSnapshot} 
+        title={`Foto Pelanggaran - ${selectedSnapshot?.studentName}`}
+        onCancel={() => setSelectedSnapshot(null)}
+        cancelText="Tutup"
+      >
+        {selectedSnapshot && (
+          <div className="text-center">
+            <img src={selectedSnapshot.imageData} alt="Violation Snapshot" className="w-full max-w-md mx-auto rounded-lg mb-4" />
+            <p className="text-sm text-gray-400">Jenis: {selectedSnapshot.violationType}</p>
+            <p className="text-sm text-gray-400">Waktu: {new Date(selectedSnapshot.timestamp).toLocaleString('id-ID')}</p>
+          </div>
+        )}
+      </Modal>
+      
       <button 
         onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
@@ -70,8 +85,8 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         &larr; Kembali
       </button>
       
-      <h2 className="text-3xl font-bold">Dasbor Pengawasan Langsung</h2>
-      <p className="text-lg text-indigo-400 mb-6">{exam.name} ({exam.code})</p>
+      <h2 className="text-3xl font-bold">Snapshot Pelanggaran</h2>
+      <p className="text-lg text-indigo-400 mb-6">{exam.name} ({exam.code}) - Foto diambil saat pelanggaran terdeteksi</p>
       
       {sessions.length === 0 ? (
         <p className="text-gray-400 text-center mt-8 bg-gray-800 p-6 rounded-lg">
@@ -92,14 +107,28 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                   : ''
               }`}
             >
-              <div className="w-full aspect-video bg-gray-900">
-                <video 
-                  ref={el => videoRefs.current[session.id] = el} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-full aspect-video bg-gray-900 flex items-center justify-center">
+                {session.violations > 0 ? (
+                  <div className="text-center p-4">
+                    <div className="text-yellow-400 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
+                    <p className="text-xs text-gray-400">Klik tombol untuk lihat foto</p>
+                  </div>
+                ) : (
+                  <div className="text-center p-4">
+                    <div className="text-green-400 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-green-400 font-bold">Tidak Ada Pelanggaran</p>
+                    <p className="text-xs text-gray-400">Siswa mengerjakan dengan baik</p>
+                  </div>
+                )}
               </div>
               <div className="p-4">
                 <h4 className="font-bold text-lg">{session.studentInfo.name}</h4>
@@ -124,6 +153,26 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                     Pelanggaran: {session.violations}/3
                   </span>
                 </div>
+                {session.violations > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {session.violationSnapshot_1 && (
+                      <button 
+                        onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name)}
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
+                      >
+                        Lihat Foto Pelanggaran 1
+                      </button>
+                    )}
+                    {session.violationSnapshot_2 && (
+                      <button 
+                        onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name)}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"
+                      >
+                        Lihat Foto Pelanggaran 2
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
