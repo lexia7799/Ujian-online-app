@@ -888,8 +888,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             )}
           </div>
         ) : (
-          <div className="text-yellow-400">⏳ Initializing Camera...</div>
-            {cameraError ? (
+          {cameraError ? (
               <>
                 <div className="text-red-400">❌ Camera Error</div>
                 <div className="text-xs text-gray-300">
@@ -897,7 +896,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 </div>
               </>
             ) : (
-              <div>⏳ Initializing Camera...</div>
+              <div className="text-yellow-400">⏳ Initializing Camera...</div>
             )}
         <div className="text-xs text-gray-400 mt-1">
           Violations: {violations}/3
