@@ -96,7 +96,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       
       await addDoc(signalingRef, {
         type: 'offer',
-        offer: offer.toJSON(),
+        offer: offer,
         from: 'teacher',
         timestamp: new Date()
       });
