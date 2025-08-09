@@ -37,6 +37,8 @@ interface TeacherProctoringDashboardProps {
 const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState<{
     imageData: string;
     timestamp: string;
@@ -55,6 +57,22 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     
     return () => unsubSessions();
   }, [exam?.id]);
+
+  // Filter sessions based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredSessions(sessions);
+    } else {
+      const filtered = sessions.filter(session => {
+        const name = session.studentInfo.name.toLowerCase();
+        const nim = session.studentInfo.nim.toLowerCase();
+        const search = searchTerm.toLowerCase();
+        
+        return name.includes(search) || nim.includes(search);
+      });
+      setFilteredSessions(filtered);
+    }
+  }, [sessions, searchTerm]);
 
   const viewSnapshot = (snapshot: any, studentName: string, violationNumber: number) => {
     setSelectedSnapshot({
@@ -104,13 +122,58 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       <h2 className="text-3xl font-bold">Snapshot Pelanggaran</h2>
       <p className="text-lg text-indigo-400 mb-6">{exam.name} ({exam.code}) - Foto diambil saat pelanggaran terdeteksi</p>
       
+      {/* Search Bar */}
+      <div className="mb-6 bg-gray-800 p-4 rounded-lg shadow-lg">
+        <div className="flex items-center space-x-4">
+          <div className="flex-grow">
+            <label htmlFor="search" className="block text-sm font-medium text-gray-300 mb-2">
+              🔍 Cari Siswa (Nama atau NIM)
+            </label>
+            <input
+              id="search"
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Ketik nama atau NIM siswa..."
+              className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="mt-6 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {searchTerm && (
+          <div className="mt-3 text-sm text-gray-400">
+            Menampilkan {filteredSessions.length} dari {sessions.length} siswa
+          </div>
+        )}
+      </div>
+      
       {sessions.length === 0 ? (
         <p className="text-gray-400 text-center mt-8 bg-gray-800 p-6 rounded-lg">
           Belum ada siswa yang bergabung dalam ujian ini.
         </p>
+      ) : filteredSessions.length === 0 ? (
+        <div className="text-center mt-8 bg-gray-800 p-6 rounded-lg">
+          <p className="text-yellow-400 text-lg mb-2">🔍 Tidak ada hasil</p>
+          <p className="text-gray-400">
+            Tidak ditemukan siswa dengan nama atau NIM "{searchTerm}"
+          </p>
+          <button
+            onClick={() => setSearchTerm('')}
+            className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Tampilkan Semua Siswa
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sessions.map(session => (
+          {filteredSessions.map(session => (
             <div 
               key={session.id} 
               className={`bg-gray-800 rounded-lg shadow-lg overflow-hidden border-2 ${
