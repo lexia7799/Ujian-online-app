@@ -80,18 +80,24 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         {selectedSnapshot && (
           <div className="text-center">
             <div className="w-full max-w-md mx-auto mb-4">
-              <img 
-                src={selectedSnapshot.imageData} 
-                alt="Violation Snapshot" 
-                className="w-full h-auto rounded-lg border border-gray-600"
-                onError={(e) => {
-                  console.error("Failed to load image:", selectedSnapshot.imageData);
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-                onLoad={() => {
-                  console.log("Image loaded successfully");
-                }}
-              />
+              {selectedSnapshot.imageData ? (
+                <img 
+                  src={selectedSnapshot.imageData} 
+                  alt="Violation Snapshot" 
+                  className="w-full h-auto rounded-lg border border-gray-600"
+                  onError={(e) => {
+                    console.error("Failed to load modal image:", selectedSnapshot.imageData?.substring(0, 50));
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                  onLoad={() => {
+                    console.log("Modal image loaded successfully");
+                  }}
+                />
+              ) : (
+                <div className="w-full h-64 bg-gray-700 rounded-lg flex items-center justify-center">
+                  <p className="text-gray-400">Foto tidak tersedia</p>
+                </div>
+              )}
             </div>
             <p className="text-sm text-gray-400">Jenis: {selectedSnapshot.violationType}</p>
             <p className="text-sm text-gray-400">Waktu: {new Date(selectedSnapshot.timestamp).toLocaleString('id-ID')}</p>
@@ -131,30 +137,31 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               <div className="w-full aspect-video bg-gray-900 flex items-center justify-center">
                 {session.violations > 0 ? (
                   <div className="text-center p-4">
-                    {(session.violationSnapshot_1 || session.violationSnapshot_2) ? (
+                    {session.violationSnapshot_1?.imageData ? (
                       <div>
-                        {session.violationSnapshot_1 && (
-                          <img 
-                            src={session.violationSnapshot_1.imageData} 
-                            alt="Preview Violation" 
-                            className="w-full h-full object-cover rounded"
-                            onError={(e) => {
-                              console.error("Failed to load preview image");
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                        {!session.violationSnapshot_1 && session.violationSnapshot_2 && (
-                          <img 
-                            src={session.violationSnapshot_2.imageData} 
-                            alt="Preview Violation" 
-                            className="w-full h-full object-cover rounded"
-                            onError={(e) => {
-                              console.error("Failed to load preview image");
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
+                        <img 
+                          src={session.violationSnapshot_1.imageData} 
+                          alt="Preview Violation" 
+                          className="w-full h-full object-cover rounded"
+                          onLoad={() => console.log("Preview image loaded successfully")}
+                          onError={(e) => {
+                            console.error("Failed to load preview image:", session.violationSnapshot_1?.imageData?.substring(0, 50));
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : session.violationSnapshot_2?.imageData ? (
+                      <div>
+                        <img 
+                          src={session.violationSnapshot_2.imageData} 
+                          alt="Preview Violation" 
+                          className="w-full h-full object-cover rounded"
+                          onLoad={() => console.log("Preview image loaded successfully")}
+                          onError={(e) => {
+                            console.error("Failed to load preview image:", session.violationSnapshot_2?.imageData?.substring(0, 50));
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
                       </div>
                     ) : (
                       <div>
@@ -205,7 +212,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                 </div>
                 {session.violations > 0 && (
                   <div className="mt-3 space-y-1">
-                    {session.violationSnapshot_1 && (
+                    {session.violationSnapshot_1?.imageData && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name)}
                         className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
@@ -213,7 +220,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         Lihat Foto Pelanggaran 1
                       </button>
                     )}
-                    {session.violationSnapshot_2 && (
+                    {session.violationSnapshot_2?.imageData && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name)}
                         className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"

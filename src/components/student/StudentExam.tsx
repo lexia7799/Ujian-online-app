@@ -54,10 +54,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Initialize camera for violation snapshots
     const initializeCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          } 
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          
+          // Wait for video to be ready
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().then(() => {
+              console.log("Camera initialized successfully");
+            }).catch(err => {
+              console.error("Failed to play video:", err);
+            });
+          };
         }
       } catch (error) {
         console.error("Failed to initialize camera for snapshots:", error);
@@ -94,24 +108,40 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    if (!videoRef.current) return null;
+    if (!videoRef.current || videoRef.current.readyState !== 4) {
+      console.log("Video not ready for capture");
+      return null;
+    }
     
     try {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
+      // Ensure we have valid dimensions
+      const videoWidth = videoRef.current.videoWidth || 640;
+      const videoHeight = videoRef.current.videoHeight || 480;
+      
+      canvas.width = videoWidth;
+      canvas.height = videoHeight;
       
       if (context) {
-        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
+        // Draw the video frame to canvas
+        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
+        
+        // Convert to base64 with better quality
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        console.log("Snapshot captured successfully", {
+          violationType,
+          imageSize: imageData.length,
+          dimensions: { width: videoWidth, height: videoHeight }
+        });
         
         return {
           imageData,
           timestamp: new Date().toISOString(),
           violationType,
-          dimensions: { width: canvas.width, height: canvas.height }
+          dimensions: { width: videoWidth, height: videoHeight }
         };
       }
     } catch (error) {
@@ -351,6 +381,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Capture snapshot on violation
       captureViolationSnapshot(reason).then(snapshot => {
         if (snapshot) {
+          console.log("Saving violation snapshot to database");
           const violationData = {
             violations: newViolations,
             lastViolation: { reason, timestamp: new Date() },
@@ -358,6 +389,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           };
           updateDoc(sessionDocRef, violationData);
         } else {
+          console.log("No snapshot captured, saving violation without photo");
           updateDoc(sessionDocRef, { 
             violations: newViolations,
             lastViolation: { reason, timestamp: new Date() }
@@ -521,7 +553,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
       {/* Hidden video element for snapshots */}
-      <video ref={videoRef} style={{ display: 'none' }} />
+      <video 
+        ref={videoRef} 
+        style={{ display: 'none' }} 
+        autoPlay 
+        playsInline 
+        muted
+        width="640"
+        height="480"
+      />
       
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 bg-gray-800 p-4 z-50 border-b border-gray-700">
