@@ -66,9 +66,14 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       const filtered = sessions.filter(session => {
         const name = session.studentInfo.name.toLowerCase();
         const nim = session.studentInfo.nim.toLowerCase();
+        const major = (session.studentInfo.major || '').toLowerCase();
+        const className = (session.studentInfo.className || '').toLowerCase();
         const search = searchTerm.toLowerCase();
         
-        return name.includes(search) || nim.includes(search);
+        return name.includes(search) || 
+               nim.includes(search) || 
+               major.includes(search) || 
+               className.includes(search);
       });
       setFilteredSessions(filtered);
     }
@@ -127,14 +132,14 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         <div className="flex items-center space-x-4">
           <div className="flex-grow">
             <label htmlFor="search" className="block text-sm font-medium text-gray-300 mb-2">
-              🔍 Cari Siswa (Nama atau NIM)
+              🔍 Cari Siswa (Nama, NIM, Kelas, atau Jurusan)
             </label>
             <input
               id="search"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Ketik nama atau NIM siswa..."
+              placeholder="Ketik nama, NIM, kelas, atau jurusan siswa..."
               className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
@@ -150,6 +155,11 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         {searchTerm && (
           <div className="mt-3 text-sm text-gray-400">
             Menampilkan {filteredSessions.length} dari {sessions.length} siswa
+            {filteredSessions.length > 0 && (
+              <span className="ml-2 text-blue-400">
+                untuk "{searchTerm}"
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -162,7 +172,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         <div className="text-center mt-8 bg-gray-800 p-6 rounded-lg">
           <p className="text-yellow-400 text-lg mb-2">🔍 Tidak ada hasil</p>
           <p className="text-gray-400">
-            Tidak ditemukan siswa dengan nama atau NIM "{searchTerm}"
+            Tidak ditemukan siswa dengan nama, NIM, kelas, atau jurusan "{searchTerm}"
           </p>
           <button
             onClick={() => setSearchTerm('')}
@@ -227,6 +237,14 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               <div className="p-4">
                 <h4 className="font-bold text-lg">{session.studentInfo.name}</h4>
                 <p className="text-sm text-gray-400">{session.studentInfo.nim}</p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-xs text-gray-500">
+                    📚 {session.studentInfo.major || 'Jurusan tidak tersedia'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    🏫 {session.studentInfo.className || 'Kelas tidak tersedia'}
+                  </p>
+                </div>
                 <div className="mt-3 flex justify-between items-center">
                   <span 
                     className={`px-3 py-1 text-xs font-bold rounded-full ${
