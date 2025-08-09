@@ -704,22 +704,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       )}
 
       {/* Hidden video element for violation snapshots */}
-      <video 
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ 
-          position: 'absolute',
-          top: '10px',
-          right: '10px',
-          width: '160px',
-          height: '120px',
-          opacity: 0.1,
-          zIndex: 1000,
-          pointerEvents: 'none'
-        }}
-      />
+      {/* Live camera feed for student and violation capture */}
+      <div className="fixed top-4 right-4 z-50 bg-gray-800 rounded-lg border-2 border-gray-600 overflow-hidden">
+        <div className="bg-gray-700 px-2 py-1 text-xs text-white text-center">
+          📷 Live Camera
+        </div>
+        <video 
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-40 h-30 object-cover"
+        />
+      </div>
       
       {/* Hidden canvas for photo capture */}
       <canvas 
@@ -733,10 +730,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       />
       
       {/* Camera status indicator with more detail */}
-      <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-50 border">
+      <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-40 border">
         {isCameraReady ? (
           <div className="text-green-400">
-            📷 Camera Ready
+            ✅ Camera Ready
             {videoRef.current && (
               <div className="text-xs text-gray-300">
                 {videoRef.current.videoWidth}x{videoRef.current.videoHeight}
@@ -744,7 +741,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             )}
           </div>
         ) : (
-          <div className="text-yellow-400">📷 Initializing Camera...</div>
+          <div className="text-yellow-400">⏳ Initializing Camera...</div>
         )}
         <div className="text-xs text-gray-400 mt-1">
           Violations: {violations}/3
