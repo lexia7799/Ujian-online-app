@@ -42,6 +42,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
@@ -50,21 +51,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Initialize camera and canvas for violation snapshots
+    // Initialize camera for violation snapshots
     const initializeCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
-        }
-        
-        // Create canvas for snapshots
-        if (!canvasRef.current) {
-          const canvas = document.createElement('canvas');
-          canvas.width = 640;
-          canvas.height = 480;
-          canvasRef.current = canvas;
         }
       } catch (error) {
         console.error("Failed to initialize camera for snapshots:", error);
@@ -101,43 +94,42 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    if (!videoRef.current || !canvasRef.current) return null;
+    if (!videoRef.current) return null;
     
     try {
-      const canvas = canvasRef.current;
+      // Create a new canvas for each snapshot
+      const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
+      if (!context) return null;
       
-      // Wait for video to be ready
-      if (videoRef.current.readyState < 2) {
-        await new Promise(resolve => {
-          const checkReady = () => {
-            if (videoRef.current && videoRef.current.readyState >= 2) {
-              resolve(true);
-            } else {
-              setTimeout(checkReady, 100);
-            }
-          };
-          checkReady();
-        });
+      // Wait for video to be ready if not already
+      if (videoRef.current.readyState < videoRef.current.HAVE_CURRENT_DATA) {
+        return null; // Video not ready, skip snapshot
       }
       
-      const videoWidth = videoRef.current.videoWidth || 640;
-      const videoHeight = videoRef.current.videoHeight || 480;
+      // Get actual video dimensions
+      const videoWidth = videoRef.current.videoWidth;
+      const videoHeight = videoRef.current.videoHeight;
+      
+      if (videoWidth === 0 || videoHeight === 0) {
+        return null; // Video dimensions not available
+      }
       
       canvas.width = videoWidth;
       canvas.height = videoHeight;
       
-      if (context) {
-        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
-        const imageData = canvas.toDataURL('image/jpeg', 0.8); // Higher quality
-        
-        return {
-          imageData,
-          timestamp: new Date().toISOString(),
-          violationType,
-          dimensions: { width: videoWidth, height: videoHeight }
-        };
-      }
+      // Draw the video frame to canvas
+      context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
+      
+      // Convert to base64 image
+      const imageData = canvas.toDataURL('image/jpeg', 0.9);
+      
+      return {
+        imageData,
+        timestamp: new Date().toISOString(),
+        violationType,
+        dimensions: { width: videoWidth, height: videoHeight }
+      };
     } catch (error) {
       console.error("Failed to capture violation snapshot:", error);
     }
@@ -186,8 +178,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   useEffect(() => {
     if (!isLoading && questions.length > 0 && isFullscreenSupported && !isFinished) {
       const timer = setTimeout(() => {
-        enterFullscreen();
-      }, 1000); // Small delay to ensure page is ready
+        if (!isInFullscreen()) {
+          enterFullscreen();
+        }
+      }, 500); // Small delay to ensure page is ready
       
       return () => clearTimeout(timer);
     }
@@ -206,13 +200,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
+        handleViolation("Exited Fullscreen");
         // Auto re-enter fullscreen immediately
         setTimeout(() => {
-          if (!isFinished && !isInFullscreen()) {
+          if (!isFinished) {
             enterFullscreen();
           }
-        }, 100);
-        handleViolation("Exited Fullscreen");
+        }, 50);
       }
     };
     
@@ -257,7 +251,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 't' || e.key === 'n' || e.key === 'w') ||
         e.key === 'F12' ||
         e.key === 'F11' || // Block F11 fullscreen toggle
-        e.key === 'Escape' || // Block Escape key (exits fullscreen)
         (e.ctrlKey && e.shiftKey && e.key === 'I') ||
         (e.ctrlKey && e.shiftKey && e.key === 'J') ||
         (e.ctrlKey && e.key === 'u') ||
@@ -265,6 +258,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       ) {
         e.preventDefault();
         handleViolation("Prohibited Shortcut");
+      }
+      
+      // Handle Escape key specially - prevent default and re-enter fullscreen
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (!isInFullscreen() && !isFinished) {
+          handleViolation("Escape Key Pressed");
+          setTimeout(() => {
+            if (!isFinished) {
+              enterFullscreen();
+            }
+          }, 50);
+        }
       }
     };
     
@@ -386,10 +392,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Auto re-enter fullscreen after violation for fullscreen-related violations
       if (reason.includes("Fullscreen") || reason.includes("Exited")) {
         setTimeout(() => {
-          if (!isFinished && !isInFullscreen()) {
+          if (!isFinished) {
             enterFullscreen();
           }
-        }, 500);
+        }, 100);
       }
     }
   };
@@ -538,10 +544,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       {/* Hidden video element for snapshots */}
       <video 
         ref={videoRef} 
-        style={{ display: 'none' }} 
+        style={{ 
+          position: 'absolute',
+          top: '-9999px',
+          left: '-9999px',
+          width: '320px',
+          height: '240px'
+        }} 
         autoPlay 
         playsInline 
         muted
+        onLoadedData={() => {
+          console.log('Video loaded and ready for snapshots');
+        }}
       />
       
       {/* Header */}
