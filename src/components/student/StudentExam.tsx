@@ -55,66 +55,78 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Initialize camera for violation snapshots
+    // Initialize camera for violation snapshots with timeout
+    let initTimeout: NodeJS.Timeout;
+    
     const initializeCamera = async () => {
       try {
-        console.log("Initializing camera for violation snapshots...");
+        console.log("Requesting camera access...");
+        
+        // Set timeout for initialization
+        initTimeout = setTimeout(() => {
+          console.log("Camera initialization timeout, proceeding without camera");
+          setIsCameraReady(false);
+          setCameraError("Camera initialization timeout");
+        }, 10000); // 10 second timeout
+        
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            facingMode: 'user',
-            frameRate: { ideal: 30, min: 15 }
+            width: { ideal: 640, min: 320 },
+            height: { ideal: 480, min: 240 },
+            facingMode: 'user'
           } 
         });
         
+        clearTimeout(initTimeout);
         streamRef.current = stream;
-        console.log("Camera stream obtained:", stream.getVideoTracks()[0].getSettings());
+        console.log("Camera stream obtained successfully");
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.muted = true;
           videoRef.current.playsInline = true;
           
-          const handleVideoReady = () => {
-            console.log("Video metadata loaded, starting playback...");
+          // Simple ready check
+          videoRef.current.onloadedmetadata = () => {
+            console.log("Video metadata loaded");
             videoRef.current?.play().then(() => {
-              console.log("Video playing, waiting for frames...");
-              // Wait for actual video frames to start flowing
-              setTimeout(() => {
-                if (videoRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
-                  console.log("Camera ready! Video dimensions:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
-                  setIsCameraReady(true);
-                  setCameraError(null);
-                } else {
-                  console.error("Video dimensions still 0 after timeout");
-                  setCameraError("Camera failed to initialize properly");
-                }
-              }, 2000);
+              console.log("Video playing successfully");
+              setIsCameraReady(true);
+              setCameraError(null);
             }).catch(error => {
-              console.error("Failed to play video:", error);
-              setCameraError("Failed to start camera playback");
+              console.error("Video play failed:", error);
+              setIsCameraReady(false);
+              setCameraError("Video playback failed");
             });
           };
           
-          videoRef.current.onloadedmetadata = handleVideoReady;
-          
-          // Fallback: try to load metadata manually
+          // Fallback for immediate ready state
           if (videoRef.current.readyState >= 1) {
-            handleVideoReady();
+            videoRef.current.play().then(() => {
+              setIsCameraReady(true);
+              setCameraError(null);
+            }).catch(() => {
+              setIsCameraReady(false);
+              setCameraError("Video playback failed");
+            });
           }
         }
       } catch (error) {
-        console.error("Failed to initialize camera for snapshots:", error);
-        setCameraError(`Camera access denied: ${error.message}`);
+        clearTimeout(initTimeout);
+        console.error("Camera access failed:", error);
+        setCameraError(`Camera access denied`);
         setIsCameraReady(false);
       }
     };
     
+    // Start camera initialization
     initializeCamera();
     
     // Cleanup function
     return () => {
+      if (initTimeout) {
+        clearTimeout(initTimeout);
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -150,18 +162,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    console.log("Attempting to capture violation snapshot:", violationType);
-    
-    if (!videoRef.current || isCapturingSnapshot.current) {
-      console.log("Cannot capture snapshot:", { 
-        hasVideo: !!videoRef.current, 
-        isCapturing: isCapturingSnapshot.current
-      });
+    if (!videoRef.current || isCapturingSnapshot.current || !isCameraReady) {
+      console.log("Cannot capture snapshot - camera not ready or already capturing");
       return null;
-    }
-    
-    if (!isCameraReady) {
-      console.log("Camera not ready, attempting to capture anyway...");
     }
     
     isCapturingSnapshot.current = true;
@@ -169,29 +172,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     try {
       const video = videoRef.current;
       
-      // Wait a moment for fresh frame
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Check if video has actual dimensions
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        console.log("Video not ready - no dimensions:", video.videoWidth, "x", video.videoHeight);
+      // Quick check for video readiness
+      if (video.videoWidth === 0 || video.videoHeight === 0 || video.readyState < 2) {
+        console.log("Video not ready for capture");
         isCapturingSnapshot.current = false;
         return null;
       }
       
-      if (video.readyState < 2) {
-        console.log("Video not ready - readyState:", video.readyState);
-        isCapturingSnapshot.current = false;
-        return null;
-      }
-      
-      console.log("Capturing from video:", video.videoWidth, "x", video.videoHeight, "readyState:", video.readyState);
+      console.log("Capturing violation snapshot:", video.videoWidth, "x", video.videoHeight);
       
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       
       if (!context) {
-        console.log("Cannot get canvas context");
         isCapturingSnapshot.current = false;
         return null;
       }
@@ -202,42 +195,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Draw the video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Convert to base64 image with high quality
-      const imageData = canvas.toDataURL('image/jpeg', 0.9);
+      // Convert to base64 image
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
       
-      // Check if we actually captured something meaningful
-      const isBlankImage = imageData.length < 1000 || 
-                          imageData === 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
-      
-      if (isBlankImage) {
-        console.log("Captured image appears to be blank/black, retrying...");
-        
-        // Try one more time with a longer delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const retryImageData = canvas.toDataURL('image/jpeg', 0.9);
-        
-        if (retryImageData.length < 1000) {
-          console.log("Retry also failed, image still blank");
-          isCapturingSnapshot.current = false;
-          return null;
-        }
-        
-        console.log("Retry successful!");
-        isCapturingSnapshot.current = false;
-        return {
-          imageData: retryImageData,
-          timestamp: new Date().toISOString(),
-          violationType,
-          dimensions: { width: canvas.width, height: canvas.height }
-        };
-      }
-      
-      console.log("Successfully captured snapshot:", { 
-        width: canvas.width, 
-        height: canvas.height, 
-        dataLength: imageData.length 
-      });
+      console.log("Snapshot captured successfully");
       
       isCapturingSnapshot.current = false;
       return {
@@ -740,19 +701,18 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         muted
         style={{ 
           position: 'fixed',
-          top: '10px',
-          right: '10px',
-          width: '160px',
-          height: '120px',
-          opacity: 0.1,
+          top: '-1000px',
+          left: '-1000px',
+          width: '320px',
+          height: '240px',
           pointerEvents: 'none'
         }}
       />
       
-      {/* Camera status indicator for debugging */}
-      {!isCameraReady && (
-        <div className="fixed top-4 right-4 bg-yellow-600 text-white px-3 py-1 rounded-md text-sm z-50">
-          {cameraError ? `Camera Error: ${cameraError}` : 'Initializing Camera...'}
+      {/* Camera status indicator */}
+      {!isCameraReady && !cameraError && (
+        <div className="fixed top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-md text-sm z-50">
+          Initializing Camera...
         </div>
       )}
 
