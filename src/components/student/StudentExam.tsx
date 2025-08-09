@@ -119,7 +119,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-    
+  }, []);
+
+  useEffect(() => {
     // Check fullscreen support
     const checkFullscreenSupport = () => {
       const elem = document.documentElement;
@@ -229,9 +231,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           violationType,
           dimensions: { width: canvas.width, height: canvas.height }
         };
-      }
-        isCapturingSnapshot.current = false;
-        return null;
       }
       
       console.log("Successfully captured snapshot:", { 
