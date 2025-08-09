@@ -711,10 +711,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         muted
         style={{ 
           position: 'absolute',
-          top: '-1000px',
-          left: '-1000px',
-          width: '320px',
-          height: '240px',
+          top: '10px',
+          right: '10px',
+          width: '160px',
+          height: '120px',
+          opacity: 0.1,
+          zIndex: 1000,
           pointerEvents: 'none'
         }}
       />
@@ -730,12 +732,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         }}
       />
       
-      {/* Camera status indicator */}
-      {isCameraReady && (
-        <div className="fixed top-4 right-4 bg-green-600 text-white px-2 py-1 rounded text-xs z-50">
-          📷 Camera Ready
+      {/* Camera status indicator with more detail */}
+      <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-50 border">
+        {isCameraReady ? (
+          <div className="text-green-400">
+            📷 Camera Ready
+            {videoRef.current && (
+              <div className="text-xs text-gray-300">
+                {videoRef.current.videoWidth}x{videoRef.current.videoHeight}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-yellow-400">📷 Initializing Camera...</div>
+        )}
+        <div className="text-xs text-gray-400 mt-1">
+          Violations: {violations}/3
         </div>
-      )}
+      </div>
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
         <div>
