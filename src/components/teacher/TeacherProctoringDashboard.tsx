@@ -72,13 +72,13 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     <div>
       <Modal 
         isOpen={!!selectedSnapshot} 
-        title={`Screenshot Pelanggaran ${selectedSnapshot?.violationNumber} - ${selectedSnapshot?.studentName}`}
+        title={`Foto Pelanggaran ${selectedSnapshot?.violationNumber} - ${selectedSnapshot?.studentName}`}
         onCancel={() => setSelectedSnapshot(null)}
         cancelText="Tutup"
       >
         {selectedSnapshot && (
           <div className="text-center">
-            <img src={selectedSnapshot.imageData} alt="Violation Screenshot" className="w-full max-w-md mx-auto rounded-lg mb-4" />
+            <img src={selectedSnapshot.imageData} alt="Violation Snapshot" className="w-full max-w-md mx-auto rounded-lg mb-4" />
             <div className="bg-gray-700 p-3 rounded-md text-left">
               <p className="text-sm text-gray-300 mb-1">
                 <span className="font-bold text-red-400">Jenis Pelanggaran:</span> {selectedSnapshot.violationType}
@@ -102,7 +102,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       </button>
       
       <h2 className="text-3xl font-bold">Snapshot Pelanggaran</h2>
-      <p className="text-lg text-indigo-400 mb-6">{exam.name} ({exam.code}) - Screenshot diambil saat pelanggaran terdeteksi</p>
+      <p className="text-lg text-indigo-400 mb-6">{exam.name} ({exam.code}) - Foto diambil saat pelanggaran terdeteksi</p>
       
       {sessions.length === 0 ? (
         <p className="text-gray-400 text-center mt-8 bg-gray-800 p-6 rounded-lg">
@@ -132,7 +132,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                       </svg>
                     </div>
                     <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
-                    <p className="text-xs text-gray-400">Klik tombol untuk lihat screenshot</p>
+                    <p className="text-xs text-gray-400">Klik tombol untuk lihat foto</p>
                   </div>
                 ) : (
                   <div className="text-center p-4">
@@ -176,7 +176,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name, 1)}
                         className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        Lihat Screenshot Pelanggaran 1
+                        Lihat Foto Pelanggaran 1
                       </button>
                     )}
                     {session.violationSnapshot_2 && (
@@ -184,7 +184,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name, 2)}
                         className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        Lihat Screenshot Pelanggaran 2
+                        Lihat Foto Pelanggaran 2
                       </button>
                     )}
                     {session.violationSnapshot_3 && (
@@ -192,7 +192,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_3!, session.studentInfo.name, 3)}
                         className="w-full bg-red-800 hover:bg-red-900 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        Lihat Screenshot Pelanggaran 3
+                        Lihat Foto Pelanggaran 3
                       </button>
                     )}
                   </div>

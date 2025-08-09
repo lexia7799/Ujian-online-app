@@ -44,8 +44,19 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     setChecks(c => ({ ...c, device: !isMobile }));
     checkScreens();
     
-    // No longer need camera/mic for screenshot-based monitoring
-    setChecks(c => ({ ...c, camera: true, mic: true }));
+    if (isMobile) return;
+    
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        setChecks(c => ({ ...c, camera: true, mic: true }));
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      })
+      .catch(err => {
+        console.error("Error accessing media devices.", err);
+        setChecks(c => ({ ...c, camera: false, mic: false }));
+      });
   }, []);
 
   const allChecksPassed = checks.device && checks.camera && checks.mic && checks.screenCount;
@@ -103,8 +114,8 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         <ul className="space-y-3 mb-6">
           {renderCheckItem("Akses dari Desktop", checks.device)}
           {renderCheckItem("Layar Tunggal", checks.screenCount)}
-          {renderCheckItem("Sistem Monitoring", checks.camera)}
-          {renderCheckItem("Deteksi Pelanggaran", checks.mic)}
+          {renderCheckItem("Akses Kamera", checks.camera)}
+          {renderCheckItem("Akses Mikrofon", checks.mic)}
         </ul>
         
         {checks.device === false && (
@@ -119,21 +130,27 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           </p>
         )}
         
-        <div className="my-4 w-full aspect-video bg-gray-900 rounded-md overflow-hidden flex items-center justify-center">
-          <div className="text-center text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            <p className="text-sm">Sistem Monitoring Layar Aktif</p>
-            <p className="text-xs text-gray-500">Screenshot akan diambil saat pelanggaran terdeteksi</p>
-          </div>
+        {(checks.camera === false || checks.mic === false) && (
+          <p className="text-yellow-400 text-center mb-4">
+            ⚠️ Mohon izinkan akses kamera dan mikrofon di browser Anda, lalu segarkan halaman ini.
+          </p>
+        )}
+        
+        <div className="my-4 w-full aspect-video bg-gray-900 rounded-md overflow-hidden">
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className="w-full h-full object-cover"
+          />
         </div>
         
         {checks.device && (
           <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
             <p className="text-blue-300 text-sm">
-              ℹ️ <strong>Penting:</strong> Ujian akan otomatis masuk mode fullscreen dan memantau aktivitas layar. 
-              Keluar dari fullscreen atau berganti tab akan dianggap sebagai pelanggaran dan screenshot akan diambil.
+              ℹ️ <strong>Penting:</strong> Ujian akan otomatis masuk mode fullscreen. 
+              Keluar dari fullscreen akan dianggap sebagai pelanggaran.
             </p>
           </div>
         )}
