@@ -81,43 +81,103 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     doc.text(`Kode Ujian: ${exam.code}`, 14, 32);
     doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 14, 42);
     
-    // Prepare table data
-    const tableData = sessions.map((session, index) => [
-      index + 1,
-      session.studentInfo.name,
-      session.status,
-      session.violations,
-      session.finalScore?.toFixed(2) ?? 'N/A',
-      calculateTotalScore(session)
-    ]);
+    // Helper function to wrap text
+    const wrapText = (text: string, maxWidth: number) => {
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const testWidth = doc.getTextWidth(testLine);
+        
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      
+      return lines;
+    };
+    
+    // Column widths and positions
+    const colWidths = [10, 35, 15, 25, 15, 15, 15, 15, 15]; // Adjusted for new columns
+    const colPositions = [14, 24, 59, 74, 99, 114, 129, 144, 159];
     
     // Add table headers
-    const headers = ['No', 'Nama Siswa', 'Status', 'Pelanggaran', 'Nilai PG', 'Nilai Akhir'];
+    const headers = ['No', 'Nama', 'NIM', 'Program Studi', 'Kelas', 'Status', 'Pelanggaran', 'Nilai PG', 'Nilai Akhir'];
     let yPosition = 52;
     
     // Draw headers
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
     headers.forEach((header, index) => {
-      doc.text(header, 14 + (index * 30), yPosition);
+      const wrappedHeader = wrapText(header, colWidths[index]);
+      wrappedHeader.forEach((line, lineIndex) => {
+        doc.text(line, colPositions[index], yPosition + (lineIndex * 4));
+      });
     });
     
     // Draw line under headers
-    doc.line(14, yPosition + 2, 194, yPosition + 2);
-    yPosition += 8;
+    doc.line(14, yPosition + 6, 200, yPosition + 6);
+    yPosition += 12;
     
     // Draw data rows
     doc.setFont(undefined, 'normal');
-    tableData.forEach((row, rowIndex) => {
-      if (yPosition > 270) { // Check if we need a new page
+    sessions.forEach((session, sessionIndex) => {
+      const rowData = [
+        (sessionIndex + 1).toString(),
+        session.studentInfo.name || '',
+        session.studentInfo.nim || '',
+        session.studentInfo.major || '',
+        session.studentInfo.className || '',
+        session.status || '',
+        session.violations.toString(),
+        session.finalScore?.toFixed(2) ?? 'N/A',
+        calculateTotalScore(session)
+      ];
+      
+      // Calculate row height based on wrapped text
+      let maxLines = 1;
+      const wrappedCells = rowData.map((cell, cellIndex) => {
+        const wrapped = wrapText(cell, colWidths[cellIndex]);
+        maxLines = Math.max(maxLines, wrapped.length);
+        return wrapped;
+      });
+      
+      const rowHeight = maxLines * 4 + 2;
+      
+      if (yPosition + rowHeight > 270) { // Check if we need a new page
         doc.addPage();
         yPosition = 20;
+        
+        // Redraw headers on new page
+        doc.setFont(undefined, 'bold');
+        headers.forEach((header, index) => {
+          const wrappedHeader = wrapText(header, colWidths[index]);
+          wrappedHeader.forEach((line, lineIndex) => {
+            doc.text(line, colPositions[index], yPosition + (lineIndex * 4));
+          });
+        });
+        doc.line(14, yPosition + 6, 200, yPosition + 6);
+        yPosition += 12;
+        doc.setFont(undefined, 'normal');
       }
       
-      row.forEach((cell, cellIndex) => {
-        doc.text(String(cell), 14 + (cellIndex * 30), yPosition);
+      // Draw wrapped text for each cell
+      wrappedCells.forEach((wrappedCell, cellIndex) => {
+        wrappedCell.forEach((line, lineIndex) => {
+          doc.text(line, colPositions[cellIndex], yPosition + (lineIndex * 4));
+        });
       });
-      yPosition += 6;
+      
+      yPosition += rowHeight;
     });
     
     // Save the PDF
@@ -166,6 +226,9 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
           <thead className="bg-gray-700">
             <tr>
               <th className="p-4">Nama Siswa</th>
+              <th className="p-4">NIM</th>
+              <th className="p-4">Program Studi</th>
+              <th className="p-4">Kelas</th>
               <th className="p-4">Status</th>
               <th className="p-4">Pelanggaran</th>
               <th className="p-4">Nilai PG</th>
@@ -176,7 +239,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
           <tbody>
             {sessions.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center p-8 text-gray-400">
+                <td colSpan={9} className="text-center p-8 text-gray-400">
                   Belum ada siswa yang menyelesaikan ujian.
                 </td>
               </tr>
@@ -184,6 +247,9 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
               sessions.map(session => (
                 <tr key={session.id} className="border-b border-gray-700 hover:bg-gray-700/50">
                   <td className="p-4">{session.studentInfo.name}</td>
+                  <td className="p-4">{session.studentInfo.nim}</td>
+                  <td className="p-4">{session.studentInfo.major}</td>
+                  <td className="p-4">{session.studentInfo.className}</td>
                   <td className="p-4">{session.status}</td>
                   <td className="p-4">{session.violations}</td>
                   <td className="p-4">{session.finalScore?.toFixed(2) ?? 'N/A'}</td>
