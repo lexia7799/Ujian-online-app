@@ -21,6 +21,7 @@ interface TeacherProctoringDashboardProps {
 const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSessions, setActiveSessions] = useState<Session[]>([]);
   const [peerConnections, setPeerConnections] = useState<{ [key: string]: RTCPeerConnection }>({});
   const [remoteStreams, setRemoteStreams] = useState<{ [key: string]: MediaStream }>({});
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
@@ -30,7 +31,12 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     
     const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     const unsubSessions = onSnapshot(query(sessionsRef), (snapshot) => {
-      setSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session)));
+      const allSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
+      setSessions(allSessions);
+      
+      // Filter only active sessions (started, not finished or disqualified)
+      const activeOnly = allSessions.filter(session => session.status === 'started');
+      setActiveSessions(activeOnly);
     });
     
     return () => unsubSessions();
@@ -38,6 +44,8 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
 
   // Initialize WebRTC connection for each session
   const initializeWebRTCForSession = async (sessionId: string) => {
+    console.log(`🚀 Initializing WebRTC for session: ${sessionId}`);
+    
     try {
       const pc = new RTCPeerConnection({
         iceServers: [
@@ -46,6 +54,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         ]
       });
 
+      console.log(`📡 Created peer connection for session: ${sessionId}`);
       const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
 
       // Handle incoming stream
@@ -53,6 +62,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         const [remoteStream] = event.streams;
         console.log(`Received stream for session ${sessionId}:`, remoteStream);
         setRemoteStreams(prev => ({ ...prev, [sessionId]: remoteStream }));
+        console.log(`✅ Stream set for session ${sessionId}`);
         
         if (videoRefs.current[sessionId]) {
           videoRefs.current[sessionId]!.srcObject = remoteStream;
@@ -62,7 +72,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       // Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          console.log(`Sending ICE candidate for session ${sessionId}`);
+          console.log(`🧊 Sending ICE candidate for session ${sessionId}:`, event.candidate);
           await addDoc(signalingRef, {
             type: 'ice-candidate',
             candidate: event.candidate.toJSON(),
@@ -75,12 +85,18 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       // Handle connection state changes
       pc.onconnectionstatechange = () => {
         console.log(`Connection state for session ${sessionId}:`, pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          console.log(`✅ Successfully connected to session ${sessionId}`);
+        } else if (pc.connectionState === 'failed') {
+          console.log(`❌ Connection failed for session ${sessionId}`);
+        }
       };
 
       // Listen for signaling messages from student
       const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
+            console.log(`📨 New signaling message for session ${sessionId}`);
             const data = change.doc.data();
             console.log(`Received signaling message for session ${sessionId}:`, data.type);
             
@@ -88,9 +104,11 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               if (data.type === 'answer') {
                 console.log(`Setting remote description for session ${sessionId}`);
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                console.log(`✅ Remote description set for session ${sessionId}`);
               } else if (data.type === 'ice-candidate') {
                 console.log(`Adding ICE candidate for session ${sessionId}`);
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                console.log(`✅ ICE candidate added for session ${sessionId}`);
               }
             }
             
@@ -102,6 +120,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
 
       // Create and send offer
       console.log(`Creating offer for session ${sessionId}`);
+      
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       
@@ -111,6 +130,8 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         from: 'teacher',
         timestamp: new Date()
       });
+      
+      console.log(`📤 Offer sent for session ${sessionId}`);
 
       setPeerConnections(prev => ({ ...prev, [sessionId]: pc }));
       
@@ -121,7 +142,8 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
   };
 
   useEffect(() => {
-    sessions.forEach(async (session) => {
+    console.log(`👥 Active sessions count: ${activeSessions.length}`);
+    activeSessions.forEach(async (session) => {
       // Initialize WebRTC connection if not already established
       if (!peerConnections[session.id]) {
         await initializeWebRTCForSession(session.id);
@@ -130,22 +152,15 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       // Set up video element if stream is available
       if (videoRefs.current[session.id] && remoteStreams[session.id]) {
         videoRefs.current[session.id]!.srcObject = remoteStreams[session.id];
-      } else if (videoRefs.current[session.id] && !remoteStreams[session.id]) {
-        // Show placeholder while waiting for stream
-        const video = videoRefs.current[session.id]!;
-        video.style.backgroundColor = '#111827';
-        video.style.display = 'flex';
-        video.style.alignItems = 'center';
-        video.style.justifyContent = 'center';
-        video.style.color = 'white';
-        video.style.fontSize = '14px';
-        video.setAttribute('data-placeholder', `Menunggu koneksi dari ${session.studentInfo.name}`);
       }
     });
     
+    console.log(`🔗 Current peer connections:`, Object.keys(peerConnections));
+    
     // Cleanup connections for sessions that no longer exist
     Object.keys(peerConnections).forEach(sessionId => {
-      if (!sessions.find(s => s.id === sessionId)) {
+      if (!activeSessions.find(s => s.id === sessionId)) {
+        console.log(`🧹 Cleaning up connection for inactive session: ${sessionId}`);
         peerConnections[sessionId].close();
         setPeerConnections(prev => {
           const newConnections = { ...prev };
@@ -159,7 +174,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         });
       }
     });
-  }, [sessions, peerConnections, remoteStreams]);
+  }, [activeSessions, peerConnections, remoteStreams]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -189,6 +204,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
   const retryConnection = async (sessionId: string) => {
     // Close existing connection
     if (peerConnections[sessionId]) {
+      console.log(`🔄 Retrying connection for session: ${sessionId}`);
       peerConnections[sessionId].close();
       setPeerConnections(prev => {
         const newConnections = { ...prev };
@@ -216,20 +232,31 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       
       <h2 className="text-3xl font-bold">Pengawasan Live Streaming</h2>
       <p className="text-lg text-indigo-400 mb-2">{exam.name} ({exam.code})</p>
-      <div className="mb-6 p-3 bg-blue-900 border border-blue-500 rounded-md">
+      <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
         <p className="text-blue-300 text-sm">
           📹 <strong>Live Streaming:</strong> Video siswa akan muncul secara real-time menggunakan WebRTC. 
           Pastikan browser mendukung WebRTC dan koneksi internet stabil.
         </p>
       </div>
       
-      {sessions.length === 0 ? (
+      <div className="mb-6 p-3 bg-gray-800 border border-gray-600 rounded-md">
+        <div className="flex justify-between text-sm">
+          <span>Total Peserta: <strong>{sessions.length}</strong></span>
+          <span>Sedang Mengerjakan: <strong className="text-green-400">{activeSessions.length}</strong></span>
+          <span>Selesai: <strong className="text-blue-400">{sessions.filter(s => s.status === 'finished').length}</strong></span>
+          <span>Diskualifikasi: <strong className="text-red-400">{sessions.filter(s => s.status === 'disqualified').length}</strong></span>
+        </div>
+      </div>
+      
+      {activeSessions.length === 0 ? (
         <p className="text-gray-400 text-center mt-8 bg-gray-800 p-6 rounded-lg">
-          Belum ada siswa yang bergabung dalam ujian ini.
+          {sessions.length === 0 
+            ? "Belum ada siswa yang bergabung dalam ujian ini." 
+            : "Tidak ada siswa yang sedang mengerjakan ujian saat ini."}
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sessions.map(session => (
+          {activeSessions.map(session => (
             <div 
               key={session.id} 
               className={`bg-gray-800 rounded-lg shadow-lg overflow-hidden border-2 ${
@@ -246,6 +273,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                 <video 
                   ref={el => videoRefs.current[session.id] = el} 
                   autoPlay 
+                  muted
                   playsInline 
                   className="w-full h-full object-cover"
                 />
@@ -253,7 +281,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                   <div className="absolute inset-0 flex items-center justify-center text-white text-sm bg-gray-900">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                      <p>Menunggu streaming dari</p>
+                      <p>Menghubungkan ke</p>
                       <p className="font-bold">{session.studentInfo.name}</p>
                     </div>
                   </div>
@@ -296,6 +324,19 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+      
+      {sessions.length > activeSessions.length && (
+        <div className="mt-8 p-4 bg-gray-800 rounded-lg">
+          <h3 className="text-lg font-bold mb-2">Sesi Selesai ({sessions.length - activeSessions.length})</h3>
+          <div className="text-sm text-gray-400">
+            {sessions.filter(s => s.status !== 'started').map(session => (
+              <span key={session.id} className="inline-block mr-4 mb-1">
+                {session.studentInfo.name} ({session.status})
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>

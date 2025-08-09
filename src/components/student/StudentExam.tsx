@@ -85,14 +85,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   // Initialize WebRTC for video streaming
   const initializeWebRTC = async () => {
     try {
-      console.log('Initializing WebRTC...');
+      console.log('🚀 Student: Initializing WebRTC...');
       // Get user media (camera and microphone)
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { width: 640, height: 480 }, 
         audio: true 
       });
       
-      console.log('Got user media stream:', stream);
+      console.log('📹 Student: Got user media stream:', stream);
       setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
@@ -106,44 +106,57 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         ]
       });
 
+      console.log('🔗 Student: Created peer connection');
+
       // Add local stream to peer connection
       stream.getTracks().forEach(track => {
-        console.log('Adding track to peer connection:', track.kind);
+        console.log('➕ Student: Adding track to peer connection:', track.kind);
         pc.addTrack(track, stream);
       });
 
       // Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          console.log('Sending ICE candidate');
+          console.log('🧊 Student: Sending ICE candidate:', event.candidate);
           await addDoc(signalingRef, {
             type: 'ice-candidate',
             candidate: event.candidate.toJSON(),
             from: 'student',
             timestamp: new Date()
           });
+          console.log('✅ Student: ICE candidate sent');
         }
       };
 
       // Handle connection state changes
       pc.onconnectionstatechange = () => {
-        console.log('Connection state:', pc.connectionState);
+        console.log('🔗 Student: Connection state:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          console.log('✅ Student: Successfully connected to teacher');
+        } else if (pc.connectionState === 'failed') {
+          console.log('❌ Student: Connection to teacher failed');
+        }
       };
+      
       setPeerConnection(pc);
 
       // Listen for signaling messages from teacher
       const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
+            console.log('📨 Student: New signaling message received');
             const data = change.doc.data();
-            console.log('Received signaling message:', data.type);
+            console.log('📩 Student: Received signaling message:', data.type);
             
             if (data.from === 'teacher') {
               if (data.type === 'offer') {
-                console.log('Received offer, creating answer');
+                console.log('📝 Student: Received offer, creating answer');
                 await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                console.log('✅ Student: Remote description set');
+                
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
+                console.log('📤 Student: Local description set, sending answer');
                 
                 await addDoc(signalingRef, {
                   type: 'answer',
@@ -151,9 +164,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                   from: 'student',
                   timestamp: new Date()
                 });
+                console.log('✅ Student: Answer sent to teacher');
               } else if (data.type === 'ice-candidate') {
-                console.log('Adding ICE candidate');
+                console.log('🧊 Student: Adding ICE candidate');
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                console.log('✅ Student: ICE candidate added');
               }
             }
             
@@ -166,7 +181,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Cleanup function will be handled in useEffect cleanup
       return unsubscribe;
     } catch (error) {
-      console.error('Failed to initialize WebRTC:', error);
+      console.error('❌ Student: Failed to initialize WebRTC:', error);
     }
   };
 
