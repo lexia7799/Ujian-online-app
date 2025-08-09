@@ -42,12 +42,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
   const maxFullscreenRetries = 3;
   const isCapturingSnapshot = useRef(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -55,13 +56,31 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Initialize camera for violation snapshots
     const initializeCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          } 
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          
+          // Wait for video to be ready
+          videoRef.current.onloadedmetadata = () => {
+            if (videoRef.current) {
+              videoRef.current.play().then(() => {
+                // Wait a bit more for the video to start showing actual frames
+                setTimeout(() => {
+                  setIsCameraReady(true);
+                }, 1000);
+              }).catch(console.error);
+            }
+          };
         }
       } catch (error) {
         console.error("Failed to initialize camera for snapshots:", error);
+        setIsCameraReady(false);
       }
     };
     
@@ -95,45 +114,75 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    if (!videoRef.current || isCapturingSnapshot.current) return null;
+    if (!videoRef.current || isCapturingSnapshot.current || !isCameraReady) {
+      console.log("Cannot capture snapshot:", { 
+        hasVideo: !!videoRef.current, 
+        isCapturing: isCapturingSnapshot.current, 
+        cameraReady: isCameraReady 
+      });
+      return null;
+    }
     
     isCapturingSnapshot.current = true;
     
-    if (!videoRef.current) return null;
-    
     try {
+      // Check if video has actual dimensions and is playing
+      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        console.log("Video not ready - no dimensions");
+        isCapturingSnapshot.current = false;
+        return null;
+      }
+      
+      if (videoRef.current.readyState < 2) {
+        console.log("Video not ready - readyState:", videoRef.current.readyState);
+        isCapturingSnapshot.current = false;
+        return null;
+      }
+      
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      
-      if (context) {
-        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
-        
-        const snapshot = {
-          imageData,
-          timestamp: new Date().toISOString(),
-          violationType,
-          dimensions: { width: canvas.width, height: canvas.height }
-        };
-        
+      if (!context) {
+        console.log("Cannot get canvas context");
         isCapturingSnapshot.current = false;
-        return {
-          imageData,
-          timestamp: new Date().toISOString(),
-          violationType,
-          dimensions: { width: canvas.width, height: canvas.height }
-        };
+        return null;
       }
+      
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      // Draw the video frame to canvas
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      // Convert to base64 image
+      const imageData = canvas.toDataURL('image/jpeg', 0.8); // Higher quality
+      
+      // Check if we actually captured something (not just black)
+      if (imageData === 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=') {
+        console.log("Captured image appears to be blank/black");
+        isCapturingSnapshot.current = false;
+        return null;
+      }
+      
+      console.log("Successfully captured snapshot:", { 
+        width: canvas.width, 
+        height: canvas.height, 
+        dataLength: imageData.length 
+      });
+      
+      isCapturingSnapshot.current = false;
+      return {
+        imageData,
+        timestamp: new Date().toISOString(),
+        violationType,
+        dimensions: { width: canvas.width, height: canvas.height }
+      };
+      
     } catch (error) {
       console.error("Failed to capture violation snapshot:", error);
       isCapturingSnapshot.current = false;
+      return null;
     }
-    
-    isCapturingSnapshot.current = false;
-    return null;
   };
 
   // Fullscreen functions
@@ -355,6 +404,51 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setViolations(newViolations);
     setViolationReason(reason);
     
+    // Capture snapshot on violation (with delay to ensure camera is ready)
+    setTimeout(() => {
+      captureViolationSnapshot(reason).then(snapshot => {
+        const violationData = {
+          violations: newViolations,
+          lastViolation: { reason, timestamp: new Date() }
+        };
+        
+        if (snapshot) {
+          console.log("Saving violation snapshot:", snapshot.violationType);
+          violationData[`violationSnapshot_${newViolations}`] = snapshot;
+        } else {
+          console.log("No snapshot captured for violation:", reason);
+        }
+        
+        updateDoc(sessionDocRef, violationData).catch(error => {
+          console.error("Failed to save violation data:", error);
+        });
+      }).catch(error => {
+        console.error("Error capturing violation snapshot:", error);
+      });
+    }, 100); // Small delay to ensure video frame is ready
+    
+    playWarningSound();
+    
+    if (newViolations >= 3) {
+      finishExam(`Diskualifikasi: ${reason}`);
+    } else {
+      setShowViolationModal(true);
+      setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Auto re-enter fullscreen after violation
+      setTimeout(() => {
+        if (!isFinished && !isInFullscreen()) {
+          enterFullscreen();
+        }
+      }, 1500);
+    }
+  };
+
+  const handleViolationOld = (reason = "Unknown") => {
+    const newViolations = violations + 1;
+    setViolations(newViolations);
+    setViolationReason(reason);
+    
     // Capture snapshot on violation
     captureViolationSnapshot(reason).then(snapshot => {
       const violationData = {
@@ -367,6 +461,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       }
       
       updateDoc(sessionDocRef, violationData);
+    }).catch(error => {
+      console.error("Error in violation handling:", error);
     });
     
     playWarningSound();
@@ -562,7 +658,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         autoPlay
         playsInline
         muted
-        style={{ display: 'none' }}
+        style={{ 
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '320px',
+          height: '240px',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
       />
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
