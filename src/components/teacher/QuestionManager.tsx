@@ -28,14 +28,6 @@ const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, navigateB
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
 
-  const handleBackToVerifiedDashboard = () => {
-    if (appState.fromVerifiedDashboard) {
-      navigateTo('teacher_dashboard_verified', { exam, verifiedExam: exam });
-    } else {
-      navigateBack();
-    }
-  };
-
   const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
   const examDocRef = doc(db, `artifacts/${appId}/public/data/exams`, exam.id);
 
@@ -97,7 +89,7 @@ const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, navigateB
       </Modal>
 
       <button 
-        onClick={handleBackToVerifiedDashboard} 
+        onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali

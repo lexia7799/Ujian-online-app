@@ -46,7 +46,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
   const maxFullscreenRetries = 3;
-  const isInitialFullscreenEntry = useRef(true);
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -54,30 +53,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Initialize camera for violation snapshots
     const initializeCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            facingMode: 'user'
-          } 
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          
-          // Wait for video to be ready
-          videoRef.current.onloadedmetadata = () => {
-            if (videoRef.current) {
-              videoRef.current.play().then(() => {
-                console.log("Camera initialized successfully", {
-                  videoWidth: videoRef.current?.videoWidth,
-                  videoHeight: videoRef.current?.videoHeight,
-                  readyState: videoRef.current?.readyState
-                });
-              }).catch(err => {
-                console.error("Failed to play video:", err);
-              });
-            }
-          };
+          videoRef.current.play();
         }
       } catch (error) {
         console.error("Failed to initialize camera for snapshots:", error);
@@ -114,70 +93,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    if (!videoRef.current) {
-      console.log("Video element not available");
-      return null;
-    }
-    
-    // Wait a bit for video to be ready if it's not
-    if (videoRef.current.readyState < 2) {
-      console.log("Video not ready, waiting...");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    if (!videoRef.current) return null;
     
     try {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       
-      // Ensure we have valid dimensions
-      let videoWidth = videoRef.current.videoWidth;
-      let videoHeight = videoRef.current.videoHeight;
-      
-      // If video dimensions are not available, use element dimensions
-      if (!videoWidth || !videoHeight) {
-        videoWidth = videoRef.current.clientWidth || 640;
-        videoHeight = videoRef.current.clientHeight || 480;
-      }
-      
-      canvas.width = videoWidth;
-      canvas.height = videoHeight;
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
       
       if (context) {
-        // Draw the video frame to canvas
-        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
-        
-        // Convert to base64 with high quality
-        const imageData = canvas.toDataURL('image/jpeg', 0.9);
-        
-        // Validate that we actually captured something
-        if (imageData.length < 1000) {
-          console.log("Captured image seems too small, retrying...");
-          // Try again with a small delay
-          await new Promise(resolve => setTimeout(resolve, 500));
-          context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
-          const retryImageData = canvas.toDataURL('image/jpeg', 0.9);
-          if (retryImageData.length > imageData.length) {
-            console.log("Retry successful, using new image");
-            return {
-              imageData: retryImageData,
-              timestamp: new Date().toISOString(),
-              violationType,
-              dimensions: { width: videoWidth, height: videoHeight }
-            };
-          }
-        }
-        
-        console.log("Snapshot captured successfully", {
-          violationType,
-          imageSize: imageData.length,
-          dimensions: { width: videoWidth, height: videoHeight }
-        });
+        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
         
         return {
           imageData,
           timestamp: new Date().toISOString(),
           violationType,
-          dimensions: { width: videoWidth, height: videoHeight }
+          dimensions: { width: canvas.width, height: canvas.height }
         };
       }
     } catch (error) {
@@ -201,12 +134,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         await (elem as any).msRequestFullscreen();
       }
       fullscreenRetryCount.current = 0;
-      // Mark that initial fullscreen entry is complete
-      if (isInitialFullscreenEntry.current) {
-        setTimeout(() => {
-          isInitialFullscreenEntry.current = false;
-        }, 2000); // Give 2 seconds grace period
-      }
     } catch (error) {
       console.error("Failed to enter fullscreen:", error);
       fullscreenRetryCount.current++;
@@ -254,16 +181,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
-        // Only trigger violation after initial fullscreen entry
-        if (!isInitialFullscreenEntry.current) {
-          handleViolation("Exited Fullscreen");
-        }
-        // Always try to re-enter fullscreen
-        setTimeout(() => {
-          if (!isFinished && !isInFullscreen()) {
-            enterFullscreen();
-          }
-        }, 500);
+        handleViolation("Exited Fullscreen");
       }
     };
     
@@ -405,6 +323,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const handleViolation = (reason = "Unknown") => {
     const newViolations = violations + 1;
     setViolations(newViolations);
+    updateDoc(sessionDocRef, { 
+      violations: newViolations,
+      lastViolation: { reason, timestamp: new Date() }
+    });
     playWarningSound();
     
     if (newViolations >= 3) {
@@ -412,28 +334,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     } else {
       // Capture snapshot on violation
       captureViolationSnapshot(reason).then(snapshot => {
-        const violationData = {
-          violations: newViolations,
-          lastViolation: { reason, timestamp: new Date() }
-        };
-        
         if (snapshot) {
-          console.log("Saving violation snapshot to database");
-          violationData[`violationSnapshot_${newViolations}`] = snapshot;
-          console.log("Snapshot data being saved:", {
-            violationNumber: newViolations,
-            imageDataLength: snapshot.imageData.length,
-            violationType: snapshot.violationType
-          });
+          const violationData = {
+            violations: newViolations,
+            lastViolation: { reason, timestamp: new Date() },
+            [`violationSnapshot_${newViolations}`]: snapshot
+          };
+          updateDoc(sessionDocRef, violationData);
         } else {
-          console.log("No snapshot captured, saving violation without photo");
+          updateDoc(sessionDocRef, { 
+            violations: newViolations,
+            lastViolation: { reason, timestamp: new Date() }
+          });
         }
-        
-        updateDoc(sessionDocRef, violationData).then(() => {
-          console.log("Violation data saved successfully");
-        }).catch(error => {
-          console.error("Failed to save violation data:", error);
-        });
       });
       
       setShowViolationModal(true);
@@ -445,7 +358,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           if (!isFinished && !isInFullscreen()) {
             enterFullscreen();
           }
-        }, 500);
+        }, 1000);
       }
     }
   };
@@ -592,15 +505,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
       {/* Hidden video element for snapshots */}
-      <video 
-        ref={videoRef} 
-        style={{ display: 'none' }} 
-        autoPlay 
-        playsInline 
-        muted
-        width="640"
-        height="480"
-      />
+      <video ref={videoRef} style={{ display: 'none' }} />
       
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 bg-gray-800 p-4 z-50 border-b border-gray-700">

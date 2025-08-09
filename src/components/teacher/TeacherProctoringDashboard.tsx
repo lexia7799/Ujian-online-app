@@ -39,14 +39,6 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     studentName: string;
   } | null>(null);
 
-  const handleBackToVerifiedDashboard = () => {
-    if (appState.fromVerifiedDashboard) {
-      navigateTo('teacher_dashboard_verified', { exam, verifiedExam: exam });
-    } else {
-      navigateBack();
-    }
-  };
-
   useEffect(() => {
     if (!exam?.id) return;
     
@@ -79,26 +71,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       >
         {selectedSnapshot && (
           <div className="text-center">
-            <div className="w-full max-w-md mx-auto mb-4">
-              {selectedSnapshot.imageData ? (
-                <img 
-                  src={selectedSnapshot.imageData} 
-                  alt="Violation Snapshot" 
-                  className="w-full h-auto rounded-lg border border-gray-600"
-                  onError={(e) => {
-                    console.error("Failed to load modal image:", selectedSnapshot.imageData?.substring(0, 50));
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                  onLoad={() => {
-                    console.log("Modal image loaded successfully");
-                  }}
-                />
-              ) : (
-                <div className="w-full h-64 bg-gray-700 rounded-lg flex items-center justify-center">
-                  <p className="text-gray-400">Foto tidak tersedia</p>
-                </div>
-              )}
-            </div>
+            <img src={selectedSnapshot.imageData} alt="Violation Snapshot" className="w-full max-w-md mx-auto rounded-lg mb-4" />
             <p className="text-sm text-gray-400">Jenis: {selectedSnapshot.violationType}</p>
             <p className="text-sm text-gray-400">Waktu: {new Date(selectedSnapshot.timestamp).toLocaleString('id-ID')}</p>
           </div>
@@ -106,7 +79,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       </Modal>
       
       <button 
-        onClick={handleBackToVerifiedDashboard} 
+        onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali
@@ -137,64 +110,13 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               <div className="w-full aspect-video bg-gray-900 flex items-center justify-center">
                 {session.violations > 0 ? (
                   <div className="text-center p-4">
-                    {(session.violationSnapshot_1?.imageData || session.violationSnapshot_2?.imageData) ? (
-                      <div>
-                        {session.violationSnapshot_1?.imageData ? (
-                          <img 
-                            src={session.violationSnapshot_1.imageData} 
-                            alt="Preview Violation 1" 
-                            className="w-full h-full object-cover rounded"
-                            onLoad={() => {
-                              console.log("Preview image 1 loaded successfully");
-                            }}
-                            onError={(e) => {
-                              console.error("Failed to load preview image 1:", {
-                                hasImageData: !!session.violationSnapshot_1?.imageData,
-                                imageDataLength: session.violationSnapshot_1?.imageData?.length,
-                                imageDataStart: session.violationSnapshot_1?.imageData?.substring(0, 50)
-                              });
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        ) : session.violationSnapshot_2?.imageData ? (
-                          <img 
-                            src={session.violationSnapshot_2.imageData} 
-                            alt="Preview Violation 2" 
-                            className="w-full h-full object-cover rounded"
-                            onLoad={() => {
-                              console.log("Preview image 2 loaded successfully");
-                            }}
-                            onError={(e) => {
-                              console.error("Failed to load preview image 2:", {
-                                hasImageData: !!session.violationSnapshot_2?.imageData,
-                                imageDataLength: session.violationSnapshot_2?.imageData?.length,
-                                imageDataStart: session.violationSnapshot_2?.imageData?.substring(0, 50)
-                              });
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="text-yellow-400 mb-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                        </div>
-                        <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
-                        <p className="text-xs text-gray-400">
-                          Foto sedang diproses atau gagal diambil
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Debug: {JSON.stringify({
-                            snap1: !!session.violationSnapshot_1,
-                            snap2: !!session.violationSnapshot_2,
-                            violations: session.violations
-                          })}
-                        </p>
-                      </div>
-                    )}
+                    <div className="text-yellow-400 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
+                    <p className="text-xs text-gray-400">Klik tombol untuk lihat foto</p>
                   </div>
                 ) : (
                   <div className="text-center p-4">
@@ -233,26 +155,21 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                 </div>
                 {session.violations > 0 && (
                   <div className="mt-3 space-y-1">
-                    {session.violationSnapshot_1?.imageData && (
+                    {session.violationSnapshot_1 && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name)}
-                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded mb-1"
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        📸 Foto Pelanggaran 1: {session.violationSnapshot_1.violationType}
+                        Lihat Foto Pelanggaran 1
                       </button>
                     )}
-                    {session.violationSnapshot_2?.imageData && (
+                    {session.violationSnapshot_2 && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name)}
                         className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        📸 Foto Pelanggaran 2: {session.violationSnapshot_2.violationType}
+                        Lihat Foto Pelanggaran 2
                       </button>
-                    )}
-                    {!session.violationSnapshot_1?.imageData && !session.violationSnapshot_2?.imageData && (
-                      <div className="w-full bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded text-center">
-                        ⚠️ Foto pelanggaran tidak tersedia
-                      </div>
                     )}
                   </div>
                 )}
