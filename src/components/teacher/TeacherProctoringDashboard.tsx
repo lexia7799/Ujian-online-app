@@ -21,6 +21,11 @@ interface Session {
     timestamp: string;
     violationType: string;
   };
+  violationSnapshot_3?: {
+    imageData: string;
+    timestamp: string;
+    violationType: string;
+  };
 }
 
 interface TeacherProctoringDashboardProps {
@@ -37,6 +42,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     timestamp: string;
     violationType: string;
     studentName: string;
+    violationNumber: number;
   } | null>(null);
 
   useEffect(() => {
@@ -50,10 +56,11 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     return () => unsubSessions();
   }, [exam?.id]);
 
-  const viewSnapshot = (snapshot: any, studentName: string) => {
+  const viewSnapshot = (snapshot: any, studentName: string, violationNumber: number) => {
     setSelectedSnapshot({
       ...snapshot,
-      studentName
+      studentName,
+      violationNumber
     });
   };
 
@@ -65,15 +72,24 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     <div>
       <Modal 
         isOpen={!!selectedSnapshot} 
-        title={`Foto Pelanggaran - ${selectedSnapshot?.studentName}`}
+        title={`Foto Pelanggaran ${selectedSnapshot?.violationNumber} - ${selectedSnapshot?.studentName}`}
         onCancel={() => setSelectedSnapshot(null)}
         cancelText="Tutup"
       >
         {selectedSnapshot && (
           <div className="text-center">
             <img src={selectedSnapshot.imageData} alt="Violation Snapshot" className="w-full max-w-md mx-auto rounded-lg mb-4" />
-            <p className="text-sm text-gray-400">Jenis: {selectedSnapshot.violationType}</p>
-            <p className="text-sm text-gray-400">Waktu: {new Date(selectedSnapshot.timestamp).toLocaleString('id-ID')}</p>
+            <div className="bg-gray-700 p-3 rounded-md text-left">
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="font-bold text-red-400">Jenis Pelanggaran:</span> {selectedSnapshot.violationType}
+              </p>
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="font-bold text-blue-400">Waktu:</span> {new Date(selectedSnapshot.timestamp).toLocaleString('id-ID')}
+              </p>
+              <p className="text-sm text-gray-300">
+                <span className="font-bold text-yellow-400">Pelanggaran ke:</span> {selectedSnapshot.violationNumber}
+              </p>
+            </div>
           </div>
         )}
       </Modal>
@@ -157,7 +173,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                   <div className="mt-3 space-y-1">
                     {session.violationSnapshot_1 && (
                       <button 
-                        onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name)}
+                        onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name, 1)}
                         className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
                         Lihat Foto Pelanggaran 1
@@ -165,10 +181,18 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                     )}
                     {session.violationSnapshot_2 && (
                       <button 
-                        onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name)}
+                        onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name, 2)}
                         className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
                         Lihat Foto Pelanggaran 2
+                      </button>
+                    )}
+                    {session.violationSnapshot_3 && (
+                      <button 
+                        onClick={() => viewSnapshot(session.violationSnapshot_3!, session.studentInfo.name, 3)}
+                        className="w-full bg-red-800 hover:bg-red-900 text-white text-xs font-bold py-1 px-2 rounded"
+                      >
+                        Lihat Foto Pelanggaran 3
                       </button>
                     )}
                   </div>

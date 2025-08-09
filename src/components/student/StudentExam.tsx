@@ -34,8 +34,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [violations, setViolations] = useState(0);
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showUnansweredModal, setShowUnansweredModal] = useState(false);
+  const [unansweredQuestions, setUnansweredQuestions] = useState<number[]>([]);
   const [isFinished, setIsFinished] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
+  const [violationReason, setViolationReason] = useState('');
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -44,6 +47,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
   const maxFullscreenRetries = 3;
+  const isCapturingSnapshot = useRef(false);
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -91,6 +95,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
+    if (!videoRef.current || isCapturingSnapshot.current) return null;
+    
+    isCapturingSnapshot.current = true;
+    
     if (!videoRef.current) return null;
     
     try {
@@ -104,6 +112,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
         
+        const snapshot = {
+          imageData,
+          timestamp: new Date().toISOString(),
+          violationType,
+          dimensions: { width: canvas.width, height: canvas.height }
+        };
+        
+        isCapturingSnapshot.current = false;
         return {
           imageData,
           timestamp: new Date().toISOString(),
@@ -113,8 +129,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       }
     } catch (error) {
       console.error("Failed to capture violation snapshot:", error);
+      isCapturingSnapshot.current = false;
     }
     
+    isCapturingSnapshot.current = false;
     return null;
   };
 
@@ -234,10 +252,18 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         (e.ctrlKey && e.shiftKey && e.key === 'I') ||
         (e.ctrlKey && e.shiftKey && e.key === 'J') ||
         (e.ctrlKey && e.key === 'u') ||
+        (e.ctrlKey && e.key === 's') || // Block save
+        (e.key === 'PrintScreen') || // Block screenshot
         e.altKey && e.key === 'Tab'
       ) {
         e.preventDefault();
-        handleViolation("Prohibited Shortcut");
+        if (e.key === 'PrintScreen') {
+          handleViolation("Screenshot Attempt");
+        } else if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a')) {
+          handleViolation("Copy/Paste Attempt");
+        } else {
+          handleViolation("Prohibited Shortcut");
+        }
       }
     };
     
@@ -327,34 +353,36 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const handleViolation = (reason = "Unknown") => {
     const newViolations = violations + 1;
     setViolations(newViolations);
-    updateDoc(sessionDocRef, { 
-      violations: newViolations,
-      lastViolation: { reason, timestamp: new Date() }
+    setViolationReason(reason);
+    
+    // Capture snapshot on violation
+    captureViolationSnapshot(reason).then(snapshot => {
+      const violationData = {
+        violations: newViolations,
+        lastViolation: { reason, timestamp: new Date() }
+      };
+      
+      if (snapshot) {
+        violationData[`violationSnapshot_${newViolations}`] = snapshot;
+      }
+      
+      updateDoc(sessionDocRef, violationData);
     });
+    
     playWarningSound();
     
     if (newViolations >= 3) {
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
-      // Capture snapshot on violation
-      captureViolationSnapshot(reason).then(snapshot => {
-        if (snapshot) {
-          const violationData = {
-            violations: newViolations,
-            lastViolation: { reason, timestamp: new Date() },
-            [`violationSnapshot_${newViolations}`]: snapshot
-          };
-          updateDoc(sessionDocRef, violationData);
-        } else {
-          updateDoc(sessionDocRef, { 
-            violations: newViolations,
-            lastViolation: { reason, timestamp: new Date() }
-          });
-        }
-      });
-      
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Auto re-enter fullscreen after violation
+      setTimeout(() => {
+        if (!isFinished && !isInFullscreen()) {
+          enterFullscreen();
+        }
+      }, 1500);
     }
   };
 
@@ -364,10 +392,30 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     updateDoc(sessionDocRef, { answers: newAnswers });
   };
   
+  const checkUnansweredQuestions = () => {
+    const unanswered = questions
+      .map((q, index) => ({ question: q, index: index + 1 }))
+      .filter(({ question }) => !answers[question.id] && answers[question.id] !== 0)
+      .map(({ index }) => index);
+    
+    return unanswered;
+  };
+  
+  const handleFinishAttempt = () => {
+    const unanswered = checkUnansweredQuestions();
+    if (unanswered.length > 0) {
+      setUnansweredQuestions(unanswered);
+      setShowUnansweredModal(true);
+    } else {
+      setShowConfirmModal(true);
+    }
+  };
+  
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
     setIsFinished(true);
     setShowConfirmModal(false);
+    setShowUnansweredModal(false);
     
     // Exit fullscreen when exam is finished
     try {
@@ -471,15 +519,38 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <p>Apakah Anda yakin ingin menyelesaikan ujian? Anda tidak dapat kembali setelah ini.</p>
       </Modal>
 
+      <Modal 
+        isOpen={showUnansweredModal} 
+        title="Ada Soal yang Belum Dijawab" 
+        onCancel={() => setShowUnansweredModal(false)} 
+        onConfirm={() => setShowConfirmModal(true)} 
+        confirmText="Tetap Selesaikan" 
+        confirmColor="red"
+        cancelText="Kembali Mengerjakan"
+      >
+        <p className="mb-3">Anda belum menjawab soal nomor:</p>
+        <div className="bg-gray-700 p-3 rounded-md mb-3">
+          <span className="font-bold text-yellow-400">
+            {unansweredQuestions.join(', ')}
+          </span>
+        </div>
+        <p className="text-sm text-gray-400">
+          Apakah Anda yakin ingin menyelesaikan ujian tanpa menjawab soal-soal tersebut?
+        </p>
+      </Modal>
+
       {showViolationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="bg-gray-800 border-2 border-yellow-500 p-8 rounded-lg text-center shadow-2xl">
             <AlertIcon />
             <h3 className="text-3xl font-bold text-yellow-400 mt-4">PERINGATAN!</h3>
-            <p className="text-lg mt-2">Anda terdeteksi melakukan pelanggaran.</p>
+            <p className="text-lg mt-2">Pelanggaran Terdeteksi: {violationReason}</p>
             <p className="text-sm text-red-400 mt-1">Sistem monitoring aktif!</p>
             <p className="text-2xl font-bold mt-2">
               Kesempatan tersisa: <span className="text-white">{3 - violations}</span>
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              Foto telah diambil sebagai bukti pelanggaran
             </p>
           </div>
         </div>
@@ -560,7 +631,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       )}
 
       <button 
-        onClick={() => setShowConfirmModal(true)} 
+        onClick={handleFinishAttempt} 
         className="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg" 
         disabled={questions.length === 0}
       >
