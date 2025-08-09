@@ -177,15 +177,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Auto-enter fullscreen when exam loads
   useEffect(() => {
-    if (!isLoading && questions.length > 0 && isFullscreenSupported && !isFinished) {
-      const timer = setTimeout(() => {
-        if (!isInFullscreen()) {
-          enterFullscreen();
-        }
-      }, 500); // Small delay to ensure page is ready
-      
-      return () => clearTimeout(timer);
-    }
+    // Fullscreen is now handled by user action in StudentPreCheck
+    // This useEffect is removed to prevent permission errors
   }, [isLoading, questions.length, isFullscreenSupported, isFinished]);
 
   useEffect(() => {
