@@ -135,7 +135,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 
                 await addDoc(signalingRef, {
                   type: 'answer',
-                  answer: answer.toJSON(),
+                  answer: answer,
                   from: 'student',
                   timestamp: new Date()
                 });
