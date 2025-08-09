@@ -51,6 +51,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       // Handle incoming stream
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
+        console.log(`Received stream for session ${sessionId}:`, remoteStream);
         setRemoteStreams(prev => ({ ...prev, [sessionId]: remoteStream }));
         
         if (videoRefs.current[sessionId]) {
@@ -61,6 +62,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       // Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
+          console.log(`Sending ICE candidate for session ${sessionId}`);
           await addDoc(signalingRef, {
             type: 'ice-candidate',
             candidate: event.candidate.toJSON(),
@@ -70,16 +72,24 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
         }
       };
 
+      // Handle connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log(`Connection state for session ${sessionId}:`, pc.connectionState);
+      };
+
       // Listen for signaling messages from student
       const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
             const data = change.doc.data();
+            console.log(`Received signaling message for session ${sessionId}:`, data.type);
             
             if (data.from === 'student') {
               if (data.type === 'answer') {
+                console.log(`Setting remote description for session ${sessionId}`);
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
               } else if (data.type === 'ice-candidate') {
+                console.log(`Adding ICE candidate for session ${sessionId}`);
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
               }
             }
@@ -91,6 +101,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
       });
 
       // Create and send offer
+      console.log(`Creating offer for session ${sessionId}`);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       

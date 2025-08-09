@@ -36,6 +36,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [unansweredQuestions, setUnansweredQuestions] = useState<number[]>([]);
   
   // WebRTC streaming state
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -83,12 +85,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   // Initialize WebRTC for video streaming
   const initializeWebRTC = async () => {
     try {
+      console.log('Initializing WebRTC...');
       // Get user media (camera and microphone)
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { width: 640, height: 480 }, 
         audio: true 
       });
       
+      console.log('Got user media stream:', stream);
       setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
@@ -104,12 +108,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
       // Add local stream to peer connection
       stream.getTracks().forEach(track => {
+        console.log('Adding track to peer connection:', track.kind);
         pc.addTrack(track, stream);
       });
 
       // Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
+          console.log('Sending ICE candidate');
           await addDoc(signalingRef, {
             type: 'ice-candidate',
             candidate: event.candidate.toJSON(),
@@ -119,6 +125,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         }
       };
 
+      // Handle connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log('Connection state:', pc.connectionState);
+      };
       setPeerConnection(pc);
 
       // Listen for signaling messages from teacher
@@ -126,9 +136,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
             const data = change.doc.data();
+            console.log('Received signaling message:', data.type);
             
             if (data.from === 'teacher') {
               if (data.type === 'offer') {
+                console.log('Received offer, creating answer');
                 await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
@@ -140,6 +152,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                   timestamp: new Date()
                 });
               } else if (data.type === 'ice-candidate') {
+                console.log('Adding ICE candidate');
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
               }
             }
@@ -394,10 +407,45 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     updateDoc(sessionDocRef, { answers: newAnswers });
   };
   
+  const validateAllAnswersCompleted = () => {
+    const unanswered: number[] = [];
+    
+    questions.forEach((question, index) => {
+      const answer = answers[question.id];
+      
+      if (question.type === 'mc') {
+        // For multiple choice, answer should be a number (0, 1, 2, or 3)
+        if (answer === undefined || answer === null) {
+          unanswered.push(index + 1);
+        }
+      } else if (question.type === 'essay') {
+        // For essay, answer should be a non-empty string
+        if (!answer || answer.toString().trim() === '') {
+          unanswered.push(index + 1);
+        }
+      }
+    });
+    
+    return unanswered;
+  };
+  
+  const handleFinishExamClick = () => {
+    const unanswered = validateAllAnswersCompleted();
+    
+    if (unanswered.length > 0) {
+      setUnansweredQuestions(unanswered);
+      setShowValidationModal(true);
+      return;
+    }
+    
+    setShowConfirmModal(true);
+  };
+  
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
     setIsFinished(true);
     setShowConfirmModal(false);
+    setShowValidationModal(false);
     
     // Exit fullscreen when exam is finished
     try {
@@ -501,6 +549,27 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <p>Apakah Anda yakin ingin menyelesaikan ujian? Anda tidak dapat kembali setelah ini.</p>
       </Modal>
 
+      <Modal 
+        isOpen={showValidationModal} 
+        title="Soal Belum Dijawab!" 
+        onCancel={() => setShowValidationModal(false)} 
+        cancelText="Kembali dan Lengkapi"
+        confirmText="Tetap Selesaikan"
+        onConfirm={() => {
+          setShowValidationModal(false);
+          setShowConfirmModal(true);
+        }}
+        confirmColor="red"
+      >
+        <p className="mb-3">Anda belum menjawab beberapa soal:</p>
+        <div className="bg-gray-700 p-3 rounded-md mb-3">
+          <p className="font-bold text-yellow-400">Soal yang belum dijawab:</p>
+          <p className="text-white">{unansweredQuestions.join(', ')}</p>
+        </div>
+        <p className="text-sm text-gray-300">
+          Disarankan untuk menjawab semua soal sebelum menyelesaikan ujian.
+        </p>
+      </Modal>
       {showViolationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="bg-gray-800 border-2 border-yellow-500 p-8 rounded-lg text-center shadow-2xl">
@@ -590,7 +659,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       )}
 
       <button 
-        onClick={() => setShowConfirmModal(true)} 
+        onClick={handleFinishExamClick} 
         className="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg" 
         disabled={questions.length === 0}
       >
