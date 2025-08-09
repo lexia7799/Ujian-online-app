@@ -285,7 +285,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               </div>
             </div>
           ))}
-        }
+        </div>
       )}
     </div>
   );
