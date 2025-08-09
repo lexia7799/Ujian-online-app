@@ -4,6 +4,7 @@ import { db, appId } from '../../config/firebase';
 
 interface StudentPreCheckProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
   appState: any;
 }
 
@@ -13,7 +14,7 @@ interface DeviceChecks {
   mic: boolean | null;
 }
 
-const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, appState }) => {
+const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState }) => {
   const { studentInfo } = appState;
   const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, mic: null });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -82,10 +83,10 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, appState 
   return (
     <div>
       <button 
-        onClick={() => navigateTo('student_identity')} 
+        onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
-        &larr; Kembali ke Identitas
+        &larr; Kembali
       </button>
       <h2 className="text-3xl font-bold mb-6 text-center">Pemeriksaan Perangkat</h2>
       <div className="w-full max-w-lg mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">

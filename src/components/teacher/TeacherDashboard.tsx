@@ -7,9 +7,11 @@ import CreateExamForm from './CreateExamForm';
 interface TeacherDashboardProps {
   user: User;
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
+  canGoBack: boolean;
 }
 
-const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo }) => {
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
   const [view, setView] = useState('search');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
@@ -56,6 +58,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo })
 
   return (
     <div>
+      {canGoBack && (
+        <button 
+          onClick={navigateBack} 
+          className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+        >
+          &larr; Kembali
+        </button>
+      )}
       <h2 className="text-3xl font-bold mb-6">Dasbor Dosen</h2>
       <div className="flex space-x-4 mb-6 border-b border-gray-700">
         <button 

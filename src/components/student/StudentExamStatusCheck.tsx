@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 
 interface StudentExamStatusCheckProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
   appState: any;
 }
 
-const StudentExamStatusCheck: React.FC<StudentExamStatusCheckProps> = ({ navigateTo, appState }) => {
+const StudentExamStatusCheck: React.FC<StudentExamStatusCheckProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam, studentInfo } = appState;
   const [statusMessage, setStatusMessage] = useState('Memeriksa status ujian...');
 
@@ -37,10 +38,10 @@ const StudentExamStatusCheck: React.FC<StudentExamStatusCheckProps> = ({ navigat
         </p>
         <p className="text-lg text-gray-300 mt-2">{statusMessage}</p>
         <button 
-          onClick={() => navigateTo('student_identity')} 
+          onClick={navigateBack} 
           className="mt-8 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg"
         >
-          Kembali ke Identitas
+          Kembali
         </button>
       </div>
     </div>

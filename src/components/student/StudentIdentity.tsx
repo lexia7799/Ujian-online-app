@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 interface StudentIdentityProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
   appState: any;
 }
 
@@ -12,7 +13,7 @@ interface Identity {
   className: string;
 }
 
-const StudentIdentity: React.FC<StudentIdentityProps> = ({ navigateTo, appState }) => {
+const StudentIdentity: React.FC<StudentIdentityProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam } = appState;
   const [identity, setIdentity] = useState<Identity>({ 
     name: '', 
@@ -37,7 +38,7 @@ const StudentIdentity: React.FC<StudentIdentityProps> = ({ navigateTo, appState 
   return (
     <div>
       <button 
-        onClick={() => navigateTo('student_join')} 
+        onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali

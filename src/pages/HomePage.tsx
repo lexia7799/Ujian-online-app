@@ -3,11 +3,21 @@ import { LockIcon, UserIcon } from '../components/ui/Icons';
 
 interface HomePageProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack?: () => void;
+  canGoBack?: boolean;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
+const HomePage: React.FC<HomePageProps> = ({ navigateTo, navigateBack, canGoBack }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen -my-16">
+      {canGoBack && navigateBack && (
+        <button 
+          onClick={navigateBack} 
+          className="absolute top-8 left-8 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+        >
+          &larr; Kembali
+        </button>
+      )}
       <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600 mb-4 text-center">
         Platform Ujian Aman
       </h1>

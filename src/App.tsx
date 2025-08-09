@@ -17,6 +17,7 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [appState, setAppState] = useState<any>({});
+  const [navigationHistory, setNavigationHistory] = useState<string[]>(['home']);
 
   useEffect(() => {
     const authenticateUser = async () => {
@@ -46,6 +47,17 @@ function App() {
   const navigateTo = (pageName: string, data = {}) => {
     setPage(pageName);
     setAppState(currentState => ({ ...currentState, ...data }));
+    setNavigationHistory(prev => [...prev, pageName]);
+  };
+
+  const navigateBack = () => {
+    if (navigationHistory.length > 1) {
+      const newHistory = [...navigationHistory];
+      newHistory.pop(); // Remove current page
+      const previousPage = newHistory[newHistory.length - 1];
+      setNavigationHistory(newHistory);
+      setPage(previousPage);
+    }
   };
 
   if (!authReady) {
@@ -57,7 +69,7 @@ function App() {
   }
 
   const renderPage = () => {
-    const props = { navigateTo, appState, user };
+    const props = { navigateTo, navigateBack, appState, user, canGoBack: navigationHistory.length > 1 };
     
     switch (page) {
       case 'teacher_dashboard':

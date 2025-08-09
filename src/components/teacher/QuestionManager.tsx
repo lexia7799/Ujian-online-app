@@ -16,10 +16,11 @@ interface Question {
 
 interface QuestionManagerProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
   appState: any;
 }
 
-const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, appState }) => {
+const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam } = appState;
   const [questions, setQuestions] = useState<Question[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -88,10 +89,10 @@ const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, appState 
       </Modal>
 
       <button 
-        onClick={() => navigateTo('teacher_dashboard')} 
+        onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
-        &larr; Kembali ke Dasbor
+        &larr; Kembali
       </button>
       
       <div className="flex justify-between items-start mb-6">

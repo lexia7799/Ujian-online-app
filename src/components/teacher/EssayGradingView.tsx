@@ -21,10 +21,11 @@ interface EssayGradingViewProps {
   session: Session;
   questions: Question[];
   examId: string;
+  navigateBack: () => void;
   onBack: () => void;
 }
 
-const EssayGradingView: React.FC<EssayGradingViewProps> = ({ session, questions, examId, onBack }) => {
+const EssayGradingView: React.FC<EssayGradingViewProps> = ({ session, questions, examId, navigateBack, onBack }) => {
   const essayQuestions = questions.filter(q => q.type === 'essay');
   const [essayScores, setEssayScores] = useState<{ [key: string]: number }>(session.essayScores || {});
   const [isSaving, setIsSaving] = useState(false);
@@ -57,7 +58,7 @@ const EssayGradingView: React.FC<EssayGradingViewProps> = ({ session, questions,
         onClick={onBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
-        &larr; Kembali ke Hasil
+        &larr; Kembali
       </button>
       
       <h3 className="text-2xl font-bold">Detail Jawaban: {session.studentInfo.name}</h3>

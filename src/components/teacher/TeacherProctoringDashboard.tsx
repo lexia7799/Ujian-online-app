@@ -14,10 +14,11 @@ interface Session {
 
 interface TeacherProctoringDashboardProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
   appState: any;
 }
 
-const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({ navigateTo, appState }) => {
+const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
@@ -63,10 +64,10 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
   return (
     <div>
       <button 
-        onClick={() => navigateTo('teacher_dashboard')} 
+        onClick={navigateBack} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
-        &larr; Kembali ke Dasbor
+        &larr; Kembali
       </button>
       
       <h2 className="text-3xl font-bold">Dasbor Pengawasan Langsung</h2>

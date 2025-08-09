@@ -6,9 +6,10 @@ import { db, appId } from '../../config/firebase';
 interface CreateExamFormProps {
   user: User;
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
 }
 
-const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo }) => {
+const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo, navigateBack }) => {
   const [examName, setExamName] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -67,6 +68,12 @@ const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo }) => 
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
+      <button 
+        onClick={navigateBack} 
+        className="mb-4 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+      >
+        &larr; Kembali
+      </button>
       <h3 className="text-xl font-semibold mb-4">Detail Ujian Baru</h3>
       <form onSubmit={createExam} className="space-y-4">
         <input 

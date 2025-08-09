@@ -4,9 +4,11 @@ import { db, appId } from '../../config/firebase';
 
 interface StudentJoinProps {
   navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
+  canGoBack: boolean;
 }
 
-const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo }) => {
+const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, canGoBack }) => {
   const [examCode, setExamCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +44,14 @@ const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo }) => {
 
   return (
     <div>
+      {canGoBack && (
+        <button 
+          onClick={navigateBack} 
+          className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+        >
+          &larr; Kembali
+        </button>
+      )}
       <h2 className="text-3xl font-bold mb-6 text-center">Gabung Ujian</h2>
       <div className="w-full max-w-sm mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
         <form onSubmit={handleJoin}>
