@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import EssayGradingView from './EssayGradingView';
 
 interface Question {
@@ -75,12 +74,12 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     // Add title
     doc.setFontSize(18);
-    doc.text(`Hasil Ujian: ${exam.name}`, 20, 20);
+    doc.text(`Hasil Ujian: ${exam.name}`, 14, 22);
     
     // Add exam info
     doc.setFontSize(12);
-    doc.text(`Kode Ujian: ${exam.code}`, 20, 35);
-    doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 20, 45);
+    doc.text(`Kode Ujian: ${exam.code}`, 14, 32);
+    doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 14, 42);
     
     // Prepare table data
     const tableData = sessions.map((session, index) => [
@@ -92,22 +91,33 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       calculateTotalScore(session)
     ]);
     
-    // Add table
-    (doc as any).autoTable({
-      head: [['No', 'Nama Siswa', 'Status', 'Pelanggaran', 'Nilai PG', 'Nilai Akhir']],
-      body: tableData,
-      startY: 60,
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [75, 85, 99],
-        textColor: 255,
-      },
-      alternateRowStyles: {
-        fillColor: [249, 250, 251],
-      },
+    // Add table headers
+    const headers = ['No', 'Nama Siswa', 'Status', 'Pelanggaran', 'Nilai PG', 'Nilai Akhir'];
+    let yPosition = 52;
+    
+    // Draw headers
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    headers.forEach((header, index) => {
+      doc.text(header, 14 + (index * 30), yPosition);
+    });
+    
+    // Draw line under headers
+    doc.line(14, yPosition + 2, 194, yPosition + 2);
+    yPosition += 8;
+    
+    // Draw data rows
+    doc.setFont(undefined, 'normal');
+    tableData.forEach((row, rowIndex) => {
+      if (yPosition > 270) { // Check if we need a new page
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      row.forEach((cell, cellIndex) => {
+        doc.text(String(cell), 14 + (cellIndex * 30), yPosition);
+      });
+      yPosition += 6;
     });
     
     // Save the PDF
