@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import { AlertIcon } from '../ui/Icons';
 import Modal from '../ui/Modal';
@@ -37,7 +37,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [isFinished, setIsFinished] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
   
+  // WebRTC streaming state
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
+  const signalingRef = collection(db, `signaling/${exam.id}/${sessionId}`);
   const audioContextRef = useRef<AudioContext | null>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
@@ -71,7 +77,85 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     };
     
     fetchQuestions();
+    initializeWebRTC();
   }, [exam.id]);
+
+  // Initialize WebRTC for video streaming
+  const initializeWebRTC = async () => {
+    try {
+      // Get user media (camera and microphone)
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { width: 640, height: 480 }, 
+        audio: true 
+      });
+      
+      setLocalStream(stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      // Create peer connection
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      // Add local stream to peer connection
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+      });
+
+      // Handle ICE candidates
+      pc.onicecandidate = async (event) => {
+        if (event.candidate) {
+          await addDoc(signalingRef, {
+            type: 'ice-candidate',
+            candidate: event.candidate.toJSON(),
+            from: 'student',
+            timestamp: new Date()
+          });
+        }
+      };
+
+      setPeerConnection(pc);
+
+      // Listen for signaling messages from teacher
+      const unsubscribe = onSnapshot(signalingRef, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            
+            if (data.from === 'teacher') {
+              if (data.type === 'offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                
+                await addDoc(signalingRef, {
+                  type: 'answer',
+                  answer: answer.toJSON(),
+                  from: 'student',
+                  timestamp: new Date()
+                });
+              } else if (data.type === 'ice-candidate') {
+                await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              }
+            }
+            
+            // Clean up processed signaling messages
+            await deleteDoc(change.doc.ref);
+          }
+        });
+      });
+
+      // Cleanup function will be handled in useEffect cleanup
+      return unsubscribe;
+    } catch (error) {
+      console.error('Failed to initialize WebRTC:', error);
+    }
+  };
 
   // Fullscreen functions
   const enterFullscreen = async () => {
@@ -258,6 +342,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       } else {
         localStorage.setItem('examTabCount', newCount.toString());
       }
+      
+      // Cleanup WebRTC
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      if (peerConnection) {
+        peerConnection.close();
+      }
     };
   }, [isFinished, isLoading, violations]);
 
@@ -427,6 +519,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div>
           <h2 className="text-xl font-bold">{exam.name}</h2>
           <p className="text-sm text-gray-400">{studentInfo.name}</p>
+        </div>
+        <div className="hidden">
+          <video 
+            ref={localVideoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className="w-32 h-24 bg-gray-900 rounded-md"
+          />
         </div>
         <div className="text-right">
           <div className="text-2xl font-mono bg-gray-900 px-4 py-2 rounded-lg">
