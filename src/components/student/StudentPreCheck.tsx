@@ -146,6 +146,15 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           />
         </div>
         
+        {checks.device && (
+          <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
+            <p className="text-blue-300 text-sm">
+              ℹ️ <strong>Penting:</strong> Ujian akan otomatis masuk mode fullscreen. 
+              Keluar dari fullscreen akan dianggap sebagai pelanggaran.
+            </p>
+          </div>
+        )}
+        
         <button 
           onClick={startExam} 
           disabled={!allChecksPassed} 

@@ -21,6 +21,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [answers, setAnswers] = useState<{ [key: string]: any }>({});
+  const [isFullscreenSupported, setIsFullscreenSupported] = useState(true);
   
   const calculateTimeLeft = () => {
     const endTime = new Date(exam.endTime).getTime();
@@ -40,9 +41,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
+  const fullscreenRetryCount = useRef(0);
+  const maxFullscreenRetries = 3;
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Check fullscreen support
+    const checkFullscreenSupport = () => {
+      const elem = document.documentElement;
+      return !!(elem.requestFullscreen || 
+               (elem as any).webkitRequestFullscreen || 
+               (elem as any).mozRequestFullScreen || 
+               (elem as any).msRequestFullscreen);
+    };
+    
+    setIsFullscreenSupported(checkFullscreenSupport());
     
     const fetchQuestions = async () => {
       try {
@@ -59,6 +73,54 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     fetchQuestions();
   }, [exam.id]);
 
+  // Fullscreen functions
+  const enterFullscreen = async () => {
+    try {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if ((elem as any).webkitRequestFullscreen) {
+        await (elem as any).webkitRequestFullscreen();
+      } else if ((elem as any).mozRequestFullScreen) {
+        await (elem as any).mozRequestFullScreen();
+      } else if ((elem as any).msRequestFullscreen) {
+        await (elem as any).msRequestFullscreen();
+      }
+      fullscreenRetryCount.current = 0;
+    } catch (error) {
+      console.error("Failed to enter fullscreen:", error);
+      fullscreenRetryCount.current++;
+      
+      if (fullscreenRetryCount.current < maxFullscreenRetries) {
+        setTimeout(() => {
+          if (!isFinished) {
+            enterFullscreen();
+          }
+        }, 2000);
+      } else {
+        handleViolation("Fullscreen Required - Unable to Enter");
+      }
+    }
+  };
+
+  const isInFullscreen = () => {
+    return !!(document.fullscreenElement || 
+             (document as any).webkitFullscreenElement || 
+             (document as any).mozFullScreenElement || 
+             (document as any).msFullscreenElement);
+  };
+
+  // Auto-enter fullscreen when exam loads
+  useEffect(() => {
+    if (!isLoading && questions.length > 0 && isFullscreenSupported && !isFinished) {
+      const timer = setTimeout(() => {
+        enterFullscreen();
+      }, 1000); // Small delay to ensure page is ready
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, questions.length, isFullscreenSupported, isFinished]);
+
   useEffect(() => {
     if (isFinished || isLoading) return;
     
@@ -66,6 +128,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const handleVisibilityChange = () => {
       if (document.hidden && !isFinished) {
         handleViolation("Tab/Window Switch");
+      }
+    };
+    
+    // Monitor fullscreen changes
+    const handleFullscreenChange = () => {
+      if (!isInFullscreen() && !isFinished) {
+        handleViolation("Exited Fullscreen");
+        // Auto re-enter fullscreen after violation
+        setTimeout(() => {
+          if (!isFinished) {
+            enterFullscreen();
+          }
+        }, 1000);
       }
     };
     
@@ -109,6 +184,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       if (
         e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 't' || e.key === 'n' || e.key === 'w') ||
         e.key === 'F12' ||
+        e.key === 'F11' || // Block F11 fullscreen toggle
+        e.key === 'Escape' || // Block Escape key (exits fullscreen)
         (e.ctrlKey && e.shiftKey && e.key === 'I') ||
         (e.ctrlKey && e.shiftKey && e.key === 'J') ||
         (e.ctrlKey && e.key === 'u') ||
@@ -150,6 +227,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
     window.addEventListener("blur", handleBlur);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
     window.addEventListener("storage", handleStorageChange);
     document.addEventListener("contextmenu", handleContextMenu);
     document.addEventListener("keydown", handleKeyDown);
@@ -161,6 +242,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
       window.removeEventListener("storage", handleStorageChange);
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("keydown", handleKeyDown);
@@ -222,6 +307,21 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setIsFinished(true);
     setShowConfirmModal(false);
     
+    // Exit fullscreen when exam is finished
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        await (document as any).webkitExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        await (document as any).mozCancelFullScreen();
+      } else if ((document as any).msExitFullscreen) {
+        await (document as any).msExitFullscreen();
+      }
+    } catch (error) {
+      console.error("Failed to exit fullscreen:", error);
+    }
+    
     let score = 0;
     let status = 'finished';
     
@@ -249,6 +349,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   if (isLoading) {
     return <div className="text-center p-8">Memuat soal ujian...</div>;
+  }
+  
+  if (!isFullscreenSupported) {
+    return (
+      <div className="text-center h-screen flex flex-col justify-center items-center -mt-16">
+        <div className="bg-red-800 p-8 rounded-lg shadow-xl max-w-md">
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Browser Tidak Didukung</h2>
+          <p className="text-gray-300 mb-4">
+            Browser Anda tidak mendukung mode fullscreen yang diperlukan untuk ujian ini.
+          </p>
+          <p className="text-sm text-gray-400">
+            Silakan gunakan browser modern seperti Chrome, Firefox, atau Edge versi terbaru.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (isFinished) {
