@@ -39,6 +39,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [isFinished, setIsFinished] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
   const [violationReason, setViolationReason] = useState('');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showCameraControls, setShowCameraControls] = useState(false);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -50,14 +52,27 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const fullscreenRetryCount = useRef(0);
   const maxFullscreenRetries = 3;
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const cameraInitRetryCount = useRef(0);
+  const maxCameraRetries = 5;
 
   useEffect(() => {
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Initialize camera for violation photos with proper setup
-    const initializeCamera = async () => {
+    // Initialize camera with retry mechanism
+    const initializeCamera = async (retryCount = 0) => {
       try {
+        // Stop existing stream if any
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => {
+            track.stop();
+            console.log("🛑 Stopping existing camera track");
+          });
+        }
+        
+        setCameraError(null);
+        setIsCameraReady(false);
+        
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
             width: { ideal: 1280, min: 640 },
@@ -82,6 +97,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 videoRef.current.videoHeight > 0) {
               console.log("📷 Camera ready:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
               setIsCameraReady(true);
+              cameraInitRetryCount.current = 0; // Reset retry count on success
             } else {
               setTimeout(checkVideoReady, 100);
             }
@@ -95,12 +111,25 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             if (!isCameraReady && videoRef.current) {
               console.log("📷 Camera timeout, forcing ready state");
               setIsCameraReady(true);
+              cameraInitRetryCount.current = 0;
             }
           }, 5000);
         }
       } catch (error) {
         console.error("Camera access failed:", error);
-        setIsCameraReady(false);
+        setCameraError(`Camera error: ${error.message}`);
+        
+        // Retry camera initialization
+        if (retryCount < maxCameraRetries) {
+          cameraInitRetryCount.current = retryCount + 1;
+          console.log(`🔄 Retrying camera initialization (${retryCount + 1}/${maxCameraRetries})`);
+          setTimeout(() => {
+            initializeCamera(retryCount + 1);
+          }, 2000); // Wait 2 seconds before retry
+        } else {
+          setIsCameraReady(false);
+          setCameraError("Camera failed after multiple attempts");
+        }
       }
     };
     
@@ -117,6 +146,79 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       }
     };
   }, []);
+
+  // Function to manually restart camera
+  const restartCamera = async () => {
+    console.log("🔄 Manually restarting camera...");
+    cameraInitRetryCount.current = 0;
+    
+    // Stop existing stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
+    }
+    
+    // Reinitialize camera
+    try {
+      setCameraError(null);
+      setIsCameraReady(false);
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+          facingMode: 'user'
+        },
+        audio: false
+      });
+      
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        
+        const checkVideoReady = () => {
+          if (videoRef.current && 
+              videoRef.current.readyState >= 2 && 
+              videoRef.current.videoWidth > 0 && 
+              videoRef.current.videoHeight > 0) {
+            console.log("📷 Camera restarted successfully:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
+            setIsCameraReady(true);
+          } else {
+            setTimeout(checkVideoReady, 100);
+          }
+        };
+        
+        videoRef.current.onloadedmetadata = checkVideoReady;
+        videoRef.current.oncanplay = checkVideoReady;
+      }
+    } catch (error) {
+      console.error("Manual camera restart failed:", error);
+      setCameraError(`Restart failed: ${error.message}`);
+    }
+  };
+
+  // Monitor camera stream health
+  useEffect(() => {
+    if (!isFinished && isCameraReady) {
+      const checkCameraHealth = setInterval(() => {
+        if (videoRef.current && streamRef.current) {
+          const video = videoRef.current;
+          const stream = streamRef.current;
+          
+          // Check if video is still playing and stream is active
+          if (video.readyState < 2 || !stream.active || stream.getTracks().length === 0) {
+            console.log("⚠️ Camera health check failed, attempting restart...");
+            setIsCameraReady(false);
+            restartCamera();
+          }
+        }
+      }, 10000); // Check every 10 seconds
+      
+      return () => clearInterval(checkCameraHealth);
+    }
+  }, [isCameraReady, isFinished]);
 
   useEffect(() => {
     // Check fullscreen support
@@ -705,17 +807,62 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
       {/* Hidden video element for violation snapshots */}
       {/* Live camera feed for student and violation capture */}
-      <div className="fixed top-4 right-4 z-50 bg-gray-800 rounded-lg border-2 border-gray-600 overflow-hidden">
+      <div className="fixed top-4 right-4 z-50 bg-gray-800 rounded-lg border-2 border-gray-600 overflow-hidden shadow-lg">
         <div className="bg-gray-700 px-2 py-1 text-xs text-white text-center">
           📷 Live Camera
         </div>
-        <video 
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-40 h-30 object-cover"
-        />
+        <div className="relative">
+          <video 
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-40 h-30 object-cover"
+          />
+          {!isCameraReady && (
+            <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
+              <div className="text-center text-xs text-gray-400">
+                {cameraError ? (
+                  <>
+                    <div>❌ Camera Error</div>
+                    <div className="mt-1">Retry {cameraInitRetryCount.current}/{maxCameraRetries}</div>
+                  </>
+                ) : (
+                  <>
+                    <div>⏳ Loading...</div>
+                    <div className="mt-1">Initializing</div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="bg-gray-700 px-2 py-1 flex justify-between items-center">
+          <button
+            onClick={() => setShowCameraControls(!showCameraControls)}
+            className="text-xs text-blue-400 hover:text-blue-300"
+          >
+            {showCameraControls ? '▼' : '▶'} Controls
+          </button>
+          <div className="text-xs text-gray-400">
+            {isCameraReady ? '🟢' : '🔴'}
+          </div>
+        </div>
+        {showCameraControls && (
+          <div className="bg-gray-700 px-2 py-2 border-t border-gray-600">
+            <button
+              onClick={restartCamera}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded"
+            >
+              🔄 Restart Camera
+            </button>
+            {cameraError && (
+              <div className="mt-1 text-xs text-red-400 text-center">
+                {cameraError}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Hidden canvas for photo capture */}
@@ -742,10 +889,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         ) : (
           <div className="text-yellow-400">⏳ Initializing Camera...</div>
-        )}
+            {cameraError ? (
+              <>
+                <div className="text-red-400">❌ Camera Error</div>
+                <div className="text-xs text-gray-300">
+                  Retry {cameraInitRetryCount.current}/{maxCameraRetries}
+                </div>
+              </>
+            ) : (
+              <div>⏳ Initializing Camera...</div>
+            )}
         <div className="text-xs text-gray-400 mt-1">
           Violations: {violations}/3
         </div>
+        {streamRef.current && (
+          <div className="text-xs text-gray-400">
+            Stream: {streamRef.current.active ? '🟢 Active' : '🔴 Inactive'}
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
