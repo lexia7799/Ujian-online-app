@@ -41,6 +41,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const isPlayingSoundRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const tabCountRef = useRef(1);
@@ -340,7 +341,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   }, [isFinished, isLoading, violations]);
 
   const playWarningSound = () => {
-    if (!audioContextRef.current) return;
+    // Prevent sound spam - only play if not already playing
+    if (isPlayingSoundRef.current || !audioContextRef.current) return;
+    
+    isPlayingSoundRef.current = true;
     
     const oscillator = audioContextRef.current.createOscillator();
     const gainNode = audioContextRef.current.createGain();
@@ -351,10 +355,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime);
     gainNode.gain.setValueAtTime(1, audioContextRef.current.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContextRef.current.currentTime + 1);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContextRef.current.currentTime + 0.5);
     
     oscillator.start(audioContextRef.current.currentTime);
     oscillator.stop(audioContextRef.current.currentTime + 0.5);
+    
+    // Reset sound flag after sound duration
+    setTimeout(() => {
+      isPlayingSoundRef.current = false;
+    }, 600); // Slightly longer than sound duration to prevent overlap
   };
 
   const handleViolation = (reason = "Unknown") => {
