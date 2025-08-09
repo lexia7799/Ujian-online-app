@@ -56,8 +56,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
-            width: { ideal: 640 },
-            height: { ideal: 480 },
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
             facingMode: 'user'
           } 
         });
@@ -66,11 +66,17 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           
           // Wait for video to be ready
           videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().then(() => {
-              console.log("Camera initialized successfully");
-            }).catch(err => {
-              console.error("Failed to play video:", err);
-            });
+            if (videoRef.current) {
+              videoRef.current.play().then(() => {
+                console.log("Camera initialized successfully", {
+                  videoWidth: videoRef.current?.videoWidth,
+                  videoHeight: videoRef.current?.videoHeight,
+                  readyState: videoRef.current?.readyState
+                });
+              }).catch(err => {
+                console.error("Failed to play video:", err);
+              });
+            }
           };
         }
       } catch (error) {
@@ -108,9 +114,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Function to capture snapshot on violation
   const captureViolationSnapshot = async (violationType: string) => {
-    if (!videoRef.current || videoRef.current.readyState !== 4) {
-      console.log("Video not ready for capture");
+    if (!videoRef.current) {
+      console.log("Video element not available");
       return null;
+    }
+    
+    // Wait a bit for video to be ready if it's not
+    if (videoRef.current.readyState < 2) {
+      console.log("Video not ready, waiting...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
     try {
@@ -118,8 +130,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       const context = canvas.getContext('2d');
       
       // Ensure we have valid dimensions
-      const videoWidth = videoRef.current.videoWidth || 640;
-      const videoHeight = videoRef.current.videoHeight || 480;
+      let videoWidth = videoRef.current.videoWidth;
+      let videoHeight = videoRef.current.videoHeight;
+      
+      // If video dimensions are not available, use element dimensions
+      if (!videoWidth || !videoHeight) {
+        videoWidth = videoRef.current.clientWidth || 640;
+        videoHeight = videoRef.current.clientHeight || 480;
+      }
       
       canvas.width = videoWidth;
       canvas.height = videoHeight;
@@ -128,8 +146,26 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         // Draw the video frame to canvas
         context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
         
-        // Convert to base64 with better quality
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        // Convert to base64 with high quality
+        const imageData = canvas.toDataURL('image/jpeg', 0.9);
+        
+        // Validate that we actually captured something
+        if (imageData.length < 1000) {
+          console.log("Captured image seems too small, retrying...");
+          // Try again with a small delay
+          await new Promise(resolve => setTimeout(resolve, 500));
+          context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
+          const retryImageData = canvas.toDataURL('image/jpeg', 0.9);
+          if (retryImageData.length > imageData.length) {
+            console.log("Retry successful, using new image");
+            return {
+              imageData: retryImageData,
+              timestamp: new Date().toISOString(),
+              violationType,
+              dimensions: { width: videoWidth, height: videoHeight }
+            };
+          }
+        }
         
         console.log("Snapshot captured successfully", {
           violationType,
@@ -369,10 +405,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const handleViolation = (reason = "Unknown") => {
     const newViolations = violations + 1;
     setViolations(newViolations);
-    updateDoc(sessionDocRef, { 
-      violations: newViolations,
-      lastViolation: { reason, timestamp: new Date() }
-    });
     playWarningSound();
     
     if (newViolations >= 3) {
@@ -380,21 +412,28 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     } else {
       // Capture snapshot on violation
       captureViolationSnapshot(reason).then(snapshot => {
+        const violationData = {
+          violations: newViolations,
+          lastViolation: { reason, timestamp: new Date() }
+        };
+        
         if (snapshot) {
           console.log("Saving violation snapshot to database");
-          const violationData = {
-            violations: newViolations,
-            lastViolation: { reason, timestamp: new Date() },
-            [`violationSnapshot_${newViolations}`]: snapshot
-          };
-          updateDoc(sessionDocRef, violationData);
+          violationData[`violationSnapshot_${newViolations}`] = snapshot;
+          console.log("Snapshot data being saved:", {
+            violationNumber: newViolations,
+            imageDataLength: snapshot.imageData.length,
+            violationType: snapshot.violationType
+          });
         } else {
           console.log("No snapshot captured, saving violation without photo");
-          updateDoc(sessionDocRef, { 
-            violations: newViolations,
-            lastViolation: { reason, timestamp: new Date() }
-          });
         }
+        
+        updateDoc(sessionDocRef, violationData).then(() => {
+          console.log("Violation data saved successfully");
+        }).catch(error => {
+          console.error("Failed to save violation data:", error);
+        });
       });
       
       setShowViolationModal(true);

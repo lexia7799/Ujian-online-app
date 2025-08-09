@@ -137,31 +137,43 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
               <div className="w-full aspect-video bg-gray-900 flex items-center justify-center">
                 {session.violations > 0 ? (
                   <div className="text-center p-4">
-                    {session.violationSnapshot_1?.imageData ? (
+                    {(session.violationSnapshot_1?.imageData || session.violationSnapshot_2?.imageData) ? (
                       <div>
-                        <img 
-                          src={session.violationSnapshot_1.imageData} 
-                          alt="Preview Violation" 
-                          className="w-full h-full object-cover rounded"
-                          onLoad={() => console.log("Preview image loaded successfully")}
-                          onError={(e) => {
-                            console.error("Failed to load preview image:", session.violationSnapshot_1?.imageData?.substring(0, 50));
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ) : session.violationSnapshot_2?.imageData ? (
-                      <div>
-                        <img 
-                          src={session.violationSnapshot_2.imageData} 
-                          alt="Preview Violation" 
-                          className="w-full h-full object-cover rounded"
-                          onLoad={() => console.log("Preview image loaded successfully")}
-                          onError={(e) => {
-                            console.error("Failed to load preview image:", session.violationSnapshot_2?.imageData?.substring(0, 50));
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
+                        {session.violationSnapshot_1?.imageData ? (
+                          <img 
+                            src={session.violationSnapshot_1.imageData} 
+                            alt="Preview Violation 1" 
+                            className="w-full h-full object-cover rounded"
+                            onLoad={() => {
+                              console.log("Preview image 1 loaded successfully");
+                            }}
+                            onError={(e) => {
+                              console.error("Failed to load preview image 1:", {
+                                hasImageData: !!session.violationSnapshot_1?.imageData,
+                                imageDataLength: session.violationSnapshot_1?.imageData?.length,
+                                imageDataStart: session.violationSnapshot_1?.imageData?.substring(0, 50)
+                              });
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : session.violationSnapshot_2?.imageData ? (
+                          <img 
+                            src={session.violationSnapshot_2.imageData} 
+                            alt="Preview Violation 2" 
+                            className="w-full h-full object-cover rounded"
+                            onLoad={() => {
+                              console.log("Preview image 2 loaded successfully");
+                            }}
+                            onError={(e) => {
+                              console.error("Failed to load preview image 2:", {
+                                hasImageData: !!session.violationSnapshot_2?.imageData,
+                                imageDataLength: session.violationSnapshot_2?.imageData?.length,
+                                imageDataStart: session.violationSnapshot_2?.imageData?.substring(0, 50)
+                              });
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : null}
                       </div>
                     ) : (
                       <div>
@@ -171,7 +183,16 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                           </svg>
                         </div>
                         <p className="text-sm text-yellow-400 font-bold">Ada Pelanggaran!</p>
-                        <p className="text-xs text-gray-400">Foto tidak tersedia</p>
+                        <p className="text-xs text-gray-400">
+                          Foto sedang diproses atau gagal diambil
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Debug: {JSON.stringify({
+                            snap1: !!session.violationSnapshot_1,
+                            snap2: !!session.violationSnapshot_2,
+                            violations: session.violations
+                          })}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -215,9 +236,9 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                     {session.violationSnapshot_1?.imageData && (
                       <button 
                         onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name)}
-                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded"
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded mb-1"
                       >
-                        Lihat Foto Pelanggaran 1
+                        📸 Foto Pelanggaran 1: {session.violationSnapshot_1.violationType}
                       </button>
                     )}
                     {session.violationSnapshot_2?.imageData && (
@@ -225,8 +246,13 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name)}
                         className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded"
                       >
-                        Lihat Foto Pelanggaran 2
+                        📸 Foto Pelanggaran 2: {session.violationSnapshot_2.violationType}
                       </button>
+                    )}
+                    {!session.violationSnapshot_1?.imageData && !session.violationSnapshot_2?.imageData && (
+                      <div className="w-full bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded text-center">
+                        ⚠️ Foto pelanggaran tidak tersedia
+                      </div>
                     )}
                   </div>
                 )}
