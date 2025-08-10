@@ -842,7 +842,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             onClick={() => setShowCameraControls(!showCameraControls)}
             className="text-xs text-blue-400 hover:text-blue-300"
           >
-            {showCameraControls ? '▼' : '▶'} Controls
+            {showCameraControls ? '▼' : '▶'} Perbaiki Kamera
           </button>
           <div className="text-xs text-gray-400">
             {isCameraReady ? '🟢' : '🔴'}
@@ -902,7 +902,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         <div className="text-xs text-gray-400 mt-1">
-          Violations: {violations}/3
+          Jumlah Pelanggaran: {violations}/3
         </div>
         {streamRef.current && (
           <div className="text-xs text-gray-400">

@@ -262,7 +262,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                       session.violations > 0 ? 'text-yellow-400' : ''
                     }`}
                   >
-                    Pelanggaran: {session.violations}/3
+                    Jumlah Pelanggaran: {session.violations}/3
                   </span>
                 </div>
                 {session.violations > 0 && (

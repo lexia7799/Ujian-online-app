@@ -11,13 +11,13 @@ interface StudentPreCheckProps {
 interface DeviceChecks {
   device: boolean | null;
   camera: boolean | null;
-  mic: boolean | null;
   screenCount: boolean | null;
 }
 
 const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState }) => {
   const { studentInfo } = appState;
   const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, mic: null, screenCount: null });
+  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null });
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -46,20 +46,20 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     
     if (isMobile) return;
     
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    navigator.mediaDevices.getUserMedia({ video: true })
       .then(stream => {
-        setChecks(c => ({ ...c, camera: true, mic: true }));
+        setChecks(c => ({ ...c, camera: true }));
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       })
       .catch(err => {
         console.error("Error accessing media devices.", err);
-        setChecks(c => ({ ...c, camera: false, mic: false }));
+        setChecks(c => ({ ...c, camera: false }));
       });
   }, []);
 
-  const allChecksPassed = checks.device && checks.camera && checks.mic && checks.screenCount;
+  const allChecksPassed = checks.device && checks.camera && checks.screenCount;
 
   const startExam = async () => {
     const { exam } = appState;
@@ -115,7 +115,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           {renderCheckItem("Akses dari Desktop", checks.device)}
           {renderCheckItem("Layar Tunggal", checks.screenCount)}
           {renderCheckItem("Akses Kamera", checks.camera)}
-          {renderCheckItem("Akses Mikrofon", checks.mic)}
         </ul>
         
         {checks.device === false && (
@@ -130,9 +129,9 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           </p>
         )}
         
-        {(checks.camera === false || checks.mic === false) && (
+        {checks.camera === false && (
           <p className="text-yellow-400 text-center mb-4">
-            ⚠️ Mohon izinkan akses kamera dan mikrofon di browser Anda, lalu segarkan halaman ini.
+            ⚠️ Mohon izinkan akses kamera di browser Anda, lalu segarkan halaman ini.
           </p>
         )}
         
