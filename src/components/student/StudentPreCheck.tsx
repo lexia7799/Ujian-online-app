@@ -16,7 +16,6 @@ interface DeviceChecks {
 
 const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState }) => {
   const { studentInfo } = appState;
-  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, mic: null, screenCount: null });
   const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null });
   const videoRef = useRef<HTMLVideoElement>(null);
 
