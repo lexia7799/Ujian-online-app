@@ -18,6 +18,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Aturan untuk data teachers - izinkan akses tanpa autentikasi untuk registrasi/login
+    match /artifacts/{appId}/public/data/teachers/{teacherId} {
+      allow read, write: if true;
+    }
+
+    // Aturan untuk data students - izinkan akses tanpa autentikasi untuk registrasi/login
+    match /artifacts/{appId}/public/data/students/{studentId} {
+      allow read, write: if true;
+    }
+
     // Aturan untuk data ujian utama - izinkan akses untuk semua user
     match /artifacts/{appId}/public/data/exams/{examId} {
       allow read, write: if true;
@@ -48,10 +58,30 @@ service cloud.firestore {
     match /violations/{examId}/{sessionId}/{document=**} {
       allow read, write: if true;
     }
-
-    // Aturan untuk session data global (jika ada)
+    match /artifacts/{appId}/public/data/exams/{examId} {
+      allow read, write: if true;
+      
+      // Subcollection questions
+      match /questions/{questionId} {
+        allow read, write: if true;
+      }
+      
+      // Subcollection sessions (sesi ujian siswa)
+      match /sessions/{sessionId} {
+        allow read, write: if true;
+      }
+      
+      // Subcollection applications (aplikasi siswa untuk ikut ujian)
+      match /applications/{applicationId} {
+        allow read, write: if true;
+      }
     match /artifacts/{appId}/public/data/sessions/{sessionId} {
       allow read, write: if true;
+    // Aturan untuk WebRTC Signaling (tetap dari rules lama).
+    // Mengizinkan pengguna untuk bertukar data sinyal video.
+    match /signaling/{examId}/{sessionId}/{document=**} {
+      allow read, write: if true;
     }
+
   }
 }
