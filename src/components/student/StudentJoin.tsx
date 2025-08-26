@@ -44,10 +44,12 @@ const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, can
           );
           
           const sessionsSnapshot = await getDocs(sessionsQuery);
+          let hasAnySession = false;
           let hasCompletedSession = false;
           
           sessionsSnapshot.forEach(sessionDoc => {
             const sessionData = sessionDoc.data();
+            hasAnySession = true;
             if (['finished', 'disqualified'].includes(sessionData.status)) {
               hasCompletedSession = true;
             }
@@ -55,6 +57,11 @@ const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, can
           
           if (hasCompletedSession) {
             setError('Anda sudah menyelesaikan ujian dengan kode ini dan tidak dapat mengaksesnya lagi.');
+            return;
+          }
+          
+          if (hasAnySession) {
+            setError('Anda sudah mengikuti ujian dengan kode ini. Tidak dapat mengikuti ujian yang sama dua kali.');
             return;
           }
         }
