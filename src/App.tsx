@@ -10,7 +10,6 @@ import StudentRegister from './components/auth/StudentRegister';
 import StudentLogin from './components/auth/StudentLogin';
 import StudentDashboard from './components/student/StudentDashboard';
 import StudentJoinExam from './components/student/StudentJoinExam';
-import StudentJoinExam from './components/student/StudentJoinExam';
 import StudentWaitingRoom from './components/student/StudentWaitingRoom';
 import StudentConfirmation from './components/teacher/StudentConfirmation';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
