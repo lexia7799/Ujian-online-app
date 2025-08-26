@@ -299,7 +299,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             ) : (
               sessions.map(session => (
                 <tr key={session.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4 font-semibold">{session.studentInfo.name}</td>
+                  <td className="p-4 font-semibold">{session.studentInfo.name || session.studentInfo.fullName || 'N/A'}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.nim}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.className}</td>
