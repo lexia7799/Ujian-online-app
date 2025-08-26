@@ -511,7 +511,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           </div>
         </div>
       )}
-      </div>
 
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-2xl font-bold">Riwayat Ujian</h3>
