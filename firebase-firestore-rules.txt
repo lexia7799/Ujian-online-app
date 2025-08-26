@@ -8,49 +8,50 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Aturan untuk data teachers - hanya pengguna yang sudah login
+    // Aturan untuk data teachers - izinkan akses tanpa autentikasi untuk registrasi/login
     match /artifacts/{appId}/public/data/teachers/{teacherId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
-    // Aturan untuk data students - hanya pengguna yang sudah login
+    // Aturan untuk data students - izinkan akses tanpa autentikasi untuk registrasi/login
     match /artifacts/{appId}/public/data/students/{studentId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
-    // Aturan untuk data ujian utama - hanya pengguna yang sudah login
+    // Aturan untuk data ujian utama - izinkan akses untuk semua user
     match /artifacts/{appId}/public/data/exams/{examId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
       
       // Aturan untuk subcollection questions
       match /questions/{questionId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if true;
       }
       
       // Aturan untuk subcollection sessions (sesi ujian siswa)
       match /sessions/{sessionId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if true;
       }
       
       // Aturan untuk subcollection applications (aplikasi siswa untuk ikut ujian)
       match /applications/{applicationId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if true;
       }
     }
 
-    // Aturan untuk WebRTC Signaling (jika diperlukan untuk video monitoring)
+    // Aturan BARU khusus untuk WebRTC Signaling.
+    // Mengizinkan pengguna untuk bertukar data sinyal video.
     match /signaling/{examId}/{sessionId}/{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Aturan untuk violation snapshots (foto pelanggaran)
     match /violations/{examId}/{sessionId}/{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Aturan untuk session data global (jika ada)
     match /artifacts/{appId}/public/data/sessions/{sessionId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
