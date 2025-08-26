@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { User } from 'firebase/auth';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import CreateExamForm from './CreateExamForm';
 
 interface TeacherDashboardProps {
-  user: any;
+  user: User;
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
   canGoBack: boolean;

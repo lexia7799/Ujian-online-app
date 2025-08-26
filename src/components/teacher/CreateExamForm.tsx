@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { User } from 'firebase/auth';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CreateExamFormProps {
-  user: any;
+  user: User;
   navigateTo: (page: string, data?: any) => void;
   navigateBack?: () => void;
 }
@@ -36,7 +37,7 @@ const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo, navig
     
     try {
       const docRef = await addDoc(examsRef, {
-        teacherId: user.id,
+        teacherId: user.uid,
         name: examName,
         startTime: startTime,
         endTime: endTime,
