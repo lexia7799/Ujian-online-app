@@ -43,7 +43,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
       const examData = examDoc.data();
 
       // Get student profile
-      const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.uid));
+      const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
       if (!studentDoc.exists()) {
         setError('Profil siswa tidak ditemukan. Silakan logout dan login kembali.');
         setIsLoading(false);
@@ -54,7 +54,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
 
       // Check if already applied
       const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${examDoc.id}/applications`);
-      const existingQuery = query(applicationsRef, where("studentId", "==", user.uid));
+      const existingQuery = query(applicationsRef, where("studentId", "==", user.id));
       const existingSnapshot = await getDocs(existingQuery);
 
       if (!existingSnapshot.empty) {
@@ -65,7 +65,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
 
       // Create application
       await addDoc(applicationsRef, {
-        studentId: user.uid,
+        studentId: user.id,
         studentData: {
           fullName: studentData.fullName,
           username: studentData.username,

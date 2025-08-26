@@ -33,7 +33,7 @@ const StudentWaitingRoom: React.FC<StudentWaitingRoomProps> = ({ user, navigateT
 
           // Listen to application status
           const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${examDoc.id}/applications`);
-          const applicationQuery = query(applicationsRef, where("studentId", "==", user.uid));
+          const applicationQuery = query(applicationsRef, where("studentId", "==", user.id));
           
           const unsubscribe = onSnapshot(applicationQuery, (snapshot) => {
             if (!snapshot.empty) {
