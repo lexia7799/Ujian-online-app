@@ -21,12 +21,22 @@ interface QuestionManagerProps {
 }
 
 const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, navigateBack, appState }) => {
-  const { exam } = appState;
+  const { exam, parentExam } = appState;
   const [questions, setQuestions] = useState<Question[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [currentExam, setCurrentExam] = useState(exam);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
+
+  const handleBackNavigation = () => {
+    // If we have parentExam data, we came from teacher dashboard, so go back there
+    if (parentExam) {
+      navigateBack();
+    } else {
+      // Fallback to normal back navigation
+      navigateBack();
+    }
+  };
 
   const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
   const examDocRef = doc(db, `artifacts/${appId}/public/data/exams`, exam.id);
@@ -89,7 +99,7 @@ const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, navigateB
       </Modal>
 
       <button 
-        onClick={navigateBack} 
+        onClick={handleBackNavigation} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali

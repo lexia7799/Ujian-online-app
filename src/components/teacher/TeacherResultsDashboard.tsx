@@ -27,10 +27,20 @@ interface TeacherResultsDashboardProps {
 }
 
 const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navigateTo, navigateBack, appState }) => {
-  const { exam } = appState;
+  const { exam, parentExam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+
+  const handleBackNavigation = () => {
+    // If we have parentExam data, we came from teacher dashboard, so go back there
+    if (parentExam) {
+      navigateBack();
+    } else {
+      // Fallback to normal back navigation
+      navigateBack();
+    }
+  };
 
   useEffect(() => {
     if (!exam?.id) return;
@@ -249,7 +259,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   return (
     <div>
       <button 
-        onClick={navigateBack} 
+        onClick={handleBackNavigation} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali

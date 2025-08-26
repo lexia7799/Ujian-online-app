@@ -22,10 +22,20 @@ interface StudentConfirmationProps {
 }
 
 const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack, appState }) => {
-  const { exam } = appState;
+  const { exam, parentExam } = appState;
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleBackNavigation = () => {
+    // If we have parentExam data, we came from teacher dashboard, so go back there
+    if (parentExam) {
+      navigateBack();
+    } else {
+      // Fallback to normal back navigation
+      navigateBack();
+    }
+  };
 
   useEffect(() => {
     if (!exam?.id) return;
@@ -111,7 +121,7 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   return (
     <div>
       <button 
-        onClick={navigateBack} 
+        onClick={handleBackNavigation} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
       >
         &larr; Kembali

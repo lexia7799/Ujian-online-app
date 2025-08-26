@@ -19,6 +19,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   const [error, setError] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [inputPassword, setInputPassword] = useState('');
+  const [currentExam, setCurrentExam] = useState<any>(null);
 
   const handleSearchExam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +51,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     e.preventDefault();
     if (inputPassword === foundExam.password) {
       setIsVerified(true);
+      setCurrentExam(foundExam);
       setError('');
     } else {
       setError('Password salah.');
     }
+  };
+
+  const handleNavigateToFeature = (page: string, data: any) => {
+    // Store current exam in navigation data so child components can navigate back properly
+    navigateTo(page, { ...data, parentExam: currentExam });
   };
 
   return (
@@ -137,25 +144,25 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button 
-                  onClick={() => navigateTo('student_confirmation', { exam: foundExam })} 
+                  onClick={() => handleNavigateToFeature('student_confirmation', { exam: foundExam })} 
                   className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Konfirmasi Siswa
                 </button>
                 <button 
-                  onClick={() => navigateTo('teacher_results', { exam: foundExam })} 
+                  onClick={() => handleNavigateToFeature('teacher_results', { exam: foundExam })} 
                   className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Lihat Hasil
                 </button>
                 <button 
-                  onClick={() => navigateTo('teacher_proctoring', { exam: foundExam })} 
+                  onClick={() => handleNavigateToFeature('teacher_proctoring', { exam: foundExam })} 
                   className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Awasi Ujian
                 </button>
                 <button 
-                  onClick={() => navigateTo('question_manager', { exam: foundExam })} 
+                  onClick={() => handleNavigateToFeature('question_manager', { exam: foundExam })} 
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Kelola Soal
