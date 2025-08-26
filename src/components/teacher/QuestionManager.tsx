@@ -29,13 +29,7 @@ const QuestionManager: React.FC<QuestionManagerProps> = ({ navigateTo, navigateB
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
 
   const handleBackNavigation = () => {
-    // If we have parentExam data, we came from teacher dashboard, so go back there
-    if (parentExam) {
-      navigateBack();
-    } else {
-      // Fallback to normal back navigation
-      navigateBack();
-    }
+    navigateBack();
   };
 
   const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);

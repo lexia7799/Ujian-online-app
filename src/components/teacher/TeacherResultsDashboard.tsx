@@ -33,13 +33,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
   const handleBackNavigation = () => {
-    // If we have parentExam data, we came from teacher dashboard, so go back there
-    if (parentExam) {
-      navigateBack();
-    } else {
-      // Fallback to normal back navigation
-      navigateBack();
-    }
+    navigateBack();
   };
 
   useEffect(() => {

@@ -48,13 +48,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
   } | null>(null);
 
   const handleBackNavigation = () => {
-    // If we have parentExam data, we came from teacher dashboard, so go back there
-    if (parentExam) {
-      navigateBack();
-    } else {
-      // Fallback to normal back navigation
-      navigateBack();
-    }
+    navigateBack();
   };
 
   useEffect(() => {

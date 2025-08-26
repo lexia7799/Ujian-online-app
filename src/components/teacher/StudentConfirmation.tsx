@@ -28,13 +28,7 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   const [isLoading, setIsLoading] = useState(false);
 
   const handleBackNavigation = () => {
-    // If we have parentExam data, we came from teacher dashboard, so go back there
-    if (parentExam) {
-      navigateBack();
-    } else {
-      // Fallback to normal back navigation
-      navigateBack();
-    }
+    navigateBack();
   };
 
   useEffect(() => {

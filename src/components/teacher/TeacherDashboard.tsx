@@ -3,6 +3,10 @@ import { User } from 'firebase/auth';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import CreateExamForm from './CreateExamForm';
+import StudentConfirmation from './StudentConfirmation';
+import TeacherResultsDashboard from './TeacherResultsDashboard';
+import TeacherProctoringDashboard from './TeacherProctoringDashboard';
+import QuestionManager from './QuestionManager';
 
 interface TeacherDashboardProps {
   user?: any;
@@ -13,6 +17,7 @@ interface TeacherDashboardProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
   const [view, setView] = useState('search');
+  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager'>('main');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,10 +64,70 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   };
 
   const handleNavigateToFeature = (page: string, data: any) => {
-    // Store current exam in navigation data so child components can navigate back properly
-    navigateTo(page, { ...data, parentExam: currentExam });
+    // Navigate to different views within the dashboard
+    switch (page) {
+      case 'student_confirmation':
+        setCurrentView('student_confirmation');
+        break;
+      case 'teacher_results':
+        setCurrentView('teacher_results');
+        break;
+      case 'teacher_proctoring':
+        setCurrentView('teacher_proctoring');
+        break;
+      case 'question_manager':
+        setCurrentView('question_manager');
+        break;
+      default:
+        navigateTo(page, data);
+    }
   };
 
+  const handleBackToMain = () => {
+    setCurrentView('main');
+  };
+
+  // Render different views based on currentView
+  if (currentView === 'student_confirmation') {
+    return (
+      <StudentConfirmation 
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'teacher_results') {
+    return (
+      <TeacherResultsDashboard 
+        navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'teacher_proctoring') {
+    return (
+      <TeacherProctoringDashboard 
+        navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'question_manager') {
+    return (
+      <QuestionManager 
+        navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  // Main dashboard view
   return (
     <div>
       {canGoBack && (
