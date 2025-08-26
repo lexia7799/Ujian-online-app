@@ -70,13 +70,21 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       return;
     }
 
+    // Ensure studentInfo is properly defined
+    const finalStudentInfo = studentInfo || {
+      fullName: user.fullName || '',
+      nim: user.nim || '',
+      major: user.major || '',
+      className: user.className || ''
+    };
+
     const { exam } = appState;
     const sessionRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     
     try {
       const docRef = await addDoc(sessionRef, {
         studentId: user.id,
-        studentInfo: studentInfo,
+        studentInfo: finalStudentInfo,
         startTime: new Date(),
         status: 'started',
         violations: 0,
