@@ -23,7 +23,7 @@ const StudentExamStatusCheck: React.FC<StudentExamStatusCheckProps> = ({ navigat
       } else if (now > endTime) {
         setStatusMessage('Waktu untuk mengikuti ujian ini telah berakhir.');
       } else {
-        navigateTo('student_precheck');
+        navigateTo('student_precheck', { exam: exam, studentInfo: studentInfo });
       }
     };
     checkStatus();
