@@ -28,6 +28,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [studentProfile, setStudentProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [availableExams, setAvailableExams] = useState<any[]>([]);
+  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
+  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
 
   useEffect(() => {
     // Check if user and user.id exist
@@ -51,6 +53,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       try {
         const results: ExamResult[] = [];
         const available: any[] = [];
+        const pending: any[] = [];
+        const rejected: any[] = [];
         
         // Get all exams
         const examsSnapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/exams`));
@@ -108,24 +112,35 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             const applicationsQuery = query(
               collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
               where('studentId', '==', user.id),
-              where('status', '==', 'approved')
+              where('status', 'in', ['approved', 'pending', 'rejected'])
             );
             
             const applicationsSnapshot = await getDocs(applicationsQuery);
-            if (!applicationsSnapshot.empty) {
-              const now = new Date();
-              const startTime = new Date(examData.startTime);
-              const endTime = new Date(examData.endTime);
+            applicationsSnapshot.forEach(appDoc => {
+              const appData = appDoc.data();
+              const examWithApp = {
+                id: examId,
+                name: examData.name,
+                code: examData.code,
+                applicationStatus: appData.status,
+                appliedAt: appData.appliedAt?.toDate() || new Date(),
+                ...examData
+              };
               
-              if (now >= startTime && now <= endTime && examData.status === 'published') {
-                available.push({
-                  id: examId,
-                  name: examData.name,
-                  code: examData.code,
-                  ...examData
-                });
+              if (appData.status === 'approved') {
+                const now = new Date();
+                const startTime = new Date(examData.startTime);
+                const endTime = new Date(examData.endTime);
+                
+                if (now >= startTime && now <= endTime && examData.status === 'published') {
+                  available.push(examWithApp);
+                }
+              } else if (appData.status === 'pending') {
+                pending.push(examWithApp);
+              } else if (appData.status === 'rejected') {
+                rejected.push(examWithApp);
               }
-            }
+            });
           }
         }
         
@@ -137,6 +152,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           return b.finishTime.getTime() - a.finishTime.getTime();
         }));
         setAvailableExams(available);
+        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
+        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setIsLoading(false);
       } catch (error) {
         console.error('Error fetching exam results:', error);
@@ -232,6 +249,59 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Pending Applications Section */}
+      {pendingApplications.length > 0 && (
+        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-4 rounded-lg">
+          <h4 className="text-lg font-bold text-yellow-400 mb-3">⏳ Aplikasi Ujian Menunggu Konfirmasi</h4>
+          <div className="space-y-2">
+            {pendingApplications.map(exam => (
+              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
+                <div>
+                  <span className="font-bold">{exam.name}</span>
+                  <span className="text-gray-400 ml-2">({exam.code})</span>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
+                  </div>
+                </div>
+                <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
+                  Menunggu Konfirmasi
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-gray-300 mt-3">
+            💡 Aplikasi Anda sedang menunggu persetujuan dari dosen. Silakan tunggu hingga dosen mengkonfirmasi.
+          </p>
+        </div>
+      )}
+
+      {/* Rejected Applications Section */}
+      {rejectedApplications.length > 0 && (
+        <div className="mb-6 bg-red-800 border border-red-500 p-4 rounded-lg">
+          <h4 className="text-lg font-bold text-red-400 mb-3">❌ Aplikasi Ujian Ditolak</h4>
+          <div className="space-y-2">
+            {rejectedApplications.map(exam => (
+              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
+                <div>
+                  <span className="font-bold">{exam.name}</span>
+                  <span className="text-gray-400 ml-2">({exam.code})</span>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
+                  </div>
+                </div>
+                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
+                  Ditolak
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-gray-300 mt-3">
+            💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
+          </p>
+        </p>
         </div>
       )}
 
