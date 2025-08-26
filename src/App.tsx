@@ -3,17 +3,11 @@ import HomePage from './pages/HomePage';
 import TeacherAuthChoice from './components/auth/TeacherAuthChoice';
 import TeacherRegister from './components/auth/TeacherRegister';
 import TeacherLogin from './components/auth/TeacherLogin';
-import StudentAuthChoice from './components/auth/StudentAuthChoice';
-import StudentRegister from './components/auth/StudentRegister';
-import StudentLogin from './components/auth/StudentLogin';
-import StudentDashboard from './components/student/StudentDashboard';
-import StudentJoinExam from './components/student/StudentJoinExam';
-import StudentWaitingRoom from './components/student/StudentWaitingRoom';
-import StudentConfirmation from './components/teacher/StudentConfirmation';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import QuestionManager from './components/teacher/QuestionManager';
 import TeacherProctoringDashboard from './components/teacher/TeacherProctoringDashboard';
 import TeacherResultsDashboard from './components/teacher/TeacherResultsDashboard';
+import StudentConfirmation from './components/teacher/StudentConfirmation';
 import StudentJoin from './components/student/StudentJoin';
 import StudentIdentity from './components/student/StudentIdentity';
 import StudentExamStatusCheck from './components/student/StudentExamStatusCheck';
@@ -95,24 +89,12 @@ function App() {
         return <TeacherRegister {...props} />;
       case 'teacher_login':
         return <TeacherLogin {...props} />;
-      case 'student_auth_choice':
-        return <StudentAuthChoice {...props} />;
-      case 'student_register':
-        return <StudentRegister {...props} />;
-      case 'student_login':
-        return <StudentLogin {...props} />;
-      case 'student_dashboard':
-        return <StudentDashboard {...props} />;
-      case 'student_join_exam':
-        return <StudentJoinExam {...props} />;
-      case 'student_waiting_room':
-        return <StudentWaitingRoom {...props} />;
-      case 'student_confirmation':
-        return <StudentConfirmation {...props} />;
       case 'teacher_dashboard':
         return <TeacherDashboard {...props} />;
       case 'question_manager':
         return <QuestionManager {...props} />;
+      case 'student_confirmation':
+        return <StudentConfirmation {...props} />;
       case 'student_join':
         return <StudentJoin {...props} />;
       case 'student_identity':

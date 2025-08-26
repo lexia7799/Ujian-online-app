@@ -32,7 +32,7 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo, navigateBack, canGoBack
           <LockIcon /> Saya Dosen
         </button>
         <button 
-          onClick={() => navigateTo('student_auth_choice')} 
+          onClick={() => navigateTo('student_join')} 
           className="flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105"
         >
           <UserIcon /> Saya Siswa
