@@ -110,7 +110,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             }
             
             // Include all sessions (finished, disqualified, started)
-            if (['finished', 'disqualified', 'started'].includes(sessionData.status)) {
+            if (['finished', 'disqualified'].includes(sessionData.status)) {
               // Calculate essay score if available
               let essayScore = undefined;
               let totalScore = undefined;

@@ -114,7 +114,7 @@ function App() {
       case 'question_manager':
         return <QuestionManager {...props} />;
       case 'student_join':
-        return <StudentJoin {...props} />;
+        return <StudentJoin {...props} user={currentUser} />;
       case 'student_identity':
         return <StudentIdentity {...props} />;
       case 'student_status_check':

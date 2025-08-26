@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, collectionGroup } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface StudentJoinProps {
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
   canGoBack: boolean;
+  user?: any;
 }
 
-const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, canGoBack }) => {
+const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, canGoBack, user }) => {
   const [examCode, setExamCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,32 @@ const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, can
         setError('Kode ujian tidak ditemukan atau tidak valid.');
       } else {
         const examDoc = querySnapshot.docs[0];
-        navigateTo('student_identity', { exam: { id: examDoc.id, ...examDoc.data() } });
+        const examData = { id: examDoc.id, ...examDoc.data() };
+        
+        // Check if student has already completed this exam
+        if (user && user.id) {
+          const sessionsQuery = query(
+            collection(db, `artifacts/${appId}/public/data/exams/${examDoc.id}/sessions`),
+            where('studentId', '==', user.id)
+          );
+          
+          const sessionsSnapshot = await getDocs(sessionsQuery);
+          let hasCompletedSession = false;
+          
+          sessionsSnapshot.forEach(sessionDoc => {
+            const sessionData = sessionDoc.data();
+            if (['finished', 'disqualified'].includes(sessionData.status)) {
+              hasCompletedSession = true;
+            }
+          });
+          
+          if (hasCompletedSession) {
+            setError('Anda sudah menyelesaikan ujian dengan kode ini dan tidak dapat mengaksesnya lagi.');
+            return;
+          }
+        }
+        
+        navigateTo('student_identity', { exam: examData });
       }
     } catch (err) {
       setError('Terjadi kesalahan saat validasi kode.');
