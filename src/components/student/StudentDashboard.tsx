@@ -51,33 +51,45 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       where('studentId', '==', user.id)
     );
 
-    const unsubscribe = onSnapshot(sessionsQuery, async (snapshot) => {
-      const results: ExamResult[] = [];
-      
-      for (const sessionDoc of snapshot.docs) {
-        const sessionData = sessionDoc.data();
+    const unsubscribe = onSnapshot(
+      sessionsQuery, 
+      async (snapshot) => {
+        const results: ExamResult[] = [];
         
-        // Filter by status in code instead of query
-        if (!['finished', 'disqualified'].includes(sessionData.status)) {
-          continue;
+        for (const sessionDoc of snapshot.docs) {
+          const sessionData = sessionDoc.data();
+          
+          // Filter by status in code instead of query
+          if (!['finished', 'disqualified'].includes(sessionData.status)) {
+            continue;
+          }
+          
+          // Get exam name
+          const examDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/exams`, sessionData.examId));
+          const examData = examDoc.data();
+          
+          results.push({
+            id: sessionDoc.id,
+            examName: examData?.name || 'Unknown Exam',
+            finalScore: sessionData.finalScore || 0,
+            finishTime: sessionData.finishTime?.toDate() || new Date(),
+            status: sessionData.status
+          });
         }
         
-        // Get exam name
-        const examDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/exams`, sessionData.examId));
-        const examData = examDoc.data();
-        
-        results.push({
-          id: sessionDoc.id,
-          examName: examData?.name || 'Unknown Exam',
-          finalScore: sessionData.finalScore || 0,
-          finishTime: sessionData.finishTime?.toDate() || new Date(),
-          status: sessionData.status
-        });
+        setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching exam results:', error);
+        if (error.code === 'failed-precondition') {
+          console.warn('Firestore index required. Please create the index in Firebase Console.');
+          // Set empty results and stop loading when index is missing
+          setExamResults([]);
+        }
+        setIsLoading(false);
       }
-      
-      setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
-      setIsLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, [user?.id]);
