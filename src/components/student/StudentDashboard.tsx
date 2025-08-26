@@ -203,6 +203,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               <div>
                 <h3 className="text-xl font-bold">{studentProfile.fullName}</h3>
                 <p className="text-gray-400">{studentProfile.major} - {studentProfile.className}</p>
+                <p className="text-gray-400">NIM/NIS: {studentProfile.nim || 'N/A'}</p>
                 <p className="text-gray-400">{studentProfile.university}</p>
               </div>
             </div>
@@ -319,7 +320,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           <table className="w-full text-left">
             <thead className="bg-gray-700">
               <tr>
-                <th className="p-4">NIM/NIS</th>
                 <th className="p-4">Nama Ujian</th>
                 <th className="p-4">Kode Ujian</th>
                 <th className="p-4">Nilai PG</th>
@@ -332,7 +332,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             <tbody>
               {examResults.map(result => (
                 <tr key={result.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4 text-gray-400 font-mono">{studentProfile?.nim || 'N/A'}</td>
                   <td className="p-4 font-semibold">{result.examName}</td>
                   <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
                   <td className="p-4">
