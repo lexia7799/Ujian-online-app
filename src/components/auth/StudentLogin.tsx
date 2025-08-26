@@ -9,7 +9,7 @@ interface StudentLoginProps {
 
 const StudentLogin: React.FC<StudentLoginProps> = ({ navigateTo, navigateBack }) => {
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -25,10 +25,12 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ navigateTo, navigateBack })
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      // Convert username to dummy email for Firebase Auth
+      const dummyEmail = `${formData.username}@ujian-online.local`;
+      await signInWithEmailAndPassword(auth, dummyEmail, formData.password);
       navigateTo('student_dashboard');
     } catch (error: any) {
-      setError('Email atau password salah');
+      setError('Username atau password salah');
     } finally {
       setIsLoading(false);
     }
@@ -46,11 +48,11 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ navigateTo, navigateBack })
       <div className="w-full max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <input 
-            name="email" 
-            type="email"
-            value={formData.email}
+            name="username" 
+            type="text"
+            value={formData.username}
             onChange={handleChange} 
-            placeholder="Email" 
+            placeholder="Username" 
             className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
             required 
           />

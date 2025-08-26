@@ -11,13 +11,12 @@ interface StudentRegisterProps {
 const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateBack }) => {
   const [formData, setFormData] = useState({
     fullName: '',
-    email: '',
+    username: '',
     password: '',
     confirmPassword: '',
     major: '',
     className: '',
-    university: '',
-    profilePhoto: ''
+    university: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,9 +43,11 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     }
 
     try {
+      // Create a dummy email for Firebase Auth since it requires email
+      const dummyEmail = `${formData.username}@ujian-online.local`;
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
-        formData.email, 
+        dummyEmail, 
         formData.password
       );
       
@@ -56,11 +57,10 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
 
       await setDoc(doc(db, `artifacts/${appId}/public/data/students`, userCredential.user.uid), {
         fullName: formData.fullName,
-        email: formData.email,
+        username: formData.username,
         major: formData.major,
         className: formData.className,
         university: formData.university,
-        profilePhoto: formData.profilePhoto,
         createdAt: new Date(),
         role: 'student'
       });
@@ -94,11 +94,11 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
             required 
           />
           <input 
-            name="email" 
-            type="email"
-            value={formData.email}
+            name="username" 
+            type="text"
+            value={formData.username}
             onChange={handleChange} 
-            placeholder="Email" 
+            placeholder="Username" 
             className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
             required 
           />
@@ -146,14 +146,6 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
             placeholder="Universitas/Sekolah" 
             className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
             required 
-          />
-          <input 
-            name="profilePhoto" 
-            type="url"
-            value={formData.profilePhoto}
-            onChange={handleChange} 
-            placeholder="URL Foto Profil (opsional)" 
-            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
           />
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button 

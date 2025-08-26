@@ -7,11 +7,10 @@ interface Application {
   studentId: string;
   studentData: {
     fullName: string;
-    email: string;
+    username: string;
     major: string;
     className: string;
     university: string;
-    profilePhoto?: string;
   };
   status: 'pending' | 'approved' | 'rejected';
   appliedAt: Date;
@@ -210,22 +209,14 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
                       )}
                     </td>
                     <td className="p-4">
-                      {app.studentData.profilePhoto ? (
-                        <img 
-                          src={app.studentData.profilePhoto} 
-                          alt="Profile" 
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-bold">
-                            {app.studentData.fullName.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
+                      <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">
+                          {app.studentData.fullName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-4 font-semibold">{app.studentData.fullName}</td>
-                    <td className="p-4 text-gray-400">{app.studentData.email}</td>
+                    <td className="p-4 text-gray-400">{app.studentData.username}</td>
                     <td className="p-4">{app.studentData.major}</td>
                     <td className="p-4">{app.studentData.className}</td>
                     <td className="p-4">{app.studentData.university}</td>

@@ -11,7 +11,6 @@ interface TeacherRegisterProps {
 const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateBack }) => {
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
     confirmPassword: ''
   });
@@ -40,9 +39,11 @@ const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateB
     }
 
     try {
+      // Create a dummy email for Firebase Auth since it requires email
+      const dummyEmail = `${formData.username}@ujian-online.local`;
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
-        formData.email, 
+        dummyEmail, 
         formData.password
       );
       
@@ -52,7 +53,6 @@ const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateB
 
       await setDoc(doc(db, `artifacts/${appId}/public/data/teachers`, userCredential.user.uid), {
         username: formData.username,
-        email: formData.email,
         createdAt: new Date(),
         role: 'teacher'
       });
@@ -82,15 +82,6 @@ const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateB
             value={formData.username}
             onChange={handleChange} 
             placeholder="Username" 
-            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
-            required 
-          />
-          <input 
-            name="email" 
-            type="email"
-            value={formData.email}
-            onChange={handleChange} 
-            placeholder="Email" 
             className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
             required 
           />

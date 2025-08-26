@@ -84,13 +84,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         {studentProfile && (
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
             <div className="flex items-center space-x-4">
-              {studentProfile.profilePhoto && (
-                <img 
-                  src={studentProfile.profilePhoto} 
-                  alt="Profile" 
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-              )}
+              <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
+                <span className="text-2xl font-bold text-white">
+                  {studentProfile.fullName.charAt(0).toUpperCase()}
+                </span>
+              </div>
               <div>
                 <h3 className="text-xl font-bold">{studentProfile.fullName}</h3>
                 <p className="text-gray-400">{studentProfile.major} - {studentProfile.className}</p>

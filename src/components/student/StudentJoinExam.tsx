@@ -68,11 +68,10 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
         studentId: user.uid,
         studentData: {
           fullName: studentData.fullName,
-          email: studentData.email,
+          username: studentData.username,
           major: studentData.major,
           className: studentData.className,
-          university: studentData.university,
-          profilePhoto: studentData.profilePhoto
+          university: studentData.university
         },
         examId: examDoc.id,
         examName: examData.name,
