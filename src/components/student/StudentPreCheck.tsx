@@ -66,6 +66,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     
     try {
       const docRef = await addDoc(sessionRef, {
+        studentId: appState.user.id,
         studentInfo: studentInfo,
         startTime: new Date(),
         status: 'started',

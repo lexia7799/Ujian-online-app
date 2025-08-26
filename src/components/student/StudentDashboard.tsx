@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
+interface CustomUser {
+  id: string;
+  username: string;
+  role: string;
+  [key: string]: any;
+}
+
 interface StudentDashboardProps {
-  user: User;
+  user: CustomUser;
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
 }
@@ -23,9 +29,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check if user and user.id exist
+    if (!user || !user.id) {
+      setIsLoading(false);
+      return;
+    }
+
     // Get student profile
     const getStudentProfile = async () => {
-      const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.uid));
+      const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
       if (studentDoc.exists()) {
         setStudentProfile(studentDoc.data());
       }
@@ -36,7 +48,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     // Get exam results
     const sessionsQuery = query(
       collection(db, `artifacts/${appId}/public/data/sessions`),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', user.id),
       where('status', 'in', ['finished', 'disqualified'])
     );
 
@@ -64,10 +76,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     });
 
     return () => unsubscribe();
-  }, [user.uid]);
+  }, [user?.id]);
 
   if (isLoading) {
     return <div className="text-center p-8">Memuat dashboard...</div>;
+  }
+
+  if (!user || !user.id) {
+    return <div className="text-center p-8 text-red-400">Error: User data tidak valid</div>;
   }
 
   return (
