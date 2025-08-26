@@ -57,6 +57,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
 
       await setDoc(doc(db, `artifacts/${appId}/public/data/students`, userCredential.user.uid), {
         fullName: formData.fullName,
+        nim: formData.nim,
         username: formData.username,
         major: formData.major,
         className: formData.className,
