@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db, appId } from '../../config/firebase';
 
 interface StudentLoginProps {
   navigateTo: (page: string, data?: any) => void;
@@ -25,12 +25,27 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ navigateTo, navigateBack })
     setIsLoading(true);
 
     try {
-      // Convert username to email for Firebase Auth
-      const email = `${formData.username.toLowerCase()}@student.ujian-online.com`;
-      await signInWithEmailAndPassword(auth, email, formData.password);
-      navigateTo('student_dashboard');
+      // Query student by username and password
+      const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
+      const q = query(
+        studentsRef, 
+        where("username", "==", formData.username),
+        where("password", "==", formData.password)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const studentDoc = querySnapshot.docs[0];
+        const studentData = { id: studentDoc.id, ...studentDoc.data() };
+        
+        // Store student info in app state
+        navigateTo('student_dashboard', { currentUser: studentData });
+      } else {
+        setError('Username atau password salah');
+      }
     } catch (error: any) {
-      setError('Username atau password salah');
+      setError('Gagal login. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }

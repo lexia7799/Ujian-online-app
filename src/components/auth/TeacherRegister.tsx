@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db, appId } from '../../config/firebase';
+import { db, appId } from '../../config/firebase';
 
 interface TeacherRegisterProps {
   navigateTo: (page: string, data?: any) => void;
@@ -39,24 +38,20 @@ const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateB
     }
 
     try {
-      // Create email from username for Firebase Auth
-      const email = `${formData.username.toLowerCase()}@teacher.ujian-online.com`;
-      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
+      // Generate unique ID for teacher
+      const teacherId = `teacher_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      await updateProfile(userCredential.user, {
-        displayName: formData.username
-      });
-
-      await setDoc(doc(db, `artifacts/${appId}/public/data/teachers`, userCredential.user.uid), {
+      await setDoc(doc(db, `artifacts/${appId}/public/data/teachers`, teacherId), {
         username: formData.username,
-        email: email,
+        password: formData.password, // In production, hash this password
         createdAt: new Date(),
         role: 'teacher'
       });
 
+      alert('Akun dosen berhasil dibuat! Silakan login.');
       navigateTo('teacher_login');
     } catch (error: any) {
-      setError(error.message);
+      setError('Gagal membuat akun. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }

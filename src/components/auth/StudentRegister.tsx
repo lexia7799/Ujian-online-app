@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db, appId } from '../../config/firebase';
+import { db, appId } from '../../config/firebase';
 
 interface StudentRegisterProps {
   navigateTo: (page: string, data?: any) => void;
@@ -44,19 +43,14 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     }
 
     try {
-      // Create email from username for Firebase Auth
-      const email = `${formData.username.toLowerCase()}@student.ujian-online.com`;
-      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
+      // Generate unique ID for student
+      const studentId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      await updateProfile(userCredential.user, {
-        displayName: formData.fullName
-      });
-
-      await setDoc(doc(db, `artifacts/${appId}/public/data/students`, userCredential.user.uid), {
+      await setDoc(doc(db, `artifacts/${appId}/public/data/students`, studentId), {
         fullName: formData.fullName,
         nim: formData.nim,
         username: formData.username,
-        email: email,
+        password: formData.password, // In production, hash this password
         major: formData.major,
         className: formData.className,
         university: formData.university,
@@ -64,9 +58,10 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         role: 'student'
       });
 
+      alert('Akun siswa berhasil dibuat! Silakan login.');
       navigateTo('student_login');
     } catch (error: any) {
-      setError(error.message);
+      setError('Gagal membuat akun. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }

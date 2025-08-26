@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { User, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { auth } from './config/firebase';
 import HomePage from './pages/HomePage';
 import TeacherAuthChoice from './components/auth/TeacherAuthChoice';
 import TeacherRegister from './components/auth/TeacherRegister';
@@ -59,39 +57,19 @@ function App() {
   }, []);
   
   const [page, setPage] = useState('home');
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [appState, setAppState] = useState<any>({});
   const [navigationHistory, setNavigationHistory] = useState<string[]>(['home']);
 
-  useEffect(() => {
-    const authenticateUser = async () => {
-      try {
-        if (typeof (window as any).__initial_auth_token !== 'undefined' && (window as any).__initial_auth_token) {
-          await signInWithCustomToken(auth, (window as any).__initial_auth_token);
-        } else { 
-          await signInAnonymously(auth); 
-        }
-      } catch (error) { 
-        console.error("Autentikasi gagal:", error); 
-      }
-    };
-    
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        authenticateUser();
-      } else {
-        setUser(currentUser);
-      }
-      setAuthReady(true);
-    });
-    
-    return () => unsubscribe();
-  }, []);
-
   const navigateTo = (pageName: string, data = {}) => {
     setPage(pageName);
-    setAppState(currentState => ({ ...currentState, ...data }));
+    setAppState(currentState => {
+      const newState = { ...currentState, ...data };
+      if (data.currentUser) {
+        setCurrentUser(data.currentUser);
+      }
+      return newState;
+    });
     setNavigationHistory(prev => [...prev, pageName]);
   };
 
@@ -105,16 +83,8 @@ function App() {
     }
   };
 
-  if (!authReady) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        Memuat Autentikasi...
-      </div>
-    );
-  }
-
   const renderPage = () => {
-    const props = { navigateTo, navigateBack, appState, user, canGoBack: navigationHistory.length > 1 };
+    const props = { navigateTo, navigateBack, appState, user: currentUser, canGoBack: navigationHistory.length > 1 };
     
     switch (page) {
       case 'home':
