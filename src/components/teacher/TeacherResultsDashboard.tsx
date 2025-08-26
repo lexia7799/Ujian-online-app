@@ -273,13 +273,14 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         <table className="w-full text-left">
           <thead className="bg-gray-700">
             <tr>
-              <th className="p-4">Nama Siswa</th>
+              <th className="p-4">Nama Lengkap</th>
               <th className="p-4">NIM</th>
               <th className="p-4">Program Studi</th>
               <th className="p-4">Kelas</th>
               <th className="p-4">Status</th>
               <th className="p-4">Pelanggaran</th>
               <th className="p-4">Nilai PG</th>
+              <th className="p-4">Nilai Essay</th>
               <th className="p-4">Nilai Akhir</th>
               <th className="p-4">Aksi</th>
             </tr>
@@ -287,20 +288,32 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
           <tbody>
             {sessions.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center p-8 text-gray-400">
+                <td colSpan={10} className="text-center p-8 text-gray-400">
                   Belum ada siswa yang menyelesaikan ujian.
                 </td>
               </tr>
             ) : (
               sessions.map(session => (
                 <tr key={session.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4">{session.studentInfo.name}</td>
-                  <td className="p-4">{session.studentInfo.nim}</td>
-                  <td className="p-4">{session.studentInfo.major}</td>
-                  <td className="p-4">{session.studentInfo.className}</td>
+                  <td className="p-4 font-semibold">{session.studentInfo.name}</td>
+                  <td className="p-4 text-gray-300">{session.studentInfo.nim}</td>
+                  <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
+                  <td className="p-4 text-gray-300">{session.studentInfo.className}</td>
                   <td className="p-4">{session.status}</td>
                   <td className="p-4">{session.violations}</td>
                   <td className="p-4">{session.finalScore?.toFixed(2) ?? 'N/A'}</td>
+                  <td className="p-4">
+                    {(() => {
+                      const essayQuestions = questions.filter(q => q.type === 'essay');
+                      if (essayQuestions.length === 0) return 'N/A';
+                      
+                      if (!session.essayScores) return 'Belum dinilai';
+                      
+                      const totalEssayScore = Object.values(session.essayScores).reduce((sum, s) => sum + s, 0);
+                      const avgEssayScore = totalEssayScore / essayQuestions.length;
+                      return avgEssayScore.toFixed(2);
+                    })()}
+                  </td>
                   <td className="p-4 font-bold">{calculateTotalScore(session)}</td>
                   <td className="p-4">
                     <button 

@@ -79,10 +79,23 @@ const EssayGradingView: React.FC<EssayGradingViewProps> = ({ session, questions,
                   type="number" 
                   min="0" 
                   max="100" 
-                  value={essayScores[q.id] || ''} 
-                  onChange={(e) => handleScoreChange(q.id, e.target.value)} 
+                  value={essayScores[q.id] || ''}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value, 10);
+                    if (isNaN(value) || value < 0 || value > 100) {
+                      if (e.target.value === '') {
+                        handleScoreChange(q.id, '');
+                      }
+                      return;
+                    }
+                    handleScoreChange(q.id, e.target.value);
+                  }}
                   className="p-2 bg-gray-700 rounded-md mt-1" 
+                  placeholder="0-100"
                 />
+                {essayScores[q.id] && (essayScores[q.id] < 0 || essayScores[q.id] > 100) && (
+                  <p className="text-red-400 text-xs mt-1">Nilai harus antara 0-100</p>
+                )}
               </div>
             </div>
           ))

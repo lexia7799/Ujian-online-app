@@ -73,12 +73,30 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             hasSession = true;
             const sessionData = sessionDoc.data();
             
-            // Only include finished or disqualified sessions
-            if (['finished', 'disqualified'].includes(sessionData.status)) {
+            // Include all sessions (finished, disqualified, started)
+            if (['finished', 'disqualified', 'started'].includes(sessionData.status)) {
+              // Calculate essay score if available
+              let essayScore = undefined;
+              let totalScore = undefined;
+              
+              if (sessionData.essayScores) {
+                const essayScores = Object.values(sessionData.essayScores);
+                if (essayScores.length > 0) {
+                  essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
+                  
+                  // Calculate total score (50% MC + 50% Essay)
+                  const mcScore = sessionData.finalScore || 0;
+                  totalScore = (mcScore * 0.5) + (essayScore * 0.5);
+                }
+              }
+              
               results.push({
                 id: sessionDoc.id,
                 examName: examData.name || 'Unknown Exam',
+                examCode: examData.code,
                 finalScore: sessionData.finalScore || 0,
+                essayScore,
+                totalScore,
                 finishTime: sessionData.finishTime?.toDate() || new Date(),
                 status: sessionData.status
               });
@@ -111,7 +129,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           }
         }
         
-        setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
+        setExamResults(results.sort((a, b) => {
+          // Sort by finish time, with unfinished exams first
+          if (!a.finishTime && !b.finishTime) return 0;
+          if (!a.finishTime) return -1;
+          if (!b.finishTime) return 1;
+          return b.finishTime.getTime() - a.finishTime.getTime();
+        }));
         setAvailableExams(available);
         setIsLoading(false);
       } catch (error) {
@@ -227,7 +251,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             <thead className="bg-gray-700">
               <tr>
                 <th className="p-4">Nama Ujian</th>
-                <th className="p-4">Nilai</th>
+                <th className="p-4">Kode Ujian</th>
+                <th className="p-4">Nilai PG</th>
+                <th className="p-4">Nilai Essay</th>
+                <th className="p-4">Nilai Akhir</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Waktu Selesai</th>
               </tr>
@@ -236,6 +263,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               {examResults.map(result => (
                 <tr key={result.id} className="border-b border-gray-700 hover:bg-gray-700/50">
                   <td className="p-4 font-semibold">{result.examName}</td>
+                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
                   <td className="p-4">
                     <span className={`font-bold ${
                       result.status === 'disqualified' 
@@ -250,16 +278,38 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     </span>
                   </td>
                   <td className="p-4">
+                    <span className="text-gray-300">
+                      {result.essayScore !== undefined ? result.essayScore.toFixed(2) : 'N/A'}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`font-bold ${
+                      result.status === 'disqualified' 
+                        ? 'text-red-400' 
+                        : (result.totalScore || result.finalScore) >= 70 
+                        ? 'text-green-400' 
+                        : (result.totalScore || result.finalScore) >= 60 
+                        ? 'text-yellow-400' 
+                        : 'text-red-400'
+                    }`}>
+                      {result.totalScore ? result.totalScore.toFixed(2) : result.finalScore.toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="p-4">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full ${
                       result.status === 'finished' 
                         ? 'bg-green-600 text-white' 
-                        : 'bg-red-600 text-white'
+                        : result.status === 'disqualified'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-yellow-600 text-white'
                     }`}>
-                      {result.status === 'finished' ? 'Selesai' : 'Diskualifikasi'}
+                      {result.status === 'finished' ? 'Selesai' : 
+                       result.status === 'disqualified' ? 'Diskualifikasi' : 
+                       result.status === 'started' ? 'Sedang Berlangsung' : 'Pending'}
                     </span>
                   </td>
                   <td className="p-4 text-gray-400">
-                    {result.finishTime.toLocaleString('id-ID')}
+                    {result.finishTime ? result.finishTime.toLocaleString('id-ID') : 'Belum selesai'}
                   </td>
                 </tr>
               ))}
