@@ -37,7 +37,7 @@ const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo, navig
     
     try {
       const docRef = await addDoc(examsRef, {
-        teacherId: user.uid,
+        teacherId: user.id,
         name: examName,
         startTime: startTime,
         endTime: endTime,
