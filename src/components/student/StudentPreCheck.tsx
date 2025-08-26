@@ -6,6 +6,7 @@ interface StudentPreCheckProps {
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
   appState: any;
+  user: any;
 }
 
 interface DeviceChecks {
@@ -14,7 +15,7 @@ interface DeviceChecks {
   screenCount: boolean | null;
 }
 
-const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState }) => {
+const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState, user }) => {
   const { studentInfo } = appState;
   const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,12 +62,20 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
   const allChecksPassed = checks.device && checks.camera && checks.screenCount;
 
   const startExam = async () => {
+    // Validate that exam and user are defined
+    if (!appState.exam || !user) {
+      console.error("Missing exam or user data");
+      alert("Data ujian tidak lengkap. Silakan coba lagi.");
+      navigateBack();
+      return;
+    }
+
     const { exam } = appState;
     const sessionRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     
     try {
       const docRef = await addDoc(sessionRef, {
-        studentId: appState.user.id,
+        studentId: user.id,
         studentInfo: studentInfo,
         startTime: new Date(),
         status: 'started',
