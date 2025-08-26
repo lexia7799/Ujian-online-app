@@ -37,6 +37,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     major: '',
     className: '',
     university: '',
+    whatsapp: '',
     password: '',
     confirmPassword: ''
   });
@@ -64,6 +65,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           major: profileData.major || '',
           className: profileData.className || '',
           university: profileData.university || '',
+          whatsapp: profileData.whatsapp || '',
           password: '',
           confirmPassword: ''
         });
@@ -258,6 +260,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         major: editFormData.major,
         className: editFormData.className,
         university: editFormData.university,
+        whatsapp: editFormData.whatsapp,
         updatedAt: new Date()
       };
 
@@ -276,6 +279,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       // Reset form
       setEditFormData({
         ...editFormData,
+        whatsapp: updatedProfile.whatsapp || '',
         password: '',
         confirmPassword: ''
       });
@@ -421,6 +425,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       type="text"
                       value={editFormData.university}
                       onChange={handleEditChange} 
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Nomor WhatsApp</label>
+                    <input 
+                      name="whatsapp" 
+                      type="tel"
+                      value={editFormData.whatsapp}
+                      onChange={handleEditChange} 
+                      placeholder="08123456789"
                       className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
                       required 
                     />
