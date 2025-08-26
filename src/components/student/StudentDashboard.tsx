@@ -19,16 +19,7 @@ interface ExamResult {
   id: string;
   examName: string;
   examCode: string;
-  examCode: string;
-  examCode: string;
-  examCode: string;
   finalScore: number;
-  essayScore?: number;
-  totalScore?: number;
-  essayScore?: number;
-  totalScore?: number;
-  essayScore?: number;
-  totalScore?: number;
   essayScore?: number;
   totalScore?: number;
   finishTime: Date;
@@ -40,14 +31,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [studentProfile, setStudentProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [availableExams, setAvailableExams] = useState<any[]>([]);
-  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
-  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
-  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
-  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
-  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
-  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
-  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
-  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
   const [pendingApplications, setPendingApplications] = useState<any[]>([]);
   const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
 
@@ -86,14 +69,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         // Process results concurrently
         const results: ExamResult[] = [];
         const available: any[] = [];
-        const pending: any[] = [];
-        const rejected: any[] = [];
-        const pending: any[] = [];
-        const rejected: any[] = [];
-        const pending: any[] = [];
-        const rejected: any[] = [];
-        const pending: any[] = [];
-        const rejected: any[] = [];
         const pending: any[] = [];
         const rejected: any[] = [];
 
@@ -135,71 +110,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                   }
                 }
                 
-                let essayScore = undefined;
-                let totalScore = undefined;
-                
-                if (sessionData.essayScores) {
-                  const essayScores = Object.values(sessionData.essayScores);
-                  if (essayScores.length > 0) {
-                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                    const mcScore = sessionData.finalScore || 0;
-                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
-                  }
-                }
-                
-                let essayScore = undefined;
-                let totalScore = undefined;
-                
-                if (sessionData.essayScores) {
-                  const essayScores = Object.values(sessionData.essayScores);
-                  if (essayScores.length > 0) {
-                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                    const mcScore = sessionData.finalScore || 0;
-                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
-                  }
-                }
-                
-                let essayScore = undefined;
-                let totalScore = undefined;
-                
-                if (sessionData.essayScores) {
-                  const essayScores = Object.values(sessionData.essayScores);
-                  if (essayScores.length > 0) {
-                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                    const mcScore = sessionData.finalScore || 0;
-                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
-                  }
-                }
-                
-                let essayScore = undefined;
-                let totalScore = undefined;
-                
-                if (sessionData.essayScores) {
-                  const essayScores = Object.values(sessionData.essayScores);
-                  if (essayScores.length > 0) {
-                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                    const mcScore = sessionData.finalScore || 0;
-                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
-                  }
-                }
-                
                 results.push({
                   id: sessionData.id,
                   examName: examData.name || 'Unknown Exam',
                   examCode: examData.code,
-                  examCode: examData.code,
-                  examCode: examData.code,
-                  examCode: examData.code,
-                  examCode: examData.code,
                   finalScore: sessionData.finalScore || 0,
-                  essayScore,
-                  totalScore,
-                  essayScore,
-                  totalScore,
-                  essayScore,
-                  totalScore,
-                  essayScore,
-                  totalScore,
                   essayScore,
                   totalScore,
                   finishTime: sessionData.finishTime?.toDate() || new Date(),
@@ -242,94 +157,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                   } else if (appData.status === 'rejected') {
                     rejected.push(examWithApp);
                   }
-                  const examWithApp = {
-                    id: examId,
-                    name: examData.name,
-                    code: examData.code,
-                    applicationStatus: appData.status,
-                    appliedAt: appData.appliedAt?.toDate() || new Date(),
-                    ...examData
-                  };
-                  
-                  if (appData.status === 'approved') {
-                    const now = new Date();
-                    const startTime = new Date(examData.startTime);
-                    const endTime = new Date(examData.endTime);
-                    
-                    if (now >= startTime && now <= endTime && examData.status === 'published') {
-                      available.push(examWithApp);
-                    }
-                  } else if (appData.status === 'pending') {
-                    pending.push(examWithApp);
-                  } else if (appData.status === 'rejected') {
-                    rejected.push(examWithApp);
-                  }
-                  const examWithApp = {
-                    id: examId,
-                    name: examData.name,
-                    code: examData.code,
-                    applicationStatus: appData.status,
-                    appliedAt: appData.appliedAt?.toDate() || new Date(),
-                    ...examData
-                  };
-                  
-                  if (appData.status === 'approved') {
-                    const now = new Date();
-                    const startTime = new Date(examData.startTime);
-                    const endTime = new Date(examData.endTime);
-                    
-                    if (now >= startTime && now <= endTime && examData.status === 'published') {
-                      available.push(examWithApp);
-                    }
-                  } else if (appData.status === 'pending') {
-                    pending.push(examWithApp);
-                  } else if (appData.status === 'rejected') {
-                    rejected.push(examWithApp);
-                  }
-                  const examWithApp = {
-                    id: examId,
-                    name: examData.name,
-                    code: examData.code,
-                    applicationStatus: appData.status,
-                    appliedAt: appData.appliedAt?.toDate() || new Date(),
-                    ...examData
-                  };
-                  
-                  if (appData.status === 'approved') {
-                    const now = new Date();
-                    const startTime = new Date(examData.startTime);
-                    const endTime = new Date(examData.endTime);
-                    
-                    if (now >= startTime && now <= endTime && examData.status === 'published') {
-                      available.push(examWithApp);
-                    }
-                  } else if (appData.status === 'pending') {
-                    pending.push(examWithApp);
-                  } else if (appData.status === 'rejected') {
-                    rejected.push(examWithApp);
-                  }
-                  const examWithApp = {
-                    id: examId,
-                    name: examData.name,
-                    code: examData.code,
-                    applicationStatus: appData.status,
-                    appliedAt: appData.appliedAt?.toDate() || new Date(),
-                    ...examData
-                  };
-                  
-                  if (appData.status === 'approved') {
-                    const now = new Date();
-                    const startTime = new Date(examData.startTime);
-                    const endTime = new Date(examData.endTime);
-                    
-                    if (now >= startTime && now <= endTime && examData.status === 'published') {
-                      available.push(examWithApp);
-                    }
-                  } else if (appData.status === 'pending') {
-                    pending.push(examWithApp);
-                  } else if (appData.status === 'rejected') {
-                    rejected.push(examWithApp);
-                  }
                 });
               } catch (error) {
                 console.warn(`Failed to fetch applications for exam ${examId}:`, error);
@@ -350,14 +177,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         }));
         
         setAvailableExams(available);
-        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         
@@ -519,214 +338,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         </div>
       )}
 
-      {/* Pending Applications Section */}
-      {pendingApplications.length > 0 && (
-        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-yellow-400 mb-3">⏳ Aplikasi Ujian Menunggu Konfirmasi</h4>
-          <div className="space-y-2">
-            {pendingApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                  Menunggu Konfirmasi
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💡 Aplikasi Anda sedang menunggu persetujuan dari dosen. Silakan tunggu hingga dosen mengkonfirmasi.
-          </p>
-        </div>
-      )}
-
-      {/* Rejected Applications Section */}
-      {rejectedApplications.length > 0 && (
-        <div className="mb-6 bg-red-800 border border-red-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-red-400 mb-3">❌ Aplikasi Ujian Ditolak</h4>
-          <div className="space-y-2">
-            {rejectedApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                  Ditolak
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
-          </p>
-        </div>
-      )}
-
-      {/* Pending Applications Section */}
-      {pendingApplications.length > 0 && (
-        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-yellow-400 mb-3">⏳ Aplikasi Ujian Menunggu Konfirmasi</h4>
-          <div className="space-y-2">
-            {pendingApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                  Menunggu Konfirmasi
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💡 Aplikasi Anda sedang menunggu persetujuan dari dosen. Silakan tunggu hingga dosen mengkonfirmasi.
-          </p>
-        </div>
-      )}
-
-      {/* Rejected Applications Section */}
-      {rejectedApplications.length > 0 && (
-        <div className="mb-6 bg-red-800 border border-red-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-red-400 mb-3">❌ Aplikasi Ujian Ditolak</h4>
-          <div className="space-y-2">
-            {rejectedApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                  Ditolak
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
-          </p>
-        </div>
-      )}
-
-      {/* Pending Applications Section */}
-      {pendingApplications.length > 0 && (
-        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-yellow-400 mb-3">⏳ Aplikasi Ujian Menunggu Konfirmasi</h4>
-          <div className="space-y-2">
-            {pendingApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                  Menunggu Konfirmasi
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💡 Aplikasi Anda sedang menunggu persetujuan dari dosen. Silakan tunggu hingga dosen mengkonfirmasi.
-          </p>
-        </div>
-      )}
-
-      {/* Rejected Applications Section */}
-      {rejectedApplications.length > 0 && (
-        <div className="mb-6 bg-red-800 border border-red-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-red-400 mb-3">❌ Aplikasi Ujian Ditolak</h4>
-          <div className="space-y-2">
-            {rejectedApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                  Ditolak
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
-          </p>
-        </div>
-      )}
-
-      {/* Pending Applications Section */}
-      {pendingApplications.length > 0 && (
-        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-yellow-400 mb-3">⏳ Aplikasi Ujian Menunggu Konfirmasi</h4>
-          <div className="space-y-2">
-            {pendingApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                  Menunggu Konfirmasi
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💡 Aplikasi Anda sedang menunggu persetujuan dari dosen. Silakan tunggu hingga dosen mengkonfirmasi.
-          </p>
-        </div>
-      )}
-
-      {/* Rejected Applications Section */}
-      {rejectedApplications.length > 0 && (
-        <div className="mb-6 bg-red-800 border border-red-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-red-400 mb-3">❌ Aplikasi Ujian Ditolak</h4>
-          <div className="space-y-2">
-            {rejectedApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                  Ditolak
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
-          </p>
-        </div>
-      )}
-
       <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
         {examResults.length === 0 ? (
           <div className="text-center p-8 text-gray-400">
@@ -744,10 +355,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               <tr>
                 <th className="p-4">Nama Mata Kuliah</th>
                 <th className="p-4">Kode Ujian</th>
-                <th className="p-4">Kode Ujian</th>
-                <th className="p-4">Kode Ujian</th>
-                <th className="p-4">Kode Ujian</th>
-                <th className="p-4">Kode Ujian</th>
                 <th className="p-4">Nilai PG</th>
                 <th className="p-4">Nilai Essay</th>
                 <th className="p-4">Nilai Akhir</th>
@@ -759,10 +366,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               {examResults.map(result => (
                 <tr key={result.id} className="border-b border-gray-700 hover:bg-gray-700/50">
                   <td className="p-4 font-semibold">{result.examName}</td>
-                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
-                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
-                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
-                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
                   <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
                   <td className="p-4">
                     <span className={`font-bold ${
@@ -796,24 +399,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className="text-gray-300">
-                      {result.essayScore !== undefined ? result.essayScore.toFixed(2) : 'N/A'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`font-bold ${
-                      result.status === 'disqualified' 
-                        ? 'text-red-400' 
-                        : (result.totalScore || result.finalScore) >= 70 
-                        ? 'text-green-400' 
-                        : (result.totalScore || result.finalScore) >= 60 
-                        ? 'text-yellow-400' 
-                        : 'text-red-400'
-                    }`}>
-                      {result.totalScore ? result.totalScore.toFixed(2) : result.finalScore.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="p-4">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full ${
                       result.status === 'finished' 
                         ? 'bg-green-600 text-white' 
@@ -826,11 +411,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       {result.status === 'finished' ? 'Selesai' : 
                        result.status === 'disqualified' ? 'Diskualifikasi' : 
                        result.status === 'started' ? 'Sedang Berlangsung' : 'Pending'}
-                       result.status === 'disqualified' ? 'Diskualifikasi' : 
-                       result.status === 'started' ? 'Sedang Berlangsung' : 'Pending'}
                     </span>
                   </td>
                   <td className="p-4 text-gray-400">
+                    {result.finishTime.toLocaleString('id-ID')}
                   </td>
                 </tr>
               ))}
