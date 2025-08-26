@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collectionGroup, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -45,53 +45,53 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
     getStudentProfile();
 
-    // Get exam results
-    const sessionsQuery = query(
-      collectionGroup(db, 'sessions'),
-      where('studentId', '==', user.id)
-    );
-
-    const unsubscribe = onSnapshot(
-      sessionsQuery, 
-      async (snapshot) => {
+    // Get exam results by first getting all exams, then checking sessions
+    const getExamResults = async () => {
+      try {
         const results: ExamResult[] = [];
         
-        for (const sessionDoc of snapshot.docs) {
-          const sessionData = sessionDoc.data();
-          
-          // Filter by status in code instead of query
-          if (!['finished', 'disqualified'].includes(sessionData.status)) {
-            continue;
-          }
-          
-          // Get exam name
-          const examDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/exams`, sessionData.examId));
+        // Get all exams
+        const examsSnapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/exams`));
+        
+        // For each exam, check if student has a session
+        for (const examDoc of examsSnapshot.docs) {
           const examData = examDoc.data();
+          const examId = examDoc.id;
           
-          results.push({
-            id: sessionDoc.id,
-            examName: examData?.name || 'Unknown Exam',
-            finalScore: sessionData.finalScore || 0,
-            finishTime: sessionData.finishTime?.toDate() || new Date(),
-            status: sessionData.status
+          // Get sessions for this exam where studentId matches
+          const sessionsQuery = query(
+            collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
+            where('studentId', '==', user.id)
+          );
+          
+          const sessionsSnapshot = await getDocs(sessionsQuery);
+          
+          sessionsSnapshot.forEach(sessionDoc => {
+            const sessionData = sessionDoc.data();
+            
+            // Only include finished or disqualified sessions
+            if (['finished', 'disqualified'].includes(sessionData.status)) {
+              results.push({
+                id: sessionDoc.id,
+                examName: examData.name || 'Unknown Exam',
+                finalScore: sessionData.finalScore || 0,
+                finishTime: sessionData.finishTime?.toDate() || new Date(),
+                status: sessionData.status
+              });
+            }
           });
         }
         
         setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
         setIsLoading(false);
-      },
-      (error) => {
+      } catch (error) {
         console.error('Error fetching exam results:', error);
-        if (error.code === 'failed-precondition') {
-          console.warn('Firestore index required. Please create the index in Firebase Console.');
-          // Set empty results and stop loading when index is missing
-          setExamResults([]);
-        }
+        setExamResults([]);
         setIsLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    getExamResults();
   }, [user?.id]);
 
   if (isLoading) {
