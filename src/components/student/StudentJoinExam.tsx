@@ -42,6 +42,24 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
       const examDoc = querySnapshot.docs[0];
       const examData = examDoc.data();
 
+      // Check if student has already taken this exam
+      const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${examDoc.id}/sessions`);
+      const sessionsQuery = query(sessionsRef, where("studentId", "==", user.id));
+      const sessionsSnapshot = await getDocs(sessionsQuery);
+      
+      if (!sessionsSnapshot.empty) {
+        const sessionData = sessionsSnapshot.docs[0].data();
+        if (['finished', 'disqualified'].includes(sessionData.status)) {
+          setError('Anda sudah mengikuti ujian dengan kode ini dan tidak dapat mengaksesnya lagi.');
+          setIsLoading(false);
+          return;
+        } else {
+          setError('Anda sudah mengikuti ujian dengan kode ini. Tidak dapat mengikuti ujian yang sama dua kali.');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // Get student profile
       const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
       if (!studentDoc.exists()) {
