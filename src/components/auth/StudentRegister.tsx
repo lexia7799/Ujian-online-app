@@ -11,6 +11,7 @@ interface StudentRegisterProps {
 const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateBack }) => {
   const [formData, setFormData] = useState({
     fullName: '',
+    nim: '',
     username: '',
     password: '',
     confirmPassword: '',
@@ -91,6 +92,15 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
             value={formData.fullName}
             onChange={handleChange} 
             placeholder="Nama Lengkap" 
+            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
+            required 
+          />
+          <input 
+            name="nim" 
+            type="text"
+            value={formData.nim}
+            onChange={handleChange} 
+            placeholder="NIM/NIS (Nomor Induk)" 
             className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
             required 
           />
