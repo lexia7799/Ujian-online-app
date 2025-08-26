@@ -99,9 +99,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           const sessionsSnapshot = await getDocs(sessionsQuery);
           
           let hasSession = false;
+          let hasCompletedSession = false;
           sessionsSnapshot.forEach(sessionDoc => {
             hasSession = true;
             const sessionData = sessionDoc.data();
+            
+            // Check if session is completed (finished or disqualified)
+            if (['finished', 'disqualified'].includes(sessionData.status)) {
+              hasCompletedSession = true;
+            }
             
             // Include all sessions (finished, disqualified, started)
             if (['finished', 'disqualified', 'started'].includes(sessionData.status)) {
@@ -134,7 +140,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           });
           
           // Check if student has approved application but no session yet
-          if (!hasSession) {
+          // Only allow access if no session exists OR session is not completed
+          if (!hasSession || !hasCompletedSession) {
             const applicationsQuery = query(
               collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
               where('studentId', '==', user.id),
@@ -153,7 +160,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 ...examData
               };
               
-              if (appData.status === 'approved') {
+              // Only show approved exams if student hasn't completed them yet
+              if (appData.status === 'approved' && !hasCompletedSession) {
                 const now = new Date();
                 const startTime = new Date(examData.startTime);
                 const endTime = new Date(examData.endTime);
@@ -161,9 +169,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 if (now >= startTime && now <= endTime && examData.status === 'published') {
                   available.push(examWithApp);
                 }
-              } else if (appData.status === 'pending') {
+              } else if (appData.status === 'pending' && !hasCompletedSession) {
                 pending.push(examWithApp);
-              } else if (appData.status === 'rejected') {
+              } else if (appData.status === 'rejected' && !hasCompletedSession) {
                 rejected.push(examWithApp);
               }
             });
