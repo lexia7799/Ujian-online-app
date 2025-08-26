@@ -92,6 +92,11 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         finalScore: null
       });
       navigateTo('student_exam', { sessionId: docRef.id });
+      navigateTo('student_exam', { 
+        sessionId: docRef.id, 
+        exam: exam,
+        studentInfo: finalStudentInfo 
+      });
     } catch (error) {
       console.error("Gagal memulai sesi ujian:", error);
       alert("Gagal memulai sesi ujian. Silakan coba lagi.");
