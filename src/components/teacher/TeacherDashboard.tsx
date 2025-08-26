@@ -137,6 +137,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button 
+                  onClick={() => navigateTo('student_confirmation', { exam: foundExam })} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                >
+                  Konfirmasi Siswa
+                </button>
+                <button 
                   onClick={() => navigateTo('teacher_results', { exam: foundExam })} 
                   className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >

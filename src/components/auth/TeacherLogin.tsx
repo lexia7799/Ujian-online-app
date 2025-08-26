@@ -1,0 +1,88 @@
+import React, { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
+
+interface TeacherLoginProps {
+  navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
+}
+
+const TeacherLogin: React.FC<TeacherLoginProps> = ({ navigateTo, navigateBack }) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      navigateTo('teacher_dashboard');
+    } catch (error: any) {
+      setError('Email atau password salah');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button 
+        onClick={navigateBack} 
+        className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+      >
+        &larr; Kembali
+      </button>
+      <h2 className="text-3xl font-bold mb-6 text-center">Login Dosen</h2>
+      <div className="w-full max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input 
+            name="email" 
+            type="email"
+            value={formData.email}
+            onChange={handleChange} 
+            placeholder="Email" 
+            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
+            required 
+          />
+          <input 
+            name="password" 
+            type="password"
+            value={formData.password}
+            onChange={handleChange} 
+            placeholder="Password" 
+            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600" 
+            required 
+          />
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg disabled:bg-indigo-400"
+          >
+            {isLoading ? 'Login...' : 'Login'}
+          </button>
+        </form>
+        <div className="mt-4 text-center">
+          <button 
+            onClick={() => navigateTo('teacher_register')}
+            className="text-indigo-400 hover:text-indigo-300 text-sm"
+          >
+            Belum punya akun? Daftar di sini
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TeacherLogin;
