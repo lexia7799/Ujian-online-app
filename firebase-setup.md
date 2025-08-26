@@ -180,6 +180,11 @@ Create these composite indexes in Firestore:
    - Fields: `status` (Ascending), `studentId` (Ascending), `__name__` (Ascending)
    - Note: This index is required for StudentDashboard queries across all sessions
 
+5. **Collection Group**: `sessions` (Single Field Index)
+   - Fields: `studentId` (Ascending)
+   - Note: This index is required for collection group queries on studentId field
+   - Direct link: Use the Firebase Console error link to create this index automatically
+
 ## 6. Storage Rules (for violation photos)
 
 ```javascript
