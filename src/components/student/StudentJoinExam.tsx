@@ -58,7 +58,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
       const existingSnapshot = await getDocs(existingQuery);
 
       if (!existingSnapshot.empty) {
-        setError('Anda sudah mengajukan untuk ujian ini. Menunggu konfirmasi dosen.');
+        navigateTo('student_waiting_room', { examCode: examCode.toUpperCase() });
         setIsLoading(false);
         return;
       }
@@ -80,8 +80,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
         appliedAt: new Date()
       });
 
-      setSuccess('Berhasil mengajukan untuk ujian! Menunggu konfirmasi dari dosen.');
-      setExamCode('');
+      navigateTo('student_waiting_room', { examCode: examCode.toUpperCase() });
     } catch (err) {
       setError('Terjadi kesalahan saat mengajukan ujian.');
     } finally {

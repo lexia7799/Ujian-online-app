@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface StudentWaitingRoomProps {
@@ -23,7 +23,7 @@ const StudentWaitingRoom: React.FC<StudentWaitingRoomProps> = ({ user, navigateT
       try {
         // Find exam by code
         const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
-        const examQuery = query(examsRef, where("code", "==", examCode.toUpperCase()));
+        const examQuery = query(examsRef, where("code", "==", examCode));
         const examSnapshot = await getDocs(examQuery);
         
         if (!examSnapshot.empty) {

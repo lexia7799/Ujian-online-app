@@ -10,6 +10,7 @@ import StudentRegister from './components/auth/StudentRegister';
 import StudentLogin from './components/auth/StudentLogin';
 import StudentDashboard from './components/student/StudentDashboard';
 import StudentJoinExam from './components/student/StudentJoinExam';
+import StudentJoinExam from './components/student/StudentJoinExam';
 import StudentWaitingRoom from './components/student/StudentWaitingRoom';
 import StudentConfirmation from './components/teacher/StudentConfirmation';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
@@ -117,6 +118,28 @@ function App() {
     const props = { navigateTo, navigateBack, appState, user, canGoBack: navigationHistory.length > 1 };
     
     switch (page) {
+      case 'home':
+        return <HomePage {...props} />;
+      case 'teacher_auth_choice':
+        return <TeacherAuthChoice {...props} />;
+      case 'teacher_register':
+        return <TeacherRegister {...props} />;
+      case 'teacher_login':
+        return <TeacherLogin {...props} />;
+      case 'student_auth_choice':
+        return <StudentAuthChoice {...props} />;
+      case 'student_register':
+        return <StudentRegister {...props} />;
+      case 'student_login':
+        return <StudentLogin {...props} />;
+      case 'student_dashboard':
+        return <StudentDashboard {...props} />;
+      case 'student_join_exam':
+        return <StudentJoinExam {...props} />;
+      case 'student_waiting_room':
+        return <StudentWaitingRoom {...props} />;
+      case 'student_confirmation':
+        return <StudentConfirmation {...props} />;
       case 'teacher_dashboard':
         return <TeacherDashboard {...props} />;
       case 'question_manager':
