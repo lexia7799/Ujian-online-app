@@ -48,8 +48,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     // Get exam results
     const sessionsQuery = query(
       collectionGroup(db, 'sessions'),
-      where('studentId', '==', user.id),
-      where('status', 'in', ['finished', 'disqualified'])
+      where('studentId', '==', user.id)
     );
 
     const unsubscribe = onSnapshot(sessionsQuery, async (snapshot) => {
@@ -57,6 +56,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       
       for (const sessionDoc of snapshot.docs) {
         const sessionData = sessionDoc.data();
+        
+        // Filter by status in code instead of query
+        if (!['finished', 'disqualified'].includes(sessionData.status)) {
+          continue;
+        }
         
         // Get exam name
         const examDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/exams`, sessionData.examId));

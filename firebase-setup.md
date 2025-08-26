@@ -176,6 +176,10 @@ Create these composite indexes in Firestore:
 3. **Collection**: `artifacts/ujian-online-app/public/data/exams/{examId}/sessions`
    - Fields: `studentInfo.name` (Ascending), `status` (Ascending)
 
+4. **Collection Group**: `sessions`
+   - Fields: `status` (Ascending), `studentId` (Ascending), `__name__` (Ascending)
+   - Note: This index is required for StudentDashboard queries across all sessions
+
 ## 6. Storage Rules (for violation photos)
 
 ```javascript
