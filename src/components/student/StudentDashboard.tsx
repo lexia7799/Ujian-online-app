@@ -98,19 +98,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           
           const sessionsSnapshot = await getDocs(sessionsQuery);
           
-          let hasSession = false;
           let hasCompletedSession = false;
+          
           sessionsSnapshot.forEach(sessionDoc => {
-            hasSession = true;
             const sessionData = sessionDoc.data();
             
             // Check if session is completed (finished or disqualified)
             if (['finished', 'disqualified'].includes(sessionData.status)) {
               hasCompletedSession = true;
-            }
-            
-            // Include all sessions (finished, disqualified, started)
-            if (['finished', 'disqualified'].includes(sessionData.status)) {
               // Calculate essay score if available
               let essayScore = undefined;
               let totalScore = undefined;
@@ -139,8 +134,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             }
           });
           
-          // Only allow access if student has NOT completed this exam
-          if (!hasCompletedSession) {
+          // If student has completed this exam, skip adding it to available/pending/rejected lists
+          if (hasCompletedSession) {
+            // Skip this exam - student has already completed it
+            continue;
+          }
+          
+          // Only process applications if student hasn't completed the exam
+          {
             const applicationsQuery = query(
               collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
               where('studentId', '==', user.id),
@@ -159,7 +160,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 ...examData
               };
               
-              // Only show approved exams if student hasn't completed them
               if (appData.status === 'approved') {
                 const now = new Date();
                 const startTime = new Date(examData.startTime);
