@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collectionGroup, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -47,7 +47,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
     // Get exam results
     const sessionsQuery = query(
-      collection(db, `artifacts/${appId}/public/data/sessions`),
+      collectionGroup(db, 'sessions'),
       where('studentId', '==', user.id),
       where('status', 'in', ['finished', 'disqualified'])
     );

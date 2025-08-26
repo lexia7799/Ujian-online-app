@@ -8,6 +8,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Aturan untuk collection group sessions - izinkan akses ke semua sessions
+    // di berbagai lokasi (subcollection dari exams atau top-level)
+    match /{path=**}/sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
     // Aturan untuk data teachers - izinkan akses untuk registrasi/login
     match /artifacts/{appId}/public/data/teachers/{teacherId} {
       allow read, write: if true;
