@@ -16,7 +16,7 @@ const TeacherAuthChoice: React.FC<TeacherAuthChoiceProps> = ({ navigateTo, navig
       </button>
       
       <h2 className="text-3xl font-bold mb-8">Portal Dosen</h2>
-      <div className="space-y-8">
+      <div className="flex space-x-4">
         <button 
           onClick={() => navigateTo('teacher_login')}
           className="w-64 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg"
