@@ -48,7 +48,7 @@ const StudentWaitingRoom: React.FC<StudentWaitingRoomProps> = ({ user, navigateT
                 const endTime = new Date(examInfo.endTime);
                 
                 if (now >= startTime && now <= endTime && examInfo.status === 'published') {
-                  navigateTo('student_precheck', { exam: examInfo });
+                  navigateTo('student_precheck', { exam: examInfo, currentUser: user });
                 }
               }
             }
@@ -171,7 +171,7 @@ const StudentWaitingRoom: React.FC<StudentWaitingRoomProps> = ({ user, navigateT
             Ujian "<span className="font-bold">{examData?.name}</span>" sudah bisa dimulai.
           </p>
           <button
-            onClick={() => navigateTo('student_precheck', { exam: examData })}
+            onClick={() => navigateTo('student_precheck', { exam: examData, currentUser: user })}
             className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg"
           >
             Mulai Ujian

@@ -58,7 +58,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
       const existingSnapshot = await getDocs(existingQuery);
 
       if (!existingSnapshot.empty) {
-        navigateTo('student_waiting_room', { examCode: examCode.toUpperCase() });
+        navigateTo('student_waiting_room', { examCode: examCode.toUpperCase(), currentUser: user });
         setIsLoading(false);
         return;
       }
@@ -79,7 +79,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
         appliedAt: new Date()
       });
 
-      navigateTo('student_waiting_room', { examCode: examCode.toUpperCase() });
+      navigateTo('student_waiting_room', { examCode: examCode.toUpperCase(), currentUser: user });
     } catch (err) {
       setError('Terjadi kesalahan saat mengajukan ujian.');
     } finally {

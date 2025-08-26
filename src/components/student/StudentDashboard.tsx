@@ -27,6 +27,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [studentProfile, setStudentProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [availableExams, setAvailableExams] = useState<any[]>([]);
 
   useEffect(() => {
     // Check if user and user.id exist
@@ -45,10 +46,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
     getStudentProfile();
 
-    // Get exam results by first getting all exams, then checking sessions
+    // Get exam results and available exams
     const getExamResults = async () => {
       try {
         const results: ExamResult[] = [];
+        const available: any[] = [];
         
         // Get all exams
         const examsSnapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/exams`));
@@ -66,7 +68,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           
           const sessionsSnapshot = await getDocs(sessionsQuery);
           
+          let hasSession = false;
           sessionsSnapshot.forEach(sessionDoc => {
+            hasSession = true;
             const sessionData = sessionDoc.data();
             
             // Only include finished or disqualified sessions
@@ -80,9 +84,35 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               });
             }
           });
+          
+          // Check if student has approved application but no session yet
+          if (!hasSession) {
+            const applicationsQuery = query(
+              collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
+              where('studentId', '==', user.id),
+              where('status', '==', 'approved')
+            );
+            
+            const applicationsSnapshot = await getDocs(applicationsQuery);
+            if (!applicationsSnapshot.empty) {
+              const now = new Date();
+              const startTime = new Date(examData.startTime);
+              const endTime = new Date(examData.endTime);
+              
+              if (now >= startTime && now <= endTime && examData.status === 'published') {
+                available.push({
+                  id: examId,
+                  name: examData.name,
+                  code: examData.code,
+                  ...examData
+                });
+              }
+            }
+          }
         }
         
         setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
+        setAvailableExams(available);
         setIsLoading(false);
       } catch (error) {
         console.error('Error fetching exam results:', error);
@@ -104,12 +134,20 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
   return (
     <div>
-      <button 
-        onClick={navigateBack} 
-        className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
-      >
-        &larr; Kembali
-      </button>
+      <div className="flex justify-between items-center mb-6">
+        <button 
+          onClick={navigateBack} 
+          className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+        >
+          &larr; Kembali
+        </button>
+        <button 
+          onClick={() => navigateTo('home')} 
+          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
+        >
+          Logout
+        </button>
+      </div>
       
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-4">Dashboard Siswa</h2>
@@ -133,23 +171,55 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-2xl font-bold">Riwayat Ujian</h3>
-        <button 
-          onClick={() => navigateTo('student_join_exam')}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
-        >
-          Ikuti Ujian Baru
-        </button>
+        <div className="flex space-x-4">
+          <button 
+            onClick={() => navigateTo('student_join_exam', { currentUser: user })}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Ajukan Ujian
+          </button>
+          {availableExams.length > 0 && (
+            <button 
+              onClick={() => navigateTo('student_precheck', { exam: availableExams[0], currentUser: user })}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"
+            >
+              Mulai Ujian ({availableExams.length})
+            </button>
+          )}
+        </div>
       </div>
+
+      {availableExams.length > 0 && (
+        <div className="mb-6 bg-green-800 border border-green-500 p-4 rounded-lg">
+          <h4 className="text-lg font-bold text-green-400 mb-2">🎯 Ujian Siap Dimulai</h4>
+          <div className="space-y-2">
+            {availableExams.map(exam => (
+              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
+                <div>
+                  <span className="font-bold">{exam.name}</span>
+                  <span className="text-gray-400 ml-2">({exam.code})</span>
+                </div>
+                <button
+                  onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm"
+                >
+                  Mulai
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
         {examResults.length === 0 ? (
           <div className="text-center p-8 text-gray-400">
             <p className="text-lg mb-4">Belum ada riwayat ujian</p>
             <button 
-              onClick={() => navigateTo('student_join_exam')}
+              onClick={() => navigateTo('student_join_exam', { currentUser: user })}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
             >
-              Ikuti Ujian Pertama
+              Ajukan Ujian Pertama
             </button>
           </div>
         ) : (
