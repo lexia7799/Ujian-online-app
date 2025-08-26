@@ -32,7 +32,7 @@ const StudentIdentity: React.FC<StudentIdentityProps> = ({ navigateTo, navigateB
       alert("Semua data identitas harus diisi.");
       return;
     }
-    navigateTo('student_status_check', { studentInfo: identity });
+    navigateTo('student_status_check', { studentInfo: identity, exam: exam });
   };
 
   return (
