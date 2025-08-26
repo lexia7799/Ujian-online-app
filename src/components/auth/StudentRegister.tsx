@@ -44,13 +44,9 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     }
 
     try {
-      // Create a dummy email for Firebase Auth since it requires email
-      const dummyEmail = `${formData.username}@ujian-online.local`;
-      const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        dummyEmail, 
-        formData.password
-      );
+      // Create email from username for Firebase Auth
+      const email = `${formData.username.toLowerCase()}@student.ujian-online.com`;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       
       await updateProfile(userCredential.user, {
         displayName: formData.fullName
@@ -60,6 +56,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         fullName: formData.fullName,
         nim: formData.nim,
         username: formData.username,
+        email: email,
         major: formData.major,
         className: formData.className,
         university: formData.university,

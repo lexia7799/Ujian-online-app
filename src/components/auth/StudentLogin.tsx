@@ -25,9 +25,9 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ navigateTo, navigateBack })
     setIsLoading(true);
 
     try {
-      // Convert username to dummy email for Firebase Auth
-      const dummyEmail = `${formData.username}@ujian-online.local`;
-      await signInWithEmailAndPassword(auth, dummyEmail, formData.password);
+      // Convert username to email for Firebase Auth
+      const email = `${formData.username.toLowerCase()}@student.ujian-online.com`;
+      await signInWithEmailAndPassword(auth, email, formData.password);
       navigateTo('student_dashboard');
     } catch (error: any) {
       setError('Username atau password salah');

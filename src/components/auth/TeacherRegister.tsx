@@ -39,13 +39,9 @@ const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateB
     }
 
     try {
-      // Create a dummy email for Firebase Auth since it requires email
-      const dummyEmail = `${formData.username}@ujian-online.local`;
-      const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        dummyEmail, 
-        formData.password
-      );
+      // Create email from username for Firebase Auth
+      const email = `${formData.username.toLowerCase()}@teacher.ujian-online.com`;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       
       await updateProfile(userCredential.user, {
         displayName: formData.username
@@ -53,6 +49,7 @@ const TeacherRegister: React.FC<TeacherRegisterProps> = ({ navigateTo, navigateB
 
       await setDoc(doc(db, `artifacts/${appId}/public/data/teachers`, userCredential.user.uid), {
         username: formData.username,
+        email: email,
         createdAt: new Date(),
         role: 'teacher'
       });
