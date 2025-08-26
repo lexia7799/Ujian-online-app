@@ -4,7 +4,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CreateExamFormProps {
-  user: User;
+  user?: any;
   navigateTo: (page: string, data?: any) => void;
   navigateBack?: () => void;
 }
@@ -21,7 +21,7 @@ const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo, navig
     e.preventDefault();
     setError('');
     
-    if (!examName.trim() || !user || !password.trim() || !startTime || !endTime) {
+    if (!examName.trim() || !password.trim() || !startTime || !endTime) {
       setError("Semua kolom harus diisi.");
       return;
     }
@@ -37,7 +37,7 @@ const CreateExamForm: React.FC<CreateExamFormProps> = ({ user, navigateTo, navig
     
     try {
       const docRef = await addDoc(examsRef, {
-        teacherId: user.id,
+        teacherId: user?.id || 'teacher_default',
         name: examName,
         startTime: startTime,
         endTime: endTime,

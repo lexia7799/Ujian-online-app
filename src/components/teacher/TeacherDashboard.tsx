@@ -5,7 +5,7 @@ import { db, appId } from '../../config/firebase';
 import CreateExamForm from './CreateExamForm';
 
 interface TeacherDashboardProps {
-  user: User;
+  user?: any;
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
   canGoBack: boolean;
