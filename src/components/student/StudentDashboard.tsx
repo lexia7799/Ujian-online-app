@@ -301,7 +301,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           <p className="text-sm text-gray-300 mt-3">
             💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
           </p>
-        </p>
         </div>
       )}
 
