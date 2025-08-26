@@ -19,13 +19,13 @@ const StudentAuthChoice: React.FC<StudentAuthChoiceProps> = ({ navigateTo, navig
       <div className="space-y-6">
         <button 
           onClick={() => navigateTo('student_login')}
-          className="w-64 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg mb-4"
+          className="w-64 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg mb-6"
         >
           Login
         </button>
         <button 
           onClick={() => navigateTo('student_register')}
-          className="w-64 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg mt-4"
+          className="w-64 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg mt-6"
         >
           Daftar Akun Baru
         </button>
