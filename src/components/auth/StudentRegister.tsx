@@ -16,11 +16,13 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     confirmPassword: '',
     major: '',
     className: '',
-    university: ''
+    university: '',
+    whatsapp: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [conflictInfo, setConflictInfo] = useState<{[key: string]: string}>({});
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -31,28 +33,38 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         delete newErrors[e.target.name];
         return newErrors;
       });
+      setConflictInfo(prev => {
+        const newConflicts = { ...prev };
+        delete newConflicts[e.target.name];
+        return newConflicts;
+      });
     }
   };
 
   const validateUniqueFields = async () => {
     const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
     const errors: {[key: string]: string} = {};
+    const conflicts: {[key: string]: string} = {};
     
     // Check for duplicate NIM
     const nimQuery = query(studentsRef, where("nim", "==", formData.nim));
     const nimSnapshot = await getDocs(nimQuery);
     if (!nimSnapshot.empty) {
+      const existingStudent = nimSnapshot.docs[0].data();
       errors.nim = "NIM/NIS sudah terdaftar. Gunakan NIM/NIS yang berbeda.";
+      conflicts.nim = existingStudent.whatsapp || 'Tidak tersedia';
     }
     
     // Check for duplicate username
     const usernameQuery = query(studentsRef, where("username", "==", formData.username));
     const usernameSnapshot = await getDocs(usernameQuery);
     if (!usernameSnapshot.empty) {
+      const existingStudent = usernameSnapshot.docs[0].data();
       errors.username = "Username sudah digunakan. Pilih username yang berbeda.";
+      conflicts.username = existingStudent.whatsapp || 'Tidak tersedia';
     }
     
-    return errors;
+    return { errors, conflicts };
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,9 +86,10 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
 
     try {
       // Validate unique fields
-      const uniqueFieldErrors = await validateUniqueFields();
+      const { errors: uniqueFieldErrors, conflicts } = await validateUniqueFields();
       if (Object.keys(uniqueFieldErrors).length > 0) {
         setValidationErrors(uniqueFieldErrors);
+        setConflictInfo(conflicts);
         setIsLoading(false);
         return;
       }
@@ -97,6 +110,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         major: formData.major,
         className: formData.className,
         university: formData.university,
+        whatsapp: formData.whatsapp,
         createdAt: new Date(),
         role: 'student'
       });
@@ -126,6 +140,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
           <ul className="text-blue-200 text-sm space-y-1">
             <li>• NIM/NIS harus unik dan tidak boleh sama dengan yang sudah terdaftar</li>
             <li>• Username harus unik dan tidak boleh sama dengan yang sudah ada</li>
+            <li>• Nomor WhatsApp akan ditampilkan jika terjadi konflik data</li>
             <li>• Password minimal 6 karakter</li>
             <li>• Pastikan semua data yang dimasukkan benar dan valid</li>
           </ul>
@@ -184,6 +199,18 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
                   required 
                 />
               </div>
+              
+              <div>
+                <input 
+                  name="whatsapp" 
+                  type="tel"
+                  value={formData.whatsapp}
+                  onChange={handleChange} 
+                  placeholder="Nomor WhatsApp (contoh: 08123456789)" 
+                  className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                  required 
+                />
+              </div>
             </div>
             
             {/* Right Column */}
@@ -205,6 +232,14 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
                 {validationErrors.nim && (
                   <p className="text-red-400 text-xs mt-1">{validationErrors.nim}</p>
                 )}
+                {conflictInfo.nim && (
+                  <div className="mt-2 p-2 bg-red-900 border border-red-500 rounded-md">
+                    <p className="text-red-300 text-xs">
+                      <strong>Konflik Data:</strong> NIM/NIS ini sudah digunakan oleh pengguna dengan WhatsApp: 
+                      <span className="font-mono ml-1">{conflictInfo.nim}</span>
+                    </p>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -221,6 +256,14 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
                 />
                 {validationErrors.username && (
                   <p className="text-red-400 text-xs mt-1">{validationErrors.username}</p>
+                )}
+                {conflictInfo.username && (
+                  <div className="mt-2 p-2 bg-red-900 border border-red-500 rounded-md">
+                    <p className="text-red-300 text-xs">
+                      <strong>Konflik Data:</strong> Username ini sudah digunakan oleh pengguna dengan WhatsApp: 
+                      <span className="font-mono ml-1">{conflictInfo.username}</span>
+                    </p>
+                  </div>
                 )}
               </div>
               
