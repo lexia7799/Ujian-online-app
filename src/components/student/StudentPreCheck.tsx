@@ -62,6 +62,23 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
   const allChecksPassed = checks.device && checks.camera && checks.screenCount;
 
   const startExam = async () => {
+    // Request fullscreen immediately on user interaction
+    try {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if ((elem as any).webkitRequestFullscreen) {
+        await (elem as any).webkitRequestFullscreen();
+      } else if ((elem as any).mozRequestFullScreen) {
+        await (elem as any).mozRequestFullScreen();
+      } else if ((elem as any).msRequestFullscreen) {
+        await (elem as any).msRequestFullscreen();
+      }
+    } catch (error) {
+      console.warn("Failed to enter fullscreen:", error);
+      // Continue with exam even if fullscreen fails
+    }
+
     // Validate that exam and user are defined
     if (!appState.exam || !user) {
       console.error("Missing exam or user data");
