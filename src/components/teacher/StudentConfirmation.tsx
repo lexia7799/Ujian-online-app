@@ -66,8 +66,8 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   const handleApproveSelected = async () => {
     setIsLoading(true);
     try {
-      const promises = Array.from(selectedStudents).map(appId => {
-        const appRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`, appId);
+      const promises = Array.from(selectedStudents).map(applicationId => {
+        const appRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`, applicationId);
         return updateDoc(appRef, { status: 'approved' });
       });
       
@@ -83,8 +83,8 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   const handleRejectSelected = async () => {
     setIsLoading(true);
     try {
-      const promises = Array.from(selectedStudents).map(appId => {
-        const appRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`, appId);
+      const promises = Array.from(selectedStudents).map(applicationId => {
+        const appRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`, applicationId);
         return updateDoc(appRef, { status: 'rejected' });
       });
       
