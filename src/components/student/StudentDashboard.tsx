@@ -139,9 +139,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             }
           });
           
-          // Check if student has approved application but no session yet
-          // Only allow access if no session exists OR session is not completed
-          if (!hasSession || !hasCompletedSession) {
+          // Only allow access if student has NOT completed this exam
+          if (!hasCompletedSession) {
             const applicationsQuery = query(
               collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
               where('studentId', '==', user.id),
@@ -160,8 +159,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 ...examData
               };
               
-              // Only show approved exams if student hasn't completed them yet
-              if (appData.status === 'approved' && !hasCompletedSession) {
+              // Only show approved exams if student hasn't completed them
+              if (appData.status === 'approved') {
                 const now = new Date();
                 const startTime = new Date(examData.startTime);
                 const endTime = new Date(examData.endTime);
@@ -169,9 +168,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 if (now >= startTime && now <= endTime && examData.status === 'published') {
                   available.push(examWithApp);
                 }
-              } else if (appData.status === 'pending' && !hasCompletedSession) {
+              } else if (appData.status === 'pending') {
                 pending.push(examWithApp);
-              } else if (appData.status === 'rejected' && !hasCompletedSession) {
+              } else if (appData.status === 'rejected') {
                 rejected.push(examWithApp);
               }
             });
