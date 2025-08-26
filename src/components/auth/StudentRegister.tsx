@@ -59,9 +59,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     const usernameQuery = query(studentsRef, where("username", "==", formData.username));
     const usernameSnapshot = await getDocs(usernameQuery);
     if (!usernameSnapshot.empty) {
-      const existingStudent = usernameSnapshot.docs[0].data();
       errors.username = "Username sudah digunakan. Pilih username yang berbeda.";
-      conflicts.username = existingStudent.whatsapp || 'Tidak tersedia';
     }
     
     return { errors, conflicts };
@@ -140,7 +138,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
           <ul className="text-blue-200 text-sm space-y-1">
             <li>• NIM/NIS harus unik dan tidak boleh sama dengan yang sudah terdaftar</li>
             <li>• Username harus unik dan tidak boleh sama dengan yang sudah ada</li>
-            <li>• Nomor WhatsApp akan ditampilkan jika terjadi konflik data</li>
+            <li>• Nomor WhatsApp akan ditampilkan jika terjadi konflik NIM/NIS</li>
             <li>• Password minimal 6 karakter</li>
             <li>• Pastikan semua data yang dimasukkan benar dan valid</li>
           </ul>
@@ -256,14 +254,6 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
                 />
                 {validationErrors.username && (
                   <p className="text-red-400 text-xs mt-1">{validationErrors.username}</p>
-                )}
-                {conflictInfo.username && (
-                  <div className="mt-2 p-2 bg-red-900 border border-red-500 rounded-md">
-                    <p className="text-red-300 text-xs">
-                      <strong>Konflik Data:</strong> Username ini sudah digunakan oleh pengguna dengan WhatsApp: 
-                      <span className="font-mono ml-1">{conflictInfo.username}</span>
-                    </p>
-                  </div>
                 )}
               </div>
               
