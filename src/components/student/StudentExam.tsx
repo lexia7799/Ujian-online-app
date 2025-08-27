@@ -907,17 +907,26 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       </div>
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold">{exam.name}</h2>
-          <p className="text-sm text-gray-400">{studentInfo.name}</p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-mono bg-gray-900 px-4 py-2 rounded-lg">
-            {Math.floor(timeLeft / 3600).toString().padStart(2, '0')}:
-            {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
-            {(timeLeft % 60).toString().padStart(2, '0')}
+        <div className="w-full">
+          <div className="flex justify-center mb-4">
+            <div className="text-center">
+              <div className="text-3xl font-mono bg-gray-900 px-6 py-3 rounded-lg mb-2">
+                {Math.floor(timeLeft / 3600).toString().padStart(2, '0')}:
+                {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
+                {(timeLeft % 60).toString().padStart(2, '0')}
+              </div>
+              <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
+            </div>
           </div>
-          <div className="text-sm text-red-500 mt-1">Pelanggaran: {violations}/3</div>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold">{exam.name}</h2>
+              <p className="text-sm text-gray-400">{studentInfo.name}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-400">Kode: {exam.code}</p>
+            </div>
+          </div>
         </div>
       </div>
 

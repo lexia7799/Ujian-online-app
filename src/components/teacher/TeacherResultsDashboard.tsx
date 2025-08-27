@@ -149,7 +149,8 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     sessions.forEach((session, sessionIndex) => {
       // Prepare row data with text wrapping for name
-      const nameLines = wrapText(session.studentInfo.name || '', colWidths[1] - 2, 9);
+      const studentName = session.studentInfo.name || session.studentInfo.fullName || 'N/A';
+      const nameLines = wrapText(studentName, colWidths[1] - 2, 9);
       const rowHeight = Math.max(12, nameLines.length * 4 + 4);
       
       // Alternate row colors
