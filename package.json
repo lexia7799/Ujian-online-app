@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:netlify": "npm run build",
+    "build:vercel": "npm run build"
   },
   "dependencies": {
     "firebase": "^12.1.0",
