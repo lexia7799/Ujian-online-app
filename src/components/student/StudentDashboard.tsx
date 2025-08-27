@@ -165,6 +165,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 const startTime = new Date(examData.startTime);
                 const endTime = new Date(examData.endTime);
                 
+                // Only show in available if exam is ready and published
                 if (now >= startTime && now <= endTime && examData.status === 'published') {
                   available.push(examWithApp);
                 }

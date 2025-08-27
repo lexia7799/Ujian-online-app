@@ -77,8 +77,12 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
       
       await Promise.all(promises);
       setSelectedStudents(new Set());
+      
+      // Show success message
+      alert(`${selectedStudents.size} siswa berhasil disetujui!`);
     } catch (error) {
       console.error('Error approving students:', error);
+      alert('Gagal menyetujui siswa. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }
@@ -94,8 +98,12 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
       
       await Promise.all(promises);
       setSelectedStudents(new Set());
+      
+      // Show success message
+      alert(`${selectedStudents.size} siswa berhasil ditolak!`);
     } catch (error) {
       console.error('Error rejecting students:', error);
+      alert('Gagal menolak siswa. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }

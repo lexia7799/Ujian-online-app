@@ -47,9 +47,8 @@ const StudentWaitingRoom: React.FC<StudentWaitingRoomProps> = ({ user, navigateT
                 const startTime = new Date(examInfo.startTime);
                 const endTime = new Date(examInfo.endTime);
                 
-                if (now >= startTime && now <= endTime && examInfo.status === 'published') {
-                  navigateTo('student_precheck', { exam: examInfo, currentUser: user });
-                }
+                // Don't auto-navigate to precheck, let student manually start exam
+                // This prevents automatic redirection when bulk approval happens
               }
             }
             setIsLoading(false);
