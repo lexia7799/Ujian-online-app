@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import CreateExamForm from './CreateExamForm';
 import StudentConfirmation from './StudentConfirmation';
@@ -25,6 +25,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   const [isVerified, setIsVerified] = useState(false);
   const [inputPassword, setInputPassword] = useState('');
   const [currentExam, setCurrentExam] = useState<any>(null);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const handleSearchExam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +88,35 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
 
   const handleBackToMain = () => {
     setCurrentView('main');
+  };
+
+  const handleEditPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword.trim()) {
+      setError('Password tidak boleh kosong');
+      return;
+    }
+    
+    setIsUpdatingPassword(true);
+    setError('');
+    
+    try {
+      const examDocRef = doc(db, `artifacts/${appId}/public/data/exams`, currentExam.id);
+      await updateDoc(examDocRef, { password: newPassword });
+      
+      // Update local state
+      setCurrentExam({ ...currentExam, password: newPassword });
+      setFoundExam({ ...foundExam, password: newPassword });
+      
+      setShowEditPassword(false);
+      setNewPassword('');
+      alert('Password ujian berhasil diperbarui!');
+    } catch (error) {
+      console.error('Error updating password:', error);
+      setError('Gagal memperbarui password. Silakan coba lagi.');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   // Render different views based on currentView
@@ -207,6 +239,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
               <p className="text-sm text-gray-400">
                 Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{foundExam.code}</span>
               </p>
+              <div className="mt-2 flex items-center space-x-2">
+                <p className="text-sm text-gray-400">
+                  Password: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{"*".repeat(foundExam.password.length)}</span>
+                </p>
+                <button
+                  onClick={() => setShowEditPassword(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded"
+                >
+                  Edit Password
+                </button>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button 
                   onClick={() => handleNavigateToFeature('student_confirmation', { exam: foundExam })} 
@@ -232,6 +275,73 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                 >
                   Kelola Soal
                 </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Edit Password Modal */}
+          {showEditPassword && (
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+              <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold">Edit Password Ujian</h3>
+                  <button
+                    onClick={() => {
+                      setShowEditPassword(false);
+                      setNewPassword('');
+                      setError('');
+                    }}
+                    className="text-gray-400 hover:text-white text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <form onSubmit={handleEditPassword} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Password Baru untuk: {foundExam.name}
+                    </label>
+                    <input
+                      type="text"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Masukkan password baru"
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="bg-yellow-900 border border-yellow-500 p-3 rounded-md">
+                    <p className="text-yellow-300 text-sm">
+                      ⚠️ <strong>Peringatan:</strong> Mengubah password akan mempengaruhi akses ke ujian ini. 
+                      Pastikan untuk memberitahu siswa jika diperlukan.
+                    </p>
+                  </div>
+                  
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  
+                  <div className="flex justify-end space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditPassword(false);
+                        setNewPassword('');
+                        setError('');
+                      }}
+                      className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isUpdatingPassword}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-blue-400"
+                    >
+                      {isUpdatingPassword ? 'Menyimpan...' : 'Simpan Password'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
