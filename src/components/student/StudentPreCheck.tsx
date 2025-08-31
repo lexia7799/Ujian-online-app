@@ -149,7 +149,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     }
   };
 
-  const renderCheckItem = (label: string, status: boolean | null) => {
+  const renderCheckItem = (label: string, status: boolean | null, additionalInfo?: string) => {
     let statusText = "Memeriksa...";
     let colorClass = "text-yellow-400";
     
@@ -165,6 +165,11 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       <li className="flex justify-between items-center p-3 bg-gray-700 rounded-md">
         <span>{label}</span>
         <span className={`font-bold ${colorClass}`}>{statusText}</span>
+        {additionalInfo && (
+          <div className="mt-2 text-xs text-gray-400">
+            {additionalInfo}
+          </div>
+        )}
       </li>
     );
   };
@@ -183,7 +188,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           {renderCheckItem("Akses dari Desktop", checks.device)}
           {renderCheckItem("Layar Tunggal", checks.screenCount)}
           {renderCheckItem("Akses Kamera", checks.camera)}
-          {renderCheckItem("Sistem Deteksi Wajah", checks.faceDetection)}
+          {renderCheckItem("Sistem Deteksi Wajah", checks.faceDetection, faceDetectionStatus)}
         </ul>
         
         {isLoadingModels && (
@@ -227,11 +232,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
             className="w-full h-full object-cover"
           />
         </div>
-        {additionalInfo && (
-          <div className="mt-2 text-xs text-gray-400">
-            {additionalInfo}
-          {renderCheckItem("Sistem Deteksi Wajah", checks.faceDetection, faceDetectionStatus)}
-        )}
         
         {checks.device && (
           <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
@@ -276,4 +276,3 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
 };
 
 export default StudentPreCheck;
-            ❌ Gagal memuat sistem deteksi wajah. Refresh halaman atau gunakan browser Chrome/Firefox terbaru.
