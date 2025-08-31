@@ -113,6 +113,16 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
     });
   };
 
+  const viewSnapshot = (snapshot: AttendanceSnapshot, studentName: string, studentNim: string, studentClass: string, studentMajor: string) => {
+    setSelectedSnapshot({
+      ...snapshot,
+      studentName,
+      studentNim,
+      studentClass,
+      studentMajor
+    });
+  };
+
   const getAttendanceSnapshots = (session: Session): AttendanceSnapshot[] => {
     const snapshots: AttendanceSnapshot[] = [];
     // Check for up to 23 attendance snapshots (comprehensive schedule)
@@ -332,9 +342,9 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
                       {attendancePhotos.map((photo, index) => (
                         <button 
                           key={index}
-                          onClick={() => viewAttendancePhoto(
+                          onClick={() => viewSnapshot(
                             photo, 
-                            session.studentInfo.name || 'Siswa', 
+                            session.studentInfo.name || session.studentInfo.fullName || 'Siswa', 
                             session.studentInfo.nim || 'Tidak tersedia',
                             session.studentInfo.className || 'Tidak tersedia',
                             session.studentInfo.major || 'Tidak tersedia'

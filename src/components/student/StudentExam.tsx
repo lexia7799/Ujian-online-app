@@ -1035,9 +1035,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         <div className="text-xs text-gray-400 mt-1">
-          Face Detection: {faceDetectionEnabled ? '🤖 AKTIF (2+ Wajah = PELANGGARAN)' : faceDetectionService.isLoading() ? '⏳ Loading AI Models...' : '❌ Error'}
-        </div>
-        <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
