@@ -286,21 +286,37 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       { time: 1 * 60 * 1000, label: '1 Menit' },      // 1 minute
       { time: 5 * 60 * 1000, label: '5 Menit' },      // 5 minutes
       { time: 10 * 60 * 1000, label: '10 Menit' },    // 10 minutes
+      { time: 15 * 60 * 1000, label: '15 Menit' },    // 15 minutes
       { time: 20 * 60 * 1000, label: '20 Menit' },    // 20 minutes
+      { time: 25 * 60 * 1000, label: '25 Menit' },    // 25 minutes
       { time: 30 * 60 * 1000, label: '30 Menit' },    // 30 minutes
+      { time: 35 * 60 * 1000, label: '35 Menit' },    // 35 minutes
+      { time: 40 * 60 * 1000, label: '40 Menit' },    // 40 minutes
       { time: 45 * 60 * 1000, label: '45 Menit' },    // 45 minutes
-      { time: 60 * 60 * 1000, label: '60 Menit' }     // 60 minutes
+      { time: 50 * 60 * 1000, label: '50 Menit' },    // 50 minutes
+      { time: 55 * 60 * 1000, label: '55 Menit' },    // 55 minutes
+      { time: 60 * 60 * 1000, label: '60 Menit' },    // 60 minutes
+      { time: 70 * 60 * 1000, label: '70 Menit' },    // 70 minutes
+      { time: 80 * 60 * 1000, label: '80 Menit' },    // 80 minutes
+      { time: 90 * 60 * 1000, label: '90 Menit' },    // 90 minutes
+      { time: 100 * 60 * 1000, label: '100 Menit' },  // 100 minutes
+      { time: 110 * 60 * 1000, label: '110 Menit' },  // 110 minutes
+      { time: 120 * 60 * 1000, label: '120 Menit' }   // 120 minutes
     ];
     
     schedules.forEach(schedule => {
       const timeoutId = setTimeout(() => {
+        // Take attendance photo regardless of violations, only check if exam is finished
         if (!isFinished) {
+          console.log(`📷 Scheduled attendance photo at ${schedule.label} (Current violations: ${violations})`);
           takeAttendancePhoto(schedule.label);
         }
       }, schedule.time);
       
       attendanceIntervalRefs.current.push(timeoutId);
     });
+    
+    console.log(`📅 Attendance schedule set up for ${schedules.length} photos`);
   };
 
   // Cleanup attendance schedule
@@ -313,7 +329,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Take attendance photo (separate from violation photos)
   const takeAttendancePhoto = async (timeLabel: string) => {
-    if (!videoRef.current || !canvasRef.current || isFinished) {
+    if (!videoRef.current || !canvasRef.current) {
+      console.log(`❌ Cannot take attendance photo at ${timeLabel} - missing video/canvas`);
+      return;
+    }
+    
+    // Check if exam is finished - if so, don't take photo
+    if (isFinished) {
+      console.log(`❌ Cannot take attendance photo at ${timeLabel} - exam finished`);
       return;
     }
     
@@ -337,7 +360,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ Attendance photo saved at ${timeLabel}`);
+      console.log(`✅ Attendance photo ${attendancePhotoCount.current} saved at ${timeLabel} (Violations: ${violations})`);
     } catch (error) {
       console.error('Failed to save attendance photo:', error);
     }
@@ -789,6 +812,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowUnansweredModal(false);
     
     // Take final attendance photo before finishing
+    console.log(`📷 Taking final attendance photo: ${reason}`);
     await takeAttendancePhoto('Selesai Ujian');
     
     // Cleanup intervals
@@ -831,6 +855,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
     
     setFinalScore(score);
+    console.log(`📊 Exam finished: ${reason}, Score: ${score}, Status: ${status}`);
     await updateDoc(sessionDocRef, { 
       status, 
       finishTime: new Date(), 
@@ -1040,11 +1065,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div className="text-xs text-gray-400">
           Foto Absensi: {attendancePhotoCount.current}
         </div>
-        {streamRef.current && (
-          <div className="text-xs text-gray-400">
-            Stream: {streamRef.current.active ? '🟢 Active' : '🔴 Inactive'}
-          </div>
-        )}
       </div>
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
