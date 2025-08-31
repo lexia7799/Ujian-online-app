@@ -27,6 +27,21 @@ interface Session {
   attendanceSnapshot_6?: AttendanceSnapshot;
   attendanceSnapshot_7?: AttendanceSnapshot;
   attendanceSnapshot_8?: AttendanceSnapshot;
+  attendanceSnapshot_9?: AttendanceSnapshot;
+  attendanceSnapshot_10?: AttendanceSnapshot;
+  attendanceSnapshot_11?: AttendanceSnapshot;
+  attendanceSnapshot_12?: AttendanceSnapshot;
+  attendanceSnapshot_13?: AttendanceSnapshot;
+  attendanceSnapshot_14?: AttendanceSnapshot;
+  attendanceSnapshot_15?: AttendanceSnapshot;
+  attendanceSnapshot_16?: AttendanceSnapshot;
+  attendanceSnapshot_17?: AttendanceSnapshot;
+  attendanceSnapshot_18?: AttendanceSnapshot;
+  attendanceSnapshot_19?: AttendanceSnapshot;
+  attendanceSnapshot_20?: AttendanceSnapshot;
+  attendanceSnapshot_21?: AttendanceSnapshot;
+  attendanceSnapshot_22?: AttendanceSnapshot;
+  attendanceSnapshot_23?: AttendanceSnapshot;
 }
 
 interface TeacherAttendanceDashboardProps {
@@ -53,18 +68,13 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
     const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     const unsubSessions = onSnapshot(sessionsRef, (snapshot) => {
       const sessionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
-      // Only show sessions that have at least one attendance photo
+      // Show all sessions, even those without attendance photos yet
       const sessionsWithAttendance = sessionData.filter(session => 
-        session.attendanceSnapshot_1 || 
-        session.attendanceSnapshot_2 || 
-        session.attendanceSnapshot_3 ||
-        session.attendanceSnapshot_4 ||
-        session.attendanceSnapshot_5 ||
-        session.attendanceSnapshot_6 ||
-        session.attendanceSnapshot_7 ||
-        session.attendanceSnapshot_8
+        // Check if session has any attendance snapshots (up to 23 possible)
+        Object.keys(session).some(key => key.startsWith('attendanceSnapshot_'))
       );
-      setSessions(sessionsWithAttendance);
+      // Show all sessions, not just those with attendance photos
+      setSessions(sessionData);
     });
     
     return () => unsubSessions();
@@ -101,7 +111,8 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
 
   const getAttendanceSnapshots = (session: Session): AttendanceSnapshot[] => {
     const snapshots: AttendanceSnapshot[] = [];
-    for (let i = 1; i <= 8; i++) {
+    // Check for up to 23 attendance snapshots (comprehensive schedule)
+    for (let i = 1; i <= 23; i++) {
       const snapshot = session[`attendanceSnapshot_${i}` as keyof Session] as AttendanceSnapshot;
       if (snapshot) {
         snapshots.push(snapshot);
@@ -269,7 +280,9 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
                         </div>
-                        <p className="text-sm text-gray-400">Belum Ada Foto Absensi</p>
+                        <p className="text-sm text-gray-400">
+                          {session.status === 'started' ? 'Ujian Sedang Berlangsung' : 'Belum Ada Foto Absensi'}
+                        </p>
                       </div>
                     </div>
                   )}

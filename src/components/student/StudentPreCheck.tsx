@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
-import { faceDetectionService } from '../../utils/faceDetection';
 
 interface StudentPreCheckProps {
   navigateTo: (page: string, data?: any) => void;
@@ -14,15 +13,12 @@ interface DeviceChecks {
   device: boolean | null;
   camera: boolean | null;
   screenCount: boolean | null;
-  faceDetection: boolean | null;
 }
 
 const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState, user }) => {
   const { studentInfo } = appState;
-  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null, faceDetection: null });
+  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null });
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [faceDetectionStatus, setFaceDetectionStatus] = useState<string>('Memuat...');
 
   useEffect(() => {
     // Enhanced mobile detection
@@ -50,25 +46,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     
     if (isMobile) return;
     
-    // Load face detection models first
-    const loadFaceModels = async () => {
-      setIsLoadingModels(true);
-      setFaceDetectionStatus('Memuat model AI deteksi wajah...');
-      
-      const modelsLoaded = await faceDetectionService.loadModels();
-      
-      if (modelsLoaded) {
-        setFaceDetectionStatus('✅ Siap - Hanya 2+ wajah yang memicu pelanggaran');
-      } else {
-        setFaceDetectionStatus('❌ Gagal memuat - Refresh halaman dan coba lagi');
-      }
-      
-      setChecks(c => ({ ...c, faceDetection: modelsLoaded }));
-      setIsLoadingModels(false);
-    };
-    
-    loadFaceModels();
-    
     navigator.mediaDevices.getUserMedia({ 
       video: { 
         width: { ideal: 1280, min: 640 },
@@ -88,7 +65,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       });
   }, []);
 
-  const allChecksPassed = checks.device && checks.camera && checks.screenCount && checks.faceDetection;
+  const allChecksPassed = checks.device && checks.camera && checks.screenCount;
 
   const startExam = async () => {
     // Request fullscreen immediately on user interaction
@@ -188,16 +165,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           {renderCheckItem("Akses dari Desktop", checks.device)}
           {renderCheckItem("Layar Tunggal", checks.screenCount)}
           {renderCheckItem("Akses Kamera", checks.camera)}
-          {renderCheckItem("Sistem Deteksi Wajah", checks.faceDetection, faceDetectionStatus)}
         </ul>
-        
-        {isLoadingModels && (
-          <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
-            <p className="text-blue-300 text-sm">
-              🤖 Memuat model deteksi wajah... Mohon tunggu sebentar.
-            </p>
-          </div>
-        )}
         
         {checks.device === false && (
           <p className="text-red-400 text-center mb-4">
@@ -217,12 +185,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           </p>
         )}
         
-        {checks.faceDetection === false && (
-          <p className="text-red-400 text-center mb-4">
-            ❌ Gagal memuat sistem deteksi wajah. Refresh halaman dan coba lagi.
-          </p>
-        )}
-        
         <div className="my-4 w-full aspect-video bg-gray-900 rounded-md overflow-hidden">
           <video 
             ref={videoRef} 
@@ -235,33 +197,16 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         
         {checks.device && (
           <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
-            <p className="text-blue-300 text-sm">
-              🤖 Memuat model deteksi wajah... Mohon tunggu sebentar (ini hanya sekali).
+            <p className="text-blue-300 text-sm font-bold">
+              📷 Sistem Foto Absensi Berkala Aktif
             </p>
             <ul className="text-blue-200 text-xs mt-2 space-y-1">
               <li>• Ujian akan otomatis masuk mode fullscreen</li>
-              <li>• Sistem akan mendeteksi jika ada 2 wajah atau lebih (PELANGGARAN)</li>
-              <li>• 1 wajah = normal, tidak ada pelanggaran</li>
-              <li>• Foto akan diambil secara berkala untuk absensi</li>
+              <li>• Foto absensi akan diambil secara berkala setiap 5 menit</li>
+              <li>• Foto juga diambil saat submit ujian</li>
               <li>• Keluar dari fullscreen akan dianggap pelanggaran</li>
+              <li>• Sistem monitoring keamanan tetap aktif</li>
             </ul>
-          </div>
-        )}
-        
-        {checks.faceDetection && (
-          <div className="mb-4 p-3 bg-green-900 border border-green-500 rounded-md">
-            <p className="text-green-300 text-sm">
-              🤖 <strong>Sistem AI Deteksi Wajah Aktif:</strong>
-            </p>
-            <ul className="text-green-200 text-xs mt-2 space-y-1">
-              <li>• ✅ 0-1 Wajah = Normal</li>
-              <li>• 🚨 2+ Wajah = PELANGGARAN + FOTO OTOMATIS</li>
-              <li>• 📸 Foto otomatis diambil saat pelanggaran</li>
-              <li>• ⚡ Deteksi setiap 5 detik selama ujian</li>
-            </ul>
-            <p className="text-yellow-300 text-xs mt-2">
-              <strong>PENTING:</strong> Pastikan tidak ada orang lain di sekitar Anda selama ujian!
-            </p>
           </div>
         )}
         
