@@ -53,14 +53,14 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     // Load face detection models first
     const loadFaceModels = async () => {
       setIsLoadingModels(true);
-      setFaceDetectionStatus('Memuat model deteksi wajah...');
+      setFaceDetectionStatus('Memuat model AI deteksi wajah...');
       
       const modelsLoaded = await faceDetectionService.loadModels();
       
       if (modelsLoaded) {
-        setFaceDetectionStatus('Siap - Hanya 2+ wajah yang akan memicu pelanggaran');
+        setFaceDetectionStatus('✅ Siap - Hanya 2+ wajah yang memicu pelanggaran');
       } else {
-        setFaceDetectionStatus('Gagal memuat - Refresh halaman dan coba lagi');
+        setFaceDetectionStatus('❌ Gagal memuat - Refresh halaman dan coba lagi');
       }
       
       setChecks(c => ({ ...c, faceDetection: modelsLoaded }));
@@ -251,14 +251,16 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         {checks.faceDetection && (
           <div className="mb-4 p-3 bg-green-900 border border-green-500 rounded-md">
             <p className="text-green-300 text-sm">
-              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Hanya 2+ wajah yang memicu pelanggaran.
+              🤖 <strong>Sistem AI Deteksi Wajah Aktif:</strong>
             </p>
             <ul className="text-green-200 text-xs mt-2 space-y-1">
               <li>• ✅ 0-1 Wajah = Normal</li>
-              <li>• 🚨 2+ Wajah = Pelanggaran (Ada orang lain)</li>
+              <li>• 🚨 2+ Wajah = PELANGGARAN (Ada orang lain membantu)</li>
+              <li>• 📸 Foto otomatis diambil saat pelanggaran</li>
+              <li>• ⚡ Deteksi setiap 5 detik selama ujian</li>
             </ul>
             <p className="text-yellow-300 text-xs mt-2">
-              <strong>Penting:</strong> Pastikan hanya Anda yang berada di depan kamera selama ujian!
+              <strong>PENTING:</strong> Pastikan tidak ada orang lain di sekitar Anda selama ujian!
             </p>
           </div>
         )}

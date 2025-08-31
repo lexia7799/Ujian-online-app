@@ -241,36 +241,42 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Initialize face detection
   const initializeFaceDetection = async () => {
-    // Wait for models to load if not ready
-    if (!faceDetectionService.isReady()) {
-      console.log('🤖 Face detection models not ready, loading...');
-      const loaded = await faceDetectionService.loadModels();
-      if (!loaded) {
-        console.log('❌ Failed to load face detection models');
-        return;
-      }
+    console.log('🤖 Initializing face detection...');
+    
+    // Ensure models are loaded
+    const loaded = await faceDetectionService.loadModels();
+    if (!loaded) {
+      console.log('❌ Failed to load face detection models');
+      return;
     }
     
     setFaceDetectionEnabled(true);
     console.log('✅ Face detection enabled');
     
-    // Start face detection interval (every 10 seconds for better performance)
+    // Start face detection interval (every 5 seconds for better responsiveness)
     faceDetectionIntervalRef.current = setInterval(async () => {
       if (videoRef.current && isCameraReady && !isFinished) {
         try {
+          console.log('🔍 Running face detection check...');
           const faceCount = await faceDetectionService.detectFaces(videoRef.current);
           
-          // Only trigger violation for exactly 2+ faces (0 and 1 face are normal)
+          console.log(`👥 Detection result: ${faceCount} face(s)`);
+          
+          // CRITICAL: Only trigger violation for 2+ faces
+          // 0 faces = normal (student looking down, away, etc.)
+          // 1 face = normal (ideal condition)
+          // 2+ faces = VIOLATION (someone else helping)
           if (faceCount >= 2) {
-            console.log(`🚨 Multiple faces detected: ${faceCount}`);
+            console.log(`🚨 VIOLATION: Multiple faces detected: ${faceCount}`);
             handleViolation(`Terdeteksi ${faceCount} Wajah - Hanya Boleh 1 Orang`);
+          } else {
+            console.log(`✅ Normal: ${faceCount} face(s) - No violation`);
           }
-          // faceCount === 0 or 1 is normal, no violation
         } catch (error) {
-          console.error('Face detection error:', error);
+          console.error('❌ Face detection error:', error);
         }
       }
-    }, 10000); // Check every 10 seconds
+    }, 5000); // Check every 5 seconds for better responsiveness
   };
 
   // Setup attendance photo schedule
@@ -1029,7 +1035,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         <div className="text-xs text-gray-400 mt-1">
-          Face Detection: {faceDetectionEnabled ? '🤖 Aktif (Hanya 2+ Wajah = Pelanggaran)' : faceDetectionService.isLoading() ? '⏳ Loading Models...' : '❌ Error'}
+          Face Detection: {faceDetectionEnabled ? '🤖 AKTIF (2+ Wajah = PELANGGARAN)' : faceDetectionService.isLoading() ? '⏳ Loading AI Models...' : '❌ Error'}
         </div>
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3

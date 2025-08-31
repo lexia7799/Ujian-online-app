@@ -44,33 +44,42 @@ export class FaceDetectionService {
 
   async detectFaces(videoElement: HTMLVideoElement): Promise<number> {
     if (!this.isModelLoaded || this.isDetecting) {
+      console.log('⚠️ Face detection not ready or already detecting');
       return 1; // Return 1 (normal) if not ready
     }
 
     if (!videoElement || videoElement.readyState < 2) {
+      console.log('⚠️ Video element not ready');
       return 1; // Return 1 (normal) if video not ready
     }
 
     try {
       this.isDetecting = true;
       
-      // Detect faces with tiny face detector (faster and lighter)
+      console.log('🔍 Starting face detection...');
+      
+      // Detect faces with tiny face detector (optimized settings)
       const detections = await faceapi
         .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions({
-          inputSize: 320, // Smaller input size for better performance
-          scoreThreshold: 0.5 // Higher threshold for more accurate detection
+          inputSize: 416, // Larger input size for better accuracy
+          scoreThreshold: 0.3 // Lower threshold to catch more faces
         }));
 
       const faceCount = detections.length;
       
-      // Only log when there's a violation (2+ faces)
-      if (faceCount >= 2) {
-        console.log(`🚨 Multiple faces detected: ${faceCount} faces`);
+      // Always log the detection result for debugging
+      console.log(`👥 Face detection result: ${faceCount} face(s) detected`);
+      
+      // Log detection details for debugging
+      if (detections.length > 0) {
+        detections.forEach((detection, index) => {
+          console.log(`Face ${index + 1}: confidence ${detection.score.toFixed(3)}`);
+        });
       }
       
       return faceCount;
     } catch (error) {
-      console.error('Face detection error:', error);
+      console.error('❌ Face detection error:', error);
       return 1; // Return 1 (normal) on error to avoid false violations
     } finally {
       this.isDetecting = false;
