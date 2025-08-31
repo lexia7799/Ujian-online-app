@@ -22,6 +22,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
   const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null, faceDetection: null });
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [faceDetectionStatus, setFaceDetectionStatus] = useState<string>('Memuat...');
 
   useEffect(() => {
     // Enhanced mobile detection
@@ -52,7 +53,16 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     // Load face detection models first
     const loadFaceModels = async () => {
       setIsLoadingModels(true);
+      setFaceDetectionStatus('Memuat model deteksi wajah...');
+      
       const modelsLoaded = await faceDetectionService.loadModels();
+      
+      if (modelsLoaded) {
+        setFaceDetectionStatus('Siap - Sistem akan mendeteksi 2+ wajah sebagai pelanggaran');
+      } else {
+        setFaceDetectionStatus('Gagal memuat - Refresh halaman dan coba lagi');
+      }
+      
       setChecks(c => ({ ...c, faceDetection: modelsLoaded }));
       setIsLoadingModels(false);
     };
@@ -217,15 +227,21 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
             className="w-full h-full object-cover"
           />
         </div>
+        {additionalInfo && (
+          <div className="mt-2 text-xs text-gray-400">
+            {additionalInfo}
+          {renderCheckItem("Sistem Deteksi Wajah", checks.faceDetection, faceDetectionStatus)}
+        )}
         
         {checks.device && (
           <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
             <p className="text-blue-300 text-sm">
-              ℹ️ <strong>Penting:</strong> Selama ujian berlangsung:
+              🤖 Memuat model deteksi wajah... Mohon tunggu sebentar (ini hanya sekali).
             </p>
             <ul className="text-blue-200 text-xs mt-2 space-y-1">
               <li>• Ujian akan otomatis masuk mode fullscreen</li>
-              <li>• Sistem akan mendeteksi jika ada lebih dari 1 wajah</li>
+              <li>• Sistem akan mendeteksi jika ada 2 wajah atau lebih (PELANGGARAN)</li>
+              <li>• 1 wajah = normal, tidak ada pelanggaran</li>
               <li>• Foto akan diambil secara berkala untuk absensi</li>
               <li>• Keluar dari fullscreen akan dianggap pelanggaran</li>
             </ul>
@@ -235,11 +251,10 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         {checks.faceDetection && (
           <div className="mb-4 p-3 bg-green-900 border border-green-500 rounded-md">
             <p className="text-green-300 text-sm">
-              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Sistem akan memantau dan memastikan hanya ada 1 wajah selama ujian.
+              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Sistem akan mendeteksi jika ada 2 wajah atau lebih.
             </p>
             <ul className="text-green-200 text-xs mt-2 space-y-1">
               <li>• ✅ 1 Wajah = Normal</li>
-              <li>• ⚠️ 0 Wajah = Pelanggaran (Meninggalkan tempat)</li>
               <li>• 🚨 2+ Wajah = Pelanggaran (Ada orang lain)</li>
             </ul>
             <p className="text-yellow-300 text-xs mt-2">
@@ -261,3 +276,4 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
 };
 
 export default StudentPreCheck;
+            ❌ Gagal memuat sistem deteksi wajah. Refresh halaman atau gunakan browser Chrome/Firefox terbaru.

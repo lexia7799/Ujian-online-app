@@ -241,32 +241,37 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Initialize face detection
   const initializeFaceDetection = async () => {
+    // Wait for models to load if not ready
     if (!faceDetectionService.isReady()) {
-      console.log('🤖 Face detection models not ready yet');
-      return;
+      console.log('🤖 Face detection models not ready, loading...');
+      const loaded = await faceDetectionService.loadModels();
+      if (!loaded) {
+        console.log('❌ Failed to load face detection models');
+        return;
+      }
     }
     
     setFaceDetectionEnabled(true);
+    console.log('✅ Face detection enabled');
     
-    // Start face detection interval (every 8 seconds)
+    // Start face detection interval (every 10 seconds for better performance)
     faceDetectionIntervalRef.current = setInterval(async () => {
       if (videoRef.current && isCameraReady && !isFinished) {
         try {
           const faceCount = await faceDetectionService.detectFaces(videoRef.current);
           
+          // Only trigger violation for 2+ faces
           if (faceCount >= 2) {
             console.log(`🚨 Multiple faces detected: ${faceCount}`);
             handleViolation(`Terdeteksi ${faceCount} Wajah - Hanya Boleh 1 Orang`);
-          } else if (faceCount === 0) {
-            console.log('⚠️ No face detected');
-            handleViolation('Tidak Ada Wajah Terdeteksi - Siswa Meninggalkan Tempat');
           }
-          // faceCount === 1 is normal, no action needed
+          // faceCount === 1 or 0 is normal, no action needed
+          // We only care about multiple people (2+ faces)
         } catch (error) {
           console.error('Face detection error:', error);
         }
       }
-    }, 8000); // Check every 8 seconds
+    }, 10000); // Check every 10 seconds
   };
 
   // Setup attendance photo schedule
@@ -1025,7 +1030,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         <div className="text-xs text-gray-400 mt-1">
-          Face Detection: {faceDetectionEnabled ? '🤖 Active' : '⏳ Loading'}
+          Face Detection: {faceDetectionEnabled ? '🤖 Aktif (2+ Wajah = Pelanggaran)' : faceDetectionService.isLoading() ? '⏳ Loading Models...' : '❌ Error'}
         </div>
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
