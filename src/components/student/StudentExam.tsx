@@ -253,7 +253,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setFaceDetectionEnabled(true);
     console.log('✅ Face detection enabled');
     
-    // Start face detection interval (every 5 seconds for better responsiveness)
+    // Start face detection interval (every 5 seconds)
     faceDetectionIntervalRef.current = setInterval(async () => {
       if (videoRef.current && isCameraReady && !isFinished) {
         try {
@@ -262,13 +262,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           
           console.log(`👥 Detection result: ${faceCount} face(s)`);
           
-          // CRITICAL: Only trigger violation for 2+ faces
+          // CRITICAL: Only trigger violation and photo capture for 2+ faces
           // 0 faces = normal (student looking down, away, etc.)
           // 1 face = normal (ideal condition)
-          // 2+ faces = VIOLATION (someone else helping)
+          // 2+ faces = VIOLATION (someone else helping) + PHOTO CAPTURE
           if (faceCount >= 2) {
             console.log(`🚨 VIOLATION: Multiple faces detected: ${faceCount}`);
-            handleViolation(`Terdeteksi ${faceCount} Wajah - Hanya Boleh 1 Orang`);
+            handleViolation(`Deteksi 2 wajah`);
           } else {
             console.log(`✅ Normal: ${faceCount} face(s) - No violation`);
           }
@@ -276,7 +276,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           console.error('❌ Face detection error:', error);
         }
       }
-    }, 5000); // Check every 5 seconds for better responsiveness
+    }, 5000); // Check every 5 seconds
   };
 
   // Setup attendance photo schedule

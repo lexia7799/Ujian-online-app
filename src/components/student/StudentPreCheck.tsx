@@ -255,7 +255,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
             </p>
             <ul className="text-green-200 text-xs mt-2 space-y-1">
               <li>• ✅ 0-1 Wajah = Normal</li>
-              <li>• 🚨 2+ Wajah = PELANGGARAN (Ada orang lain membantu)</li>
+              <li>• 🚨 2+ Wajah = PELANGGARAN + FOTO OTOMATIS</li>
               <li>• 📸 Foto otomatis diambil saat pelanggaran</li>
               <li>• ⚡ Deteksi setiap 5 detik selama ujian</li>
             </ul>
