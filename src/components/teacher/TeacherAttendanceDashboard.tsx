@@ -125,7 +125,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
 
   const getAttendanceSnapshots = (session: Session): AttendanceSnapshot[] => {
     const snapshots: AttendanceSnapshot[] = [];
-    for (let i = 1; i <= 26; i++) {
+    for (let i = 1; i <= 25; i++) {
       const snapshot = session[`attendanceSnapshot_${i}` as keyof Session] as AttendanceSnapshot;
       if (snapshot) {
         snapshots.push(snapshot);

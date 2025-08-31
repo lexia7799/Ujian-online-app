@@ -62,6 +62,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
+    // Setup attendance photo schedule immediately after camera is ready
+    const setupAttendanceWhenReady = () => {
+      if (isCameraReady && !isFinished) {
+        console.log("📷 Setting up attendance photo schedule...");
+        setupAttendanceSchedule();
+      }
+    };
+    
+    // Setup attendance when camera becomes ready
+    if (isCameraReady) {
+      setupAttendanceWhenReady();
+    }
+    
     // Initialize camera with retry mechanism
     const initializeCamera = async (retryCount = 0) => {
       try {
@@ -152,6 +165,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     };
   }, []);
 
+  // Setup attendance schedule when camera becomes ready
+  useEffect(() => {
+    if (isCameraReady && !isFinished && attendanceIntervalRefs.current.length === 0) {
+      console.log("📷 Camera ready, setting up attendance schedule...");
+      setupAttendanceSchedule();
+    }
+  }, [isCameraReady, isFinished]);
+
   // Function to manually restart camera
   const restartCamera = async () => {
     console.log("🔄 Manually restarting camera...");
@@ -227,6 +248,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Setup attendance photo schedule
   const setupAttendanceSchedule = () => {
+    // Clear any existing schedules first
+    cleanupAttendanceSchedule();
+    
+    console.log("📅 Setting up attendance photo schedule for 25 photos...");
+    
     // Schedule attendance photos at specific intervals
     const schedules = [
       { time: 1 * 60 * 1000, label: '1 Menit' },
@@ -253,18 +279,21 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       { time: 105 * 60 * 1000, label: '105 Menit' },
       { time: 110 * 60 * 1000, label: '110 Menit' },
       { time: 115 * 60 * 1000, label: '115 Menit' },
-      { time: 120 * 60 * 1000, label: '120 Menit' }
+      { time: 120 * 60 * 1000, label: '120 Menit' },
     ];
     
-    schedules.forEach(schedule => {
+    schedules.forEach((schedule, index) => {
       const timeoutId = setTimeout(() => {
         if (!isFinished) {
+          console.log(`📷 Taking scheduled attendance photo ${index + 1}/25 at ${schedule.label}`);
           takeAttendancePhoto(schedule.label);
         }
       }, schedule.time);
       
       attendanceIntervalRefs.current.push(timeoutId);
     });
+    
+    console.log(`✅ Scheduled ${schedules.length} attendance photos`);
   };
 
   // Cleanup attendance schedule
@@ -278,10 +307,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   // Take attendance photo (separate from violation photos)
   const takeAttendancePhoto = async (timeLabel: string) => {
     if (!videoRef.current || !canvasRef.current || isFinished) {
+      console.log(`❌ Cannot take attendance photo at ${timeLabel}: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, finished=${isFinished}`);
       return;
     }
     
-    console.log(`📷 Taking attendance photo at ${timeLabel} (Violations: ${violations})`);
+    console.log(`📷 Taking attendance photo at ${timeLabel} (Photo #${attendancePhotoCount.current + 1}, Violations: ${violations})`);
     
     const photoData = capturePhoto();
     if (!photoData) {
@@ -303,7 +333,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ Attendance photo ${attendancePhotoCount.current} saved at ${timeLabel}`);
+      console.log(`✅ Attendance photo ${attendancePhotoCount.current}/25 saved at ${timeLabel}`);
     } catch (error) {
       console.error('Failed to save attendance photo:', error);
     }
@@ -751,6 +781,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowUnansweredModal(false);
     
     // Take final attendance photo before finishing
+    console.log("📷 Taking final attendance photo before finishing exam...");
     await takeAttendancePhoto('Selesai Ujian');
     
     // Cleanup intervals
@@ -970,40 +1001,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       {/* Camera status indicator with more detail */}
       <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-40 border">
-        {isCameraReady ? (
-          <div className="text-green-400">
-            ✅ Camera Ready
-            {videoRef.current && (
-              <div className="text-xs text-gray-300">
-                {videoRef.current.videoWidth}x{videoRef.current.videoHeight}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            {cameraError ? (
-              <>
-                <div className="text-red-400">❌ Camera Error</div>
-                <div className="text-xs text-gray-300">
-                  Retry {cameraInitRetryCount.current}/{maxCameraRetries}
-                </div>
-              </>
-            ) : (
-              <div className="text-yellow-400">⏳ Initializing Camera...</div>
-            )}
-          </div>
-        )}
+        <div className="text-green-400">📷 Monitoring Aktif</div>
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
-          Foto Absensi: {attendancePhotoCount.current}
+          Foto Absensi: {attendancePhotoCount.current}/25
         </div>
-        {streamRef.current && (
-          <div className="text-xs text-gray-400">
-            Stream: {streamRef.current.active ? '🟢 Active' : '🔴 Inactive'}
-          </div>
-        )}
       </div>
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
