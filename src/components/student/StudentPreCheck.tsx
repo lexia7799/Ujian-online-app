@@ -235,7 +235,15 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         {checks.faceDetection && (
           <div className="mb-4 p-3 bg-green-900 border border-green-500 rounded-md">
             <p className="text-green-300 text-sm">
-              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Sistem akan memantau jumlah wajah selama ujian.
+              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Sistem akan memantau dan memastikan hanya ada 1 wajah selama ujian.
+            </p>
+            <ul className="text-green-200 text-xs mt-2 space-y-1">
+              <li>• ✅ 1 Wajah = Normal</li>
+              <li>• ⚠️ 0 Wajah = Pelanggaran (Meninggalkan tempat)</li>
+              <li>• 🚨 2+ Wajah = Pelanggaran (Ada orang lain)</li>
+            </ul>
+            <p className="text-yellow-300 text-xs mt-2">
+              <strong>Penting:</strong> Pastikan hanya Anda yang berada di depan kamera selama ujian!
             </p>
           </div>
         )}

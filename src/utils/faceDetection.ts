@@ -44,10 +44,12 @@ export class FaceDetectionService {
       const detections = await faceapi
         .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions({
           inputSize: 416,
-          scoreThreshold: 0.5
+          scoreThreshold: 0.4
         }));
 
-      console.log(`👥 Detected ${detections.length} face(s)`);
+      if (detections.length !== 1) {
+        console.log(`👥 Face Detection Alert: ${detections.length} face(s) detected`);
+      }
       return detections.length;
     } catch (error) {
       console.error('Face detection error:', error);

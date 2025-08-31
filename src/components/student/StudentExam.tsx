@@ -254,12 +254,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         try {
           const faceCount = await faceDetectionService.detectFaces(videoRef.current);
           
-          if (faceCount > 1) {
+          if (faceCount >= 2) {
             console.log(`🚨 Multiple faces detected: ${faceCount}`);
-            handleViolation(`Multiple Faces Detected (${faceCount} faces)`);
+            handleViolation(`Terdeteksi ${faceCount} Wajah - Hanya Boleh 1 Orang`);
           } else if (faceCount === 0) {
             console.log('⚠️ No face detected');
-            handleViolation('No Face Detected');
+            handleViolation('Tidak Ada Wajah Terdeteksi - Siswa Meninggalkan Tempat');
           }
           // faceCount === 1 is normal, no action needed
         } catch (error) {
