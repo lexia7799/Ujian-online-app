@@ -281,7 +281,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Setup attendance photo schedule
   const setupAttendanceSchedule = () => {
-    // Schedule attendance photos at specific intervals
+    // Comprehensive attendance photo schedule - every 5 minutes
     const schedules = [
       { time: 1 * 60 * 1000, label: '1 Menit' },      // 1 minute
       { time: 5 * 60 * 1000, label: '5 Menit' },      // 5 minutes
@@ -296,19 +296,25 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       { time: 50 * 60 * 1000, label: '50 Menit' },    // 50 minutes
       { time: 55 * 60 * 1000, label: '55 Menit' },    // 55 minutes
       { time: 60 * 60 * 1000, label: '60 Menit' },    // 60 minutes
+      { time: 65 * 60 * 1000, label: '65 Menit' },    // 65 minutes
       { time: 70 * 60 * 1000, label: '70 Menit' },    // 70 minutes
+      { time: 75 * 60 * 1000, label: '75 Menit' },    // 75 minutes
       { time: 80 * 60 * 1000, label: '80 Menit' },    // 80 minutes
+      { time: 85 * 60 * 1000, label: '85 Menit' },    // 85 minutes
       { time: 90 * 60 * 1000, label: '90 Menit' },    // 90 minutes
+      { time: 95 * 60 * 1000, label: '95 Menit' },    // 95 minutes
       { time: 100 * 60 * 1000, label: '100 Menit' },  // 100 minutes
+      { time: 105 * 60 * 1000, label: '105 Menit' },  // 105 minutes
       { time: 110 * 60 * 1000, label: '110 Menit' },  // 110 minutes
+      { time: 115 * 60 * 1000, label: '115 Menit' },  // 115 minutes
       { time: 120 * 60 * 1000, label: '120 Menit' }   // 120 minutes
     ];
     
     schedules.forEach(schedule => {
       const timeoutId = setTimeout(() => {
-        // Take attendance photo regardless of violations, only check if exam is finished
+        // Take attendance photo regardless of violations - only stop if exam is finished
         if (!isFinished) {
-          console.log(`📷 Scheduled attendance photo at ${schedule.label} (Current violations: ${violations})`);
+          console.log(`📷 Scheduled attendance photo at ${schedule.label} (Violations: ${violations}, Exam Status: ${isFinished ? 'Finished' : 'Active'})`);
           takeAttendancePhoto(schedule.label);
         }
       }, schedule.time);
@@ -316,7 +322,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       attendanceIntervalRefs.current.push(timeoutId);
     });
     
-    console.log(`📅 Attendance schedule set up for ${schedules.length} photos`);
+    console.log(`📅 Comprehensive attendance schedule set up for ${schedules.length} photos (1-120 minutes + submit)`);
   };
 
   // Cleanup attendance schedule
@@ -330,19 +336,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   // Take attendance photo (separate from violation photos)
   const takeAttendancePhoto = async (timeLabel: string) => {
     if (!videoRef.current || !canvasRef.current) {
-      console.log(`❌ Cannot take attendance photo at ${timeLabel} - missing video/canvas`);
+      console.log(`❌ Cannot take attendance photo at ${timeLabel} - missing video/canvas (Violations: ${violations})`);
       return;
     }
     
     // Check if exam is finished - if so, don't take photo
     if (isFinished) {
-      console.log(`❌ Cannot take attendance photo at ${timeLabel} - exam finished`);
+      console.log(`❌ Cannot take attendance photo at ${timeLabel} - exam finished (Violations: ${violations})`);
       return;
     }
     
+    // IMPORTANT: Take photo regardless of violation count
+    console.log(`📷 Taking attendance photo at ${timeLabel} - Violations: ${violations}, Exam Active: ${!isFinished}`);
+    
     const photoData = capturePhoto();
     if (!photoData) {
-      console.log(`❌ Failed to capture attendance photo at ${timeLabel}`);
+      console.log(`❌ Failed to capture attendance photo at ${timeLabel} (Violations: ${violations})`);
       return;
     }
     
@@ -360,9 +369,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ Attendance photo ${attendancePhotoCount.current} saved at ${timeLabel} (Violations: ${violations})`);
+      console.log(`✅ Attendance photo ${attendancePhotoCount.current} saved at ${timeLabel} (Violations: ${violations}, Total Photos: ${attendancePhotoCount.current})`);
     } catch (error) {
-      console.error('Failed to save attendance photo:', error);
+      console.error(`Failed to save attendance photo at ${timeLabel}:`, error);
     }
   };
   useEffect(() => {
@@ -812,13 +821,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowUnansweredModal(false);
     
     // Take final attendance photo before finishing
-    console.log(`📷 Taking final attendance photo: ${reason}`);
+    console.log(`📷 Taking final attendance photo: ${reason} (Total violations during exam: ${violations})`);
     await takeAttendancePhoto('Selesai Ujian');
     
-    // Cleanup intervals
-    if (faceDetectionIntervalRef.current) {
-      clearInterval(faceDetectionIntervalRef.current);
-    }
+    // Cleanup attendance schedule
     cleanupAttendanceSchedule();
     
     // Exit fullscreen when exam is finished
@@ -1063,7 +1069,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           Jumlah Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
-          Foto Absensi: {attendancePhotoCount.current}
+          Foto Absensi: {attendancePhotoCount.current}/25
+        </div>
+        <div className="text-xs text-green-400">
+          📷 Absensi Aktif (1-120 menit)
         </div>
       </div>
 

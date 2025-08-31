@@ -125,8 +125,8 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
 
   const getAttendanceSnapshots = (session: Session): AttendanceSnapshot[] => {
     const snapshots: AttendanceSnapshot[] = [];
-    // Check for up to 23 attendance snapshots (comprehensive schedule)
-    for (let i = 1; i <= 23; i++) {
+    // Check for up to 25 attendance snapshots (comprehensive schedule: 24 scheduled + 1 final)
+    for (let i = 1; i <= 25; i++) {
       const snapshot = session[`attendanceSnapshot_${i}` as keyof Session] as AttendanceSnapshot;
       if (snapshot) {
         snapshots.push(snapshot);
@@ -186,7 +186,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
       </button>
       
       <h2 className="text-3xl font-bold">Rekap Absensi</h2>
-      <p className="text-lg text-cyan-400 mb-6">{exam.name} ({exam.code}) - Foto diambil secara berkala selama ujian</p>
+      <p className="text-lg text-cyan-400 mb-6">{exam.name} ({exam.code}) - Foto diambil setiap 5 menit (1-120 menit) + saat submit</p>
       
       {/* Search Bar */}
       <div className="mb-6 bg-gray-800 p-4 rounded-lg shadow-lg">
