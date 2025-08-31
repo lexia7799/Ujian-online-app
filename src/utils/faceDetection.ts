@@ -63,7 +63,7 @@ export class FaceDetectionService {
 
       const faceCount = detections.length;
       
-      // Only log when there's an issue (2+ faces)
+      // Only log when there's a violation (2+ faces)
       if (faceCount >= 2) {
         console.log(`🚨 Multiple faces detected: ${faceCount} faces`);
       }

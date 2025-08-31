@@ -58,7 +58,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       const modelsLoaded = await faceDetectionService.loadModels();
       
       if (modelsLoaded) {
-        setFaceDetectionStatus('Siap - Sistem akan mendeteksi 2+ wajah sebagai pelanggaran');
+        setFaceDetectionStatus('Siap - Hanya 2+ wajah yang akan memicu pelanggaran');
       } else {
         setFaceDetectionStatus('Gagal memuat - Refresh halaman dan coba lagi');
       }
@@ -251,10 +251,10 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         {checks.faceDetection && (
           <div className="mb-4 p-3 bg-green-900 border border-green-500 rounded-md">
             <p className="text-green-300 text-sm">
-              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Sistem akan mendeteksi jika ada 2 wajah atau lebih.
+              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Hanya 2+ wajah yang memicu pelanggaran.
             </p>
             <ul className="text-green-200 text-xs mt-2 space-y-1">
-              <li>• ✅ 1 Wajah = Normal</li>
+              <li>• ✅ 0-1 Wajah = Normal</li>
               <li>• 🚨 2+ Wajah = Pelanggaran (Ada orang lain)</li>
             </ul>
             <p className="text-yellow-300 text-xs mt-2">

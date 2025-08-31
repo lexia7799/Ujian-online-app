@@ -260,13 +260,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         try {
           const faceCount = await faceDetectionService.detectFaces(videoRef.current);
           
-          // Only trigger violation for 2+ faces
+          // Only trigger violation for exactly 2+ faces (0 and 1 face are normal)
           if (faceCount >= 2) {
             console.log(`🚨 Multiple faces detected: ${faceCount}`);
             handleViolation(`Terdeteksi ${faceCount} Wajah - Hanya Boleh 1 Orang`);
           }
-          // faceCount === 1 or 0 is normal, no action needed
-          // We only care about multiple people (2+ faces)
+          // faceCount === 0 or 1 is normal, no violation
         } catch (error) {
           console.error('Face detection error:', error);
         }
@@ -1030,7 +1029,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         <div className="text-xs text-gray-400 mt-1">
-          Face Detection: {faceDetectionEnabled ? '🤖 Aktif (2+ Wajah = Pelanggaran)' : faceDetectionService.isLoading() ? '⏳ Loading Models...' : '❌ Error'}
+          Face Detection: {faceDetectionEnabled ? '🤖 Aktif (Hanya 2+ Wajah = Pelanggaran)' : faceDetectionService.isLoading() ? '⏳ Loading Models...' : '❌ Error'}
         </div>
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
