@@ -284,8 +284,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     schedules.forEach((schedule, index) => {
       const timeoutId = setTimeout(() => {
+        // CRITICAL: Only check if exam is finished, NOT violations
+        // Attendance photos must continue even during violations
         if (!isFinished) {
           console.log(`📷 Taking scheduled attendance photo ${index + 1}/25 at ${schedule.label}`);
+          console.log(`📊 Current violations: ${violations}, Exam finished: ${isFinished}`);
           takeAttendancePhoto(schedule.label);
         }
       }, schedule.time);
@@ -306,12 +309,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Take attendance photo (separate from violation photos)
   const takeAttendancePhoto = async (timeLabel: string) => {
+    // CRITICAL: Only check if exam is finished, violations should NOT stop attendance photos
     if (!videoRef.current || !canvasRef.current || isFinished) {
       console.log(`❌ Cannot take attendance photo at ${timeLabel}: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, finished=${isFinished}`);
       return;
     }
     
-    console.log(`📷 Taking attendance photo at ${timeLabel} (Photo #${attendancePhotoCount.current + 1}, Violations: ${violations})`);
+    console.log(`📷 Taking attendance photo at ${timeLabel} (Photo #${attendancePhotoCount.current + 1})`);
+    console.log(`📊 Current status: Violations=${violations}, Finished=${isFinished}, Camera Ready=${isCameraReady}`);
     
     const photoData = capturePhoto();
     if (!photoData) {
@@ -333,7 +338,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ Attendance photo ${attendancePhotoCount.current}/25 saved at ${timeLabel}`);
+      console.log(`✅ Attendance photo ${attendancePhotoCount.current}/25 saved at ${timeLabel} (Violations: ${violations})`);
     } catch (error) {
       console.error('Failed to save attendance photo:', error);
     }
@@ -638,7 +643,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setViolations(newViolations);
     setViolationReason(reason);
     
-    console.log("🚨 Violation detected:", reason, "- Attempting to capture photo");
+    console.log("🚨 Violation detected:", reason, "- Attempting to capture violation photo");
+    console.log("📷 Attendance photos will continue running regardless of violations");
     
     // Try to capture photo with retry mechanism
     let photoData = null;
@@ -1001,12 +1007,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       {/* Camera status indicator with more detail */}
       <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-40 border">
-        <div className="text-green-400">📷 Monitoring Aktif</div>
+        <div className="text-green-400">📷 Absensi Aktif</div>
         <div className="text-xs text-gray-400 mt-1">
-          Jumlah Pelanggaran: {violations}/3
+          Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
           Foto Absensi: {attendancePhotoCount.current}/25
+        </div>
+        <div className="text-xs text-blue-400">
+          Status: {isFinished ? 'Selesai' : 'Berjalan'}
         </div>
       </div>
 

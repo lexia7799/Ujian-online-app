@@ -104,20 +104,22 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
   }, [sessions, searchTerm]);
 
   const viewAttendancePhoto = (snapshot: AttendanceSnapshot, studentName: string, studentNim: string) => {
-    // Get additional student info from session
-    const session = sessions.find(s => 
-      Object.values(s).some(value => 
-        typeof value === 'object' && 
-        value !== null && 
-        'timestamp' in value && 
-        value.timestamp === snapshot.timestamp
-      )
-    );
+    // Find the session that contains this snapshot
+    const session = sessions.find(s => {
+      // Check all attendance snapshots in this session
+      for (let i = 1; i <= 26; i++) {
+        const sessionSnapshot = s[`attendanceSnapshot_${i}` as keyof Session] as AttendanceSnapshot;
+        if (sessionSnapshot && sessionSnapshot.timestamp === snapshot.timestamp) {
+          return true;
+        }
+      }
+      return false;
+    });
     
     setSelectedSnapshot({
       ...snapshot,
-      studentName: studentName || 'Tidak tersedia',
-      studentNim: studentNim || 'Tidak tersedia',
+      studentName: studentName,
+      studentNim: studentNim,
       studentClass: session?.studentInfo?.className || 'Tidak tersedia',
       studentMajor: session?.studentInfo?.major || 'Tidak tersedia'
     });
@@ -125,7 +127,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
 
   const getAttendanceSnapshots = (session: Session): AttendanceSnapshot[] => {
     const snapshots: AttendanceSnapshot[] = [];
-    for (let i = 1; i <= 25; i++) {
+    for (let i = 1; i <= 26; i++) { // Include final photo (26th photo)
       const snapshot = session[`attendanceSnapshot_${i}` as keyof Session] as AttendanceSnapshot;
       if (snapshot) {
         snapshots.push(snapshot);
