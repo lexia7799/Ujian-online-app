@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
+import { faceDetectionService } from '../../utils/faceDetection';
 
 interface StudentPreCheckProps {
   navigateTo: (page: string, data?: any) => void;
@@ -13,12 +14,14 @@ interface DeviceChecks {
   device: boolean | null;
   camera: boolean | null;
   screenCount: boolean | null;
+  faceDetection: boolean | null;
 }
 
 const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateBack, appState, user }) => {
   const { studentInfo } = appState;
-  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null });
+  const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null, faceDetection: null });
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   useEffect(() => {
     // Enhanced mobile detection
@@ -46,6 +49,16 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     
     if (isMobile) return;
     
+    // Load face detection models first
+    const loadFaceModels = async () => {
+      setIsLoadingModels(true);
+      const modelsLoaded = await faceDetectionService.loadModels();
+      setChecks(c => ({ ...c, faceDetection: modelsLoaded }));
+      setIsLoadingModels(false);
+    };
+    
+    loadFaceModels();
+    
     navigator.mediaDevices.getUserMedia({ 
       video: { 
         width: { ideal: 1280, min: 640 },
@@ -65,7 +78,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       });
   }, []);
 
-  const allChecksPassed = checks.device && checks.camera && checks.screenCount;
+  const allChecksPassed = checks.device && checks.camera && checks.screenCount && checks.faceDetection;
 
   const startExam = async () => {
     // Request fullscreen immediately on user interaction
@@ -126,7 +139,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     }
   };
 
-  const renderCheckItem = (label: string, status: boolean | null, additionalInfo?: string) => {
+  const renderCheckItem = (label: string, status: boolean | null) => {
     let statusText = "Memeriksa...";
     let colorClass = "text-yellow-400";
     
@@ -142,11 +155,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       <li className="flex justify-between items-center p-3 bg-gray-700 rounded-md">
         <span>{label}</span>
         <span className={`font-bold ${colorClass}`}>{statusText}</span>
-        {additionalInfo && (
-          <div className="mt-2 text-xs text-gray-400">
-            {additionalInfo}
-          </div>
-        )}
       </li>
     );
   };
@@ -165,7 +173,16 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           {renderCheckItem("Akses dari Desktop", checks.device)}
           {renderCheckItem("Layar Tunggal", checks.screenCount)}
           {renderCheckItem("Akses Kamera", checks.camera)}
+          {renderCheckItem("Sistem Deteksi Wajah", checks.faceDetection)}
         </ul>
+        
+        {isLoadingModels && (
+          <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
+            <p className="text-blue-300 text-sm">
+              🤖 Memuat model deteksi wajah... Mohon tunggu sebentar.
+            </p>
+          </div>
+        )}
         
         {checks.device === false && (
           <p className="text-red-400 text-center mb-4">
@@ -185,6 +202,12 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           </p>
         )}
         
+        {checks.faceDetection === false && (
+          <p className="text-red-400 text-center mb-4">
+            ❌ Gagal memuat sistem deteksi wajah. Refresh halaman dan coba lagi.
+          </p>
+        )}
+        
         <div className="my-4 w-full aspect-video bg-gray-900 rounded-md overflow-hidden">
           <video 
             ref={videoRef} 
@@ -197,16 +220,23 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         
         {checks.device && (
           <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
-            <p className="text-blue-300 text-sm font-bold">
-              📷 Sistem Foto Absensi Berkala Aktif
+            <p className="text-blue-300 text-sm">
+              ℹ️ <strong>Penting:</strong> Selama ujian berlangsung:
             </p>
             <ul className="text-blue-200 text-xs mt-2 space-y-1">
               <li>• Ujian akan otomatis masuk mode fullscreen</li>
-              <li>• Foto absensi akan diambil secara berkala setiap 5 menit</li>
-              <li>• Foto juga diambil saat submit ujian</li>
+              <li>• Sistem akan mendeteksi jika ada lebih dari 1 wajah</li>
+              <li>• Foto akan diambil secara berkala untuk absensi</li>
               <li>• Keluar dari fullscreen akan dianggap pelanggaran</li>
-              <li>• Sistem monitoring keamanan tetap aktif</li>
             </ul>
+          </div>
+        )}
+        
+        {checks.faceDetection && (
+          <div className="mb-4 p-3 bg-green-900 border border-green-500 rounded-md">
+            <p className="text-green-300 text-sm">
+              🤖 <strong>Sistem Deteksi Wajah Siap:</strong> Sistem akan memantau jumlah wajah selama ujian.
+            </p>
           </div>
         )}
         

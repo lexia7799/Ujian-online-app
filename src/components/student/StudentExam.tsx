@@ -241,88 +241,56 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Initialize face detection
   const initializeFaceDetection = async () => {
-    console.log('🤖 Initializing face detection...');
-    
-    // Ensure models are loaded
-    const loaded = await faceDetectionService.loadModels();
-    if (!loaded) {
-      console.log('❌ Failed to load face detection models');
+    if (!faceDetectionService.isReady()) {
+      console.log('🤖 Face detection models not ready yet');
       return;
     }
     
     setFaceDetectionEnabled(true);
-    console.log('✅ Face detection enabled');
     
-    // Start face detection interval (every 5 seconds)
+    // Start face detection interval (every 8 seconds)
     faceDetectionIntervalRef.current = setInterval(async () => {
       if (videoRef.current && isCameraReady && !isFinished) {
         try {
-          console.log('🔍 Running face detection check...');
           const faceCount = await faceDetectionService.detectFaces(videoRef.current);
           
-          console.log(`👥 Detection result: ${faceCount} face(s)`);
-          
-          // CRITICAL: Only trigger violation and photo capture for 2+ faces
-          // 0 faces = normal (student looking down, away, etc.)
-          // 1 face = normal (ideal condition)
-          // 2+ faces = VIOLATION (someone else helping) + PHOTO CAPTURE
-          if (faceCount >= 2) {
-            console.log(`🚨 VIOLATION: Multiple faces detected: ${faceCount}`);
-            handleViolation(`Deteksi 2 wajah`);
-          } else {
-            console.log(`✅ Normal: ${faceCount} face(s) - No violation`);
+          if (faceCount > 1) {
+            console.log(`🚨 Multiple faces detected: ${faceCount}`);
+            handleViolation(`Multiple Faces Detected (${faceCount} faces)`);
+          } else if (faceCount === 0) {
+            console.log('⚠️ No face detected');
+            handleViolation('No Face Detected');
           }
+          // faceCount === 1 is normal, no action needed
         } catch (error) {
-          console.error('❌ Face detection error:', error);
+          console.error('Face detection error:', error);
         }
       }
-    }, 5000); // Check every 5 seconds
+    }, 8000); // Check every 8 seconds
   };
 
   // Setup attendance photo schedule
   const setupAttendanceSchedule = () => {
-    // Comprehensive attendance photo schedule - every 5 minutes
+    // Schedule attendance photos at specific intervals
     const schedules = [
       { time: 1 * 60 * 1000, label: '1 Menit' },      // 1 minute
       { time: 5 * 60 * 1000, label: '5 Menit' },      // 5 minutes
       { time: 10 * 60 * 1000, label: '10 Menit' },    // 10 minutes
-      { time: 15 * 60 * 1000, label: '15 Menit' },    // 15 minutes
       { time: 20 * 60 * 1000, label: '20 Menit' },    // 20 minutes
-      { time: 25 * 60 * 1000, label: '25 Menit' },    // 25 minutes
       { time: 30 * 60 * 1000, label: '30 Menit' },    // 30 minutes
-      { time: 35 * 60 * 1000, label: '35 Menit' },    // 35 minutes
-      { time: 40 * 60 * 1000, label: '40 Menit' },    // 40 minutes
       { time: 45 * 60 * 1000, label: '45 Menit' },    // 45 minutes
-      { time: 50 * 60 * 1000, label: '50 Menit' },    // 50 minutes
-      { time: 55 * 60 * 1000, label: '55 Menit' },    // 55 minutes
-      { time: 60 * 60 * 1000, label: '60 Menit' },    // 60 minutes
-      { time: 65 * 60 * 1000, label: '65 Menit' },    // 65 minutes
-      { time: 70 * 60 * 1000, label: '70 Menit' },    // 70 minutes
-      { time: 75 * 60 * 1000, label: '75 Menit' },    // 75 minutes
-      { time: 80 * 60 * 1000, label: '80 Menit' },    // 80 minutes
-      { time: 85 * 60 * 1000, label: '85 Menit' },    // 85 minutes
-      { time: 90 * 60 * 1000, label: '90 Menit' },    // 90 minutes
-      { time: 95 * 60 * 1000, label: '95 Menit' },    // 95 minutes
-      { time: 100 * 60 * 1000, label: '100 Menit' },  // 100 minutes
-      { time: 105 * 60 * 1000, label: '105 Menit' },  // 105 minutes
-      { time: 110 * 60 * 1000, label: '110 Menit' },  // 110 minutes
-      { time: 115 * 60 * 1000, label: '115 Menit' },  // 115 minutes
-      { time: 120 * 60 * 1000, label: '120 Menit' }   // 120 minutes
+      { time: 60 * 60 * 1000, label: '60 Menit' }     // 60 minutes
     ];
     
     schedules.forEach(schedule => {
       const timeoutId = setTimeout(() => {
-        // Take attendance photo regardless of violations - only stop if exam is finished
         if (!isFinished) {
-          console.log(`📷 Scheduled attendance photo at ${schedule.label} (Violations: ${violations}, Exam Status: ${isFinished ? 'Finished' : 'Active'})`);
           takeAttendancePhoto(schedule.label);
         }
       }, schedule.time);
       
       attendanceIntervalRefs.current.push(timeoutId);
     });
-    
-    console.log(`📅 Comprehensive attendance schedule set up for ${schedules.length} photos (1-120 minutes + submit)`);
   };
 
   // Cleanup attendance schedule
@@ -335,23 +303,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Take attendance photo (separate from violation photos)
   const takeAttendancePhoto = async (timeLabel: string) => {
-    if (!videoRef.current || !canvasRef.current) {
-      console.log(`❌ Cannot take attendance photo at ${timeLabel} - missing video/canvas (Violations: ${violations})`);
+    if (!videoRef.current || !canvasRef.current || isFinished) {
       return;
     }
-    
-    // Check if exam is finished - if so, don't take photo
-    if (isFinished) {
-      console.log(`❌ Cannot take attendance photo at ${timeLabel} - exam finished (Violations: ${violations})`);
-      return;
-    }
-    
-    // IMPORTANT: Take photo regardless of violation count
-    console.log(`📷 Taking attendance photo at ${timeLabel} - Violations: ${violations}, Exam Active: ${!isFinished}`);
     
     const photoData = capturePhoto();
     if (!photoData) {
-      console.log(`❌ Failed to capture attendance photo at ${timeLabel} (Violations: ${violations})`);
+      console.log(`❌ Failed to capture attendance photo at ${timeLabel}`);
       return;
     }
     
@@ -369,9 +327,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ Attendance photo ${attendancePhotoCount.current} saved at ${timeLabel} (Violations: ${violations}, Total Photos: ${attendancePhotoCount.current})`);
+      console.log(`✅ Attendance photo saved at ${timeLabel}`);
     } catch (error) {
-      console.error(`Failed to save attendance photo at ${timeLabel}:`, error);
+      console.error('Failed to save attendance photo:', error);
     }
   };
   useEffect(() => {
@@ -821,10 +779,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowUnansweredModal(false);
     
     // Take final attendance photo before finishing
-    console.log(`📷 Taking final attendance photo: ${reason} (Total violations during exam: ${violations})`);
     await takeAttendancePhoto('Selesai Ujian');
     
-    // Cleanup attendance schedule
+    // Cleanup intervals
+    if (faceDetectionIntervalRef.current) {
+      clearInterval(faceDetectionIntervalRef.current);
+    }
     cleanupAttendanceSchedule();
     
     // Exit fullscreen when exam is finished
@@ -861,7 +821,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
     
     setFinalScore(score);
-    console.log(`📊 Exam finished: ${reason}, Score: ${score}, Status: ${status}`);
     await updateDoc(sessionDocRef, { 
       status, 
       finishTime: new Date(), 
@@ -1066,14 +1025,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         <div className="text-xs text-gray-400 mt-1">
+          Face Detection: {faceDetectionEnabled ? '🤖 Active' : '⏳ Loading'}
+        </div>
+        <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
-          Foto Absensi: {attendancePhotoCount.current}/25
+          Foto Absensi: {attendancePhotoCount.current}
         </div>
-        <div className="text-xs text-green-400">
-          📷 Absensi Aktif (1-120 menit)
-        </div>
+        {streamRef.current && (
+          <div className="text-xs text-gray-400">
+            Stream: {streamRef.current.active ? '🟢 Active' : '🔴 Inactive'}
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 z-10 flex justify-between items-center">
