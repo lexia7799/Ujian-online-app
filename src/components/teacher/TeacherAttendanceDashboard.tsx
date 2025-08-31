@@ -60,6 +60,8 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
     timeLabel: string;
     studentName: string;
     studentNim: string;
+    studentClass: string;
+    studentMajor: string;
   } | null>(null);
 
   useEffect(() => {
@@ -101,11 +103,13 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
     }
   }, [sessions, searchTerm]);
 
-  const viewAttendancePhoto = (snapshot: AttendanceSnapshot, studentName: string, studentNim: string) => {
+  const viewAttendancePhoto = (snapshot: AttendanceSnapshot, studentName: string, studentNim: string, studentClass: string, studentMajor: string) => {
     setSelectedSnapshot({
       ...snapshot,
       studentName,
-      studentNim
+      studentNim,
+      studentClass,
+      studentMajor
     });
   };
 
@@ -129,7 +133,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
     <div>
       <Modal 
         isOpen={!!selectedSnapshot} 
-        title={`Foto Absensi - ${selectedSnapshot?.studentName}`}
+        title={`Foto Absensi - ${selectedSnapshot?.studentName || 'Siswa'}`}
         onCancel={() => setSelectedSnapshot(null)}
         cancelText="Tutup"
       >
@@ -142,10 +146,16 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
             />
             <div className="bg-gray-700 p-3 rounded-md text-left">
               <p className="text-sm text-gray-300 mb-1">
-                <span className="font-bold text-blue-400">Siswa:</span> {selectedSnapshot.studentName}
+                <span className="font-bold text-blue-400">Siswa:</span> {selectedSnapshot.studentName || 'Tidak tersedia'}
               </p>
               <p className="text-sm text-gray-300 mb-1">
-                <span className="font-bold text-green-400">NIM:</span> {selectedSnapshot.studentNim}
+                <span className="font-bold text-green-400">NIM:</span> {selectedSnapshot.studentNim || 'Tidak tersedia'}
+              </p>
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="font-bold text-purple-400">Kelas:</span> {selectedSnapshot.studentClass || 'Tidak tersedia'}
+              </p>
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="font-bold text-orange-400">Jurusan:</span> {selectedSnapshot.studentMajor || 'Tidak tersedia'}
               </p>
               <p className="text-sm text-gray-300 mb-1">
                 <span className="font-bold text-cyan-400">Waktu Foto:</span> {selectedSnapshot.timeLabel}
@@ -322,7 +332,13 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
                       {attendancePhotos.map((photo, index) => (
                         <button 
                           key={index}
-                          onClick={() => viewAttendancePhoto(photo, session.studentInfo.name, session.studentInfo.nim)}
+                          onClick={() => viewAttendancePhoto(
+                            photo, 
+                            session.studentInfo.name || 'Siswa', 
+                            session.studentInfo.nim || 'Tidak tersedia',
+                            session.studentInfo.className || 'Tidak tersedia',
+                            session.studentInfo.major || 'Tidak tersedia'
+                          )}
                           className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center"
                         >
                           📷 {photo.timeLabel}
