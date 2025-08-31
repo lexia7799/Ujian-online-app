@@ -3,7 +3,6 @@ import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import { AlertIcon } from '../ui/Icons';
 import Modal from '../ui/Modal';
-import { faceDetectionService } from '../../utils/faceDetection';
 
 interface Question {
   id: string;
@@ -43,9 +42,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showCameraControls, setShowCameraControls] = useState(false);
   
-  // Face detection states
-  const [faceDetectionEnabled, setFaceDetectionEnabled] = useState(false);
-  const faceDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const attendanceIntervalRefs = useRef<NodeJS.Timeout[]>([]);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
@@ -119,9 +115,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               console.log("📷 Camera timeout, forcing ready state");
               setIsCameraReady(true);
               cameraInitRetryCount.current = 0;
-              
-              // Initialize face detection when camera is ready
-              initializeFaceDetection();
             }
           }, 5000);
         }
@@ -146,9 +139,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Start camera initialization immediately
     initializeCamera();
     
-    // Setup attendance photo schedule
-    setupAttendanceSchedule();
-    
     // Cleanup
     return () => {
       if (streamRef.current) {
@@ -158,10 +148,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         });
       }
       
-      // Cleanup face detection and attendance intervals
-      if (faceDetectionIntervalRef.current) {
-        clearInterval(faceDetectionIntervalRef.current);
-      }
       cleanupAttendanceSchedule();
     };
   }, []);
@@ -239,47 +225,35 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
   }, [isCameraReady, isFinished]);
 
-  // Initialize face detection
-  const initializeFaceDetection = async () => {
-    if (!faceDetectionService.isReady()) {
-      console.log('🤖 Face detection models not ready yet');
-      return;
-    }
-    
-    setFaceDetectionEnabled(true);
-    
-    // Start face detection interval (every 8 seconds)
-    faceDetectionIntervalRef.current = setInterval(async () => {
-      if (videoRef.current && isCameraReady && !isFinished) {
-        try {
-          const faceCount = await faceDetectionService.detectFaces(videoRef.current);
-          
-          if (faceCount > 1) {
-            console.log(`🚨 Multiple faces detected: ${faceCount}`);
-            handleViolation(`Multiple Faces Detected (${faceCount} faces)`);
-          } else if (faceCount === 0) {
-            console.log('⚠️ No face detected');
-            handleViolation('No Face Detected');
-          }
-          // faceCount === 1 is normal, no action needed
-        } catch (error) {
-          console.error('Face detection error:', error);
-        }
-      }
-    }, 8000); // Check every 8 seconds
-  };
-
   // Setup attendance photo schedule
   const setupAttendanceSchedule = () => {
     // Schedule attendance photos at specific intervals
     const schedules = [
-      { time: 1 * 60 * 1000, label: '1 Menit' },      // 1 minute
-      { time: 5 * 60 * 1000, label: '5 Menit' },      // 5 minutes
-      { time: 10 * 60 * 1000, label: '10 Menit' },    // 10 minutes
-      { time: 20 * 60 * 1000, label: '20 Menit' },    // 20 minutes
-      { time: 30 * 60 * 1000, label: '30 Menit' },    // 30 minutes
-      { time: 45 * 60 * 1000, label: '45 Menit' },    // 45 minutes
-      { time: 60 * 60 * 1000, label: '60 Menit' }     // 60 minutes
+      { time: 1 * 60 * 1000, label: '1 Menit' },
+      { time: 5 * 60 * 1000, label: '5 Menit' },
+      { time: 10 * 60 * 1000, label: '10 Menit' },
+      { time: 15 * 60 * 1000, label: '15 Menit' },
+      { time: 20 * 60 * 1000, label: '20 Menit' },
+      { time: 25 * 60 * 1000, label: '25 Menit' },
+      { time: 30 * 60 * 1000, label: '30 Menit' },
+      { time: 35 * 60 * 1000, label: '35 Menit' },
+      { time: 40 * 60 * 1000, label: '40 Menit' },
+      { time: 45 * 60 * 1000, label: '45 Menit' },
+      { time: 50 * 60 * 1000, label: '50 Menit' },
+      { time: 55 * 60 * 1000, label: '55 Menit' },
+      { time: 60 * 60 * 1000, label: '60 Menit' },
+      { time: 65 * 60 * 1000, label: '65 Menit' },
+      { time: 70 * 60 * 1000, label: '70 Menit' },
+      { time: 75 * 60 * 1000, label: '75 Menit' },
+      { time: 80 * 60 * 1000, label: '80 Menit' },
+      { time: 85 * 60 * 1000, label: '85 Menit' },
+      { time: 90 * 60 * 1000, label: '90 Menit' },
+      { time: 95 * 60 * 1000, label: '95 Menit' },
+      { time: 100 * 60 * 1000, label: '100 Menit' },
+      { time: 105 * 60 * 1000, label: '105 Menit' },
+      { time: 110 * 60 * 1000, label: '110 Menit' },
+      { time: 115 * 60 * 1000, label: '115 Menit' },
+      { time: 120 * 60 * 1000, label: '120 Menit' }
     ];
     
     schedules.forEach(schedule => {
@@ -307,6 +281,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return;
     }
     
+    console.log(`📷 Taking attendance photo at ${timeLabel} (Violations: ${violations})`);
+    
     const photoData = capturePhoto();
     if (!photoData) {
       console.log(`❌ Failed to capture attendance photo at ${timeLabel}`);
@@ -327,7 +303,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ Attendance photo saved at ${timeLabel}`);
+      console.log(`✅ Attendance photo ${attendancePhotoCount.current} saved at ${timeLabel}`);
     } catch (error) {
       console.error('Failed to save attendance photo:', error);
     }
@@ -585,10 +561,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       clearInterval(timer);
       clearInterval(devToolsInterval);
       
-      // Cleanup face detection
-      if (faceDetectionIntervalRef.current) {
-        clearInterval(faceDetectionIntervalRef.current);
-      }
       cleanupAttendanceSchedule();
       
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -782,9 +754,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     await takeAttendancePhoto('Selesai Ujian');
     
     // Cleanup intervals
-    if (faceDetectionIntervalRef.current) {
-      clearInterval(faceDetectionIntervalRef.current);
-    }
     cleanupAttendanceSchedule();
     
     // Exit fullscreen when exam is finished
@@ -1024,9 +993,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             )}
           </div>
         )}
-        <div className="text-xs text-gray-400 mt-1">
-          Face Detection: {faceDetectionEnabled ? '🤖 Active' : '⏳ Loading'}
-        </div>
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>

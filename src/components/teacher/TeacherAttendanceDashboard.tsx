@@ -13,7 +13,8 @@ interface AttendanceSnapshot {
 interface Session {
   id: string;
   studentInfo: {
-    name: string;
+    name?: string;
+    fullName?: string;
     nim: string;
     major: string;
     className: string;
@@ -27,6 +28,24 @@ interface Session {
   attendanceSnapshot_6?: AttendanceSnapshot;
   attendanceSnapshot_7?: AttendanceSnapshot;
   attendanceSnapshot_8?: AttendanceSnapshot;
+  attendanceSnapshot_9?: AttendanceSnapshot;
+  attendanceSnapshot_10?: AttendanceSnapshot;
+  attendanceSnapshot_11?: AttendanceSnapshot;
+  attendanceSnapshot_12?: AttendanceSnapshot;
+  attendanceSnapshot_13?: AttendanceSnapshot;
+  attendanceSnapshot_14?: AttendanceSnapshot;
+  attendanceSnapshot_15?: AttendanceSnapshot;
+  attendanceSnapshot_16?: AttendanceSnapshot;
+  attendanceSnapshot_17?: AttendanceSnapshot;
+  attendanceSnapshot_18?: AttendanceSnapshot;
+  attendanceSnapshot_19?: AttendanceSnapshot;
+  attendanceSnapshot_20?: AttendanceSnapshot;
+  attendanceSnapshot_21?: AttendanceSnapshot;
+  attendanceSnapshot_22?: AttendanceSnapshot;
+  attendanceSnapshot_23?: AttendanceSnapshot;
+  attendanceSnapshot_24?: AttendanceSnapshot;
+  attendanceSnapshot_25?: AttendanceSnapshot;
+  attendanceSnapshot_26?: AttendanceSnapshot;
 }
 
 interface TeacherAttendanceDashboardProps {
@@ -55,14 +74,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
       const sessionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
       // Only show sessions that have at least one attendance photo
       const sessionsWithAttendance = sessionData.filter(session => 
-        session.attendanceSnapshot_1 || 
-        session.attendanceSnapshot_2 || 
-        session.attendanceSnapshot_3 ||
-        session.attendanceSnapshot_4 ||
-        session.attendanceSnapshot_5 ||
-        session.attendanceSnapshot_6 ||
-        session.attendanceSnapshot_7 ||
-        session.attendanceSnapshot_8
+        Object.keys(session).some(key => key.startsWith('attendanceSnapshot_'))
       );
       setSessions(sessionsWithAttendance);
     });
@@ -92,16 +104,28 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
   }, [sessions, searchTerm]);
 
   const viewAttendancePhoto = (snapshot: AttendanceSnapshot, studentName: string, studentNim: string) => {
+    // Get additional student info from session
+    const session = sessions.find(s => 
+      Object.values(s).some(value => 
+        typeof value === 'object' && 
+        value !== null && 
+        'timestamp' in value && 
+        value.timestamp === snapshot.timestamp
+      )
+    );
+    
     setSelectedSnapshot({
       ...snapshot,
-      studentName,
-      studentNim
+      studentName: studentName || 'Tidak tersedia',
+      studentNim: studentNim || 'Tidak tersedia',
+      studentClass: session?.studentInfo?.className || 'Tidak tersedia',
+      studentMajor: session?.studentInfo?.major || 'Tidak tersedia'
     });
   };
 
   const getAttendanceSnapshots = (session: Session): AttendanceSnapshot[] => {
     const snapshots: AttendanceSnapshot[] = [];
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 26; i++) {
       const snapshot = session[`attendanceSnapshot_${i}` as keyof Session] as AttendanceSnapshot;
       if (snapshot) {
         snapshots.push(snapshot);
@@ -118,7 +142,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
     <div>
       <Modal 
         isOpen={!!selectedSnapshot} 
-        title={`Foto Absensi - ${selectedSnapshot?.studentName}`}
+        title={`Foto Absensi - ${selectedSnapshot?.studentName || 'Siswa'}`}
         onCancel={() => setSelectedSnapshot(null)}
         cancelText="Tutup"
       >
@@ -131,10 +155,16 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
             />
             <div className="bg-gray-700 p-3 rounded-md text-left">
               <p className="text-sm text-gray-300 mb-1">
-                <span className="font-bold text-blue-400">Siswa:</span> {selectedSnapshot.studentName}
+                <span className="font-bold text-blue-400">Nama Lengkap:</span> {selectedSnapshot.studentName || 'Tidak tersedia'}
               </p>
               <p className="text-sm text-gray-300 mb-1">
-                <span className="font-bold text-green-400">NIM:</span> {selectedSnapshot.studentNim}
+                <span className="font-bold text-green-400">NIM:</span> {selectedSnapshot.studentNim || 'Tidak tersedia'}
+              </p>
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="font-bold text-purple-400">Kelas:</span> {selectedSnapshot.studentClass || 'Tidak tersedia'}
+              </p>
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="font-bold text-orange-400">Jurusan:</span> {selectedSnapshot.studentMajor || 'Tidak tersedia'}
               </p>
               <p className="text-sm text-gray-300 mb-1">
                 <span className="font-bold text-cyan-400">Waktu Foto:</span> {selectedSnapshot.timeLabel}
@@ -276,7 +306,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
                 </div>
                 
                 <div className="p-4">
-                  <h4 className="font-bold text-lg">{session.studentInfo.name}</h4>
+                  <h4 className="font-bold text-lg">{session.studentInfo.name || session.studentInfo.fullName || 'Nama tidak tersedia'}</h4>
                   <p className="text-sm text-gray-400">{session.studentInfo.nim}</p>
                   <div className="mt-1 space-y-1">
                     <p className="text-xs text-gray-500">
@@ -309,7 +339,7 @@ const TeacherAttendanceDashboard: React.FC<TeacherAttendanceDashboardProps> = ({
                       {attendancePhotos.map((photo, index) => (
                         <button 
                           key={index}
-                          onClick={() => viewAttendancePhoto(photo, session.studentInfo.name, session.studentInfo.nim)}
+                          onClick={() => viewAttendancePhoto(photo, session.studentInfo.name || session.studentInfo.fullName || 'Tidak tersedia', session.studentInfo.nim)}
                           className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center"
                         >
                           📷 {photo.timeLabel}
