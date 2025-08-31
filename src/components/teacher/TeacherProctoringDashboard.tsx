@@ -276,7 +276,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_1!, session.studentInfo.name, 1)}
                         className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center"
                       >
-                        📷 Foto Pelanggaran 1
+                        📷 {session.violationSnapshot_1.violationType}
                       </button>
                     )}
                     {session.violationSnapshot_2 && (
@@ -284,7 +284,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_2!, session.studentInfo.name, 2)}
                         className="w-full bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center"
                       >
-                        📷 Foto Pelanggaran 2
+                        📷 {session.violationSnapshot_2.violationType}
                       </button>
                     )}
                     {session.violationSnapshot_3 && (
@@ -292,7 +292,7 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
                         onClick={() => viewSnapshot(session.violationSnapshot_3!, session.studentInfo.name, 3)}
                         className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center"
                       >
-                        📷 Foto Pelanggaran 3
+                        📷 {session.violationSnapshot_3.violationType}
                       </button>
                     )}
                   </div>
