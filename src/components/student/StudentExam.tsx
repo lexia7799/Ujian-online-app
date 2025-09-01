@@ -45,6 +45,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const attendanceTimeouts = useRef<NodeJS.Timeout[]>([]);
   const attendanceSetupDone = useRef(false);
+  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const attendancePhotoCount = useRef(0);
   const examStartTime = useRef<Date | null>(null);
   
@@ -162,10 +163,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   // Setup attendance schedule when camera becomes ready
   useEffect(() => {
     if (isCameraReady && !attendanceSetupDone.current) {
-      console.log("📷 KAMERA SIAP: Memulai setup jadwal foto absensi...");
+      console.log("📷 KAMERA SIAP: Memulai sistem foto absensi INDEPENDEN...");
       attendanceSetupDone.current = true;
       examStartTime.current = new Date();
-      setupAttendanceSchedule();
+      setupIndependentAttendanceSystem();
     }
   }, [isCameraReady]);
 
@@ -242,11 +243,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
   }, [isCameraReady, isFinished]);
 
-  // Setup attendance photo schedule
-  const setupAttendanceSchedule = () => {
-    console.log("📅 SETUP JADWAL FOTO ABSENSI - MULAI SEKARANG!");
-    console.log("🔥 PENTING: Foto absensi akan tetap berjalan meskipun ada pelanggaran 1-2 kali!");
-    console.log("🚨 HANYA BERHENTI: Jika ujian selesai atau diskualifikasi (3 pelanggaran)");
+  // Setup INDEPENDENT attendance photo system
+  const setupIndependentAttendanceSystem = () => {
+    console.log("🔥 SISTEM FOTO ABSENSI INDEPENDEN - DIMULAI!");
+    console.log("📅 JADWAL: Setiap 5 menit dari menit 1-120 (25 foto total)");
+    console.log("🚨 INDEPENDEN: Tidak terpengaruh oleh pelanggaran apapun!");
+    console.log("🛑 HANYA BERHENTI: Jika ujian benar-benar selesai (isFinished=true)");
     
     // Clear any existing timeouts first
     attendanceTimeouts.current.forEach(timeoutId => {
@@ -254,136 +256,111 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     });
     attendanceTimeouts.current = [];
     
+    // Clear existing interval if any
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+    }
+    
     setAttendanceScheduleActive(true);
     
-    // Define exact schedule in SECONDS (not minutes)
-    const schedules = [
-      { minutes: 1, time: 60 * 1000, label: '1 Menit' },      // 1 minute
-      { minutes: 5, time: 5 * 60 * 1000, label: '5 Menit' },   // 5 minutes
-      { minutes: 10, time: 10 * 60 * 1000, label: '10 Menit' }, // 10 minutes
-      { minutes: 15, time: 15 * 60 * 1000, label: '15 Menit' }, // 15 minutes
-      { minutes: 20, time: 20 * 60 * 1000, label: '20 Menit' }, // 20 minutes
-      { minutes: 25, time: 25 * 60 * 1000, label: '25 Menit' }, // 25 minutes
-      { minutes: 30, time: 30 * 60 * 1000, label: '30 Menit' }, // 30 minutes
-      { minutes: 35, time: 35 * 60 * 1000, label: '35 Menit' }, // 35 minutes
-      { minutes: 40, time: 40 * 60 * 1000, label: '40 Menit' }, // 40 minutes
-      { minutes: 45, time: 45 * 60 * 1000, label: '45 Menit' }, // 45 minutes
-      { minutes: 50, time: 50 * 60 * 1000, label: '50 Menit' }, // 50 minutes
-      { minutes: 55, time: 55 * 60 * 1000, label: '55 Menit' }, // 55 minutes
-      { minutes: 60, time: 60 * 60 * 1000, label: '60 Menit' }, // 60 minutes
-      { minutes: 65, time: 65 * 60 * 1000, label: '65 Menit' }, // 65 minutes
-      { minutes: 70, time: 70 * 60 * 1000, label: '70 Menit' }, // 70 minutes
-      { minutes: 75, time: 75 * 60 * 1000, label: '75 Menit' }, // 75 minutes
-      { minutes: 80, time: 80 * 60 * 1000, label: '80 Menit' }, // 80 minutes
-      { minutes: 85, time: 85 * 60 * 1000, label: '85 Menit' }, // 85 minutes
-      { minutes: 90, time: 90 * 60 * 1000, label: '90 Menit' }, // 90 minutes
-      { minutes: 95, time: 95 * 60 * 1000, label: '95 Menit' }, // 95 minutes
-      { minutes: 100, time: 100 * 60 * 1000, label: '100 Menit' }, // 100 minutes
-      { minutes: 105, time: 105 * 60 * 1000, label: '105 Menit' }, // 105 minutes
-      { minutes: 110, time: 110 * 60 * 1000, label: '110 Menit' }, // 110 minutes
-      { minutes: 115, time: 115 * 60 * 1000, label: '115 Menit' }, // 115 minutes
-      { minutes: 120, time: 120 * 60 * 1000, label: '120 Menit' }, // 120 minutes
-    ];
+    // INDEPENDENT ATTENDANCE SYSTEM - Runs every 5 minutes
+    // Start immediately at 1 minute, then every 5 minutes
+    const attendanceMinutes = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120];
     
-    console.log(`📅 SETUP COMPLETE: Menjadwalkan ${schedules.length} foto absensi`);
-    console.log(`🎯 JADWAL: ${schedules.map(s => s.minutes).join(', ')} menit`);
+    console.log(`📅 SISTEM INDEPENDEN: Menjadwalkan ${attendanceMinutes.length} foto absensi`);
+    console.log(`🎯 JADWAL LENGKAP: ${attendanceMinutes.join(', ')} menit`);
+    console.log(`🔥 INDEPENDEN: Sistem ini TIDAK TERPENGARUH oleh pelanggaran apapun!`);
     
-    schedules.forEach((schedule, index) => {
+    // Schedule each photo independently
+    attendanceMinutes.forEach((minute, index) => {
       const timeoutId = setTimeout(() => {
-        console.log(`⏰ JADWAL FOTO: Menit ${schedule.minutes} - Mengambil foto absensi ${index + 1}/25`);
-        
-        // Get current violations from state at execution time
-        const getCurrentViolations = () => {
-          // Access violations from DOM or state
-          const violationElement = document.querySelector('[data-violations]');
-          return violationElement ? parseInt(violationElement.getAttribute('data-violations') || '0') : 0;
-        };
-        
-        const currentViolations = getCurrentViolations();
-        console.log(`📊 KONDISI SAAT INI: Pelanggaran=${currentViolations}/3, Selesai=${isFinished}`);
-        
-        // CRITICAL: Foto absensi HANYA berhenti jika ujian selesai
-        // VIOLATIONS 1-2 TIDAK MEMPENGARUHI FOTO ABSENSI!
-        if (!isFinished) {
-          console.log(`📷 EXECUTING: Mengambil foto absensi ${index + 1}/25 di ${schedule.label}`);
-          console.log(`🔥 VIOLATIONS: ${currentViolations} pelanggaran - FOTO ABSENSI TIDAK TERPENGARUH!`);
-          takeAttendancePhoto(schedule.label);
-        } else {
-          console.log(`❌ STOPPED: Ujian sudah selesai di ${schedule.label}`);
-        }
-      }, schedule.time);
+        executeIndependentAttendancePhoto(minute, index + 1);
+      }, minute * 60 * 1000); // Convert minutes to milliseconds
       
       attendanceTimeouts.current.push(timeoutId);
-      console.log(`✅ TERJADWAL: Foto ${index + 1}/25 di menit ${schedule.minutes}`);
+      console.log(`✅ TERJADWAL: Foto ${index + 1}/25 di menit ${minute}`);
     });
     
-    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${schedules.map(s => s.minutes).join(', ')}`);
-    console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran 1-2!`);
+    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${attendanceMinutes.join(', ')}`);
+    console.log(`🚨 INDEPENDEN: Foto absensi TIDAK TERPENGARUH oleh pelanggaran 1-2!`);
   };
-
-  // Take attendance photo (separate from violation photos)
-  const takeAttendancePhoto = async (timeLabel: string) => {
-    console.log(`📸 FOTO ABSENSI DIMULAI: ${timeLabel}`);
-    console.log(`📊 KONDISI SAAT INI: Selesai=${isFinished}, Kamera=${isCameraReady}`);
+  
+  // INDEPENDENT function to execute attendance photo
+  const executeIndependentAttendancePhoto = async (minute: number, photoNumber: number) => {
+    console.log(`⏰ TIMER TRIGGERED: Menit ${minute} - Foto absensi ${photoNumber}/25`);
     
-    // CRITICAL: Foto absensi HANYA berhenti jika ujian selesai
-    // VIOLATIONS 1-2 TIDAK MEMPENGARUHI SAMA SEKALI!
+    // CRITICAL: ONLY check if exam is finished - IGNORE violations completely
     if (isFinished) {
-      console.log(`❌ BERHENTI: Ujian sudah selesai, tidak ambil foto di ${timeLabel}`);
+      console.log(`❌ EXAM FINISHED: Tidak mengambil foto di menit ${minute} karena ujian sudah selesai`);
       return;
     }
     
-    // FORCE FOTO - VIOLATIONS TIDAK MEMPENGARUHI
-    console.log(`🔥 FORCE FOTO: Mengambil foto absensi di ${timeLabel} - VIOLATIONS DIABAIKAN!`);
-    console.log(`✅ GUARANTEED: Foto absensi akan diambil meskipun ada pelanggaran!`);
+    console.log(`🔥 INDEPENDEN: Mengambil foto absensi ${photoNumber}/25 di menit ${minute}`);
+    console.log(`📊 STATUS: Ujian masih berjalan - FOTO ABSENSI AKTIF!`);
+    
+    // Execute photo capture regardless of violations
+    await takeIndependentAttendancePhoto(`${minute} Menit`, photoNumber);
+  };
+
+  // INDEPENDENT attendance photo function - completely separate from violations
+  const takeIndependentAttendancePhoto = async (timeLabel: string, photoNumber: number) => {
+    console.log(`📸 FOTO ABSENSI INDEPENDEN: ${timeLabel} (${photoNumber}/25)`);
+    console.log(`🔥 INDEPENDEN: Sistem foto absensi terpisah dari deteksi pelanggaran!`);
+    
+    // Double check - should not happen since we check before calling this function
+    if (isFinished) {
+      console.log(`❌ EXAM FINISHED: Ujian sudah selesai, tidak ambil foto ${timeLabel}`);
+      return;
+    }
+    
+    console.log(`📷 EXECUTING: Mengambil foto absensi ${photoNumber}/25 di ${timeLabel}`);
+    console.log(`🔥 GARANTSI: Foto ini TIDAK TERPENGARUH oleh violations apapun!`);
     
     if (!videoRef.current || !canvasRef.current || !isCameraReady) {
-      console.log(`⚠️ MASALAH TEKNIS: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, kamera=${isCameraReady}`);
+      console.log(`⚠️ CAMERA ISSUE: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, ready=${isCameraReady}`);
       // Retry after 1 second if camera not ready
       if (!isCameraReady) {
-        console.log(`🔄 RETRY FOTO: Mencoba lagi ${timeLabel} dalam 1 detik...`);
+        console.log(`🔄 RETRY: Mencoba lagi foto ${timeLabel} dalam 1 detik...`);
         setTimeout(() => {
           if (!isFinished) {
-            console.log(`🔄 RETRY EXECUTING: ${timeLabel} - VIOLATIONS DIABAIKAN`);
-            takeAttendancePhoto(timeLabel);
+            console.log(`🔄 RETRY EXECUTING: ${timeLabel} - INDEPENDEN DARI VIOLATIONS`);
+            takeIndependentAttendancePhoto(timeLabel, photoNumber);
           }
         }, 1000);
       }
       return;
     }
     
-    console.log(`📷 MENGAMBIL FOTO: Absensi ${attendancePhotoCount.current + 1}/25 di ${timeLabel}`);
-    console.log(`🔥 STATUS: FOTO ABSENSI BERJALAN - VIOLATIONS TIDAK MEMPENGARUHI!`);
+    console.log(`📷 CAPTURING: Foto absensi ${photoNumber}/25 di ${timeLabel}`);
     
     const photoData = capturePhoto();
     if (!photoData) {
-      console.log(`❌ GAGAL CAPTURE: Foto ${timeLabel} gagal, mencoba lagi...`);
+      console.log(`❌ CAPTURE FAILED: Foto ${timeLabel} gagal, retry...`);
       // Retry capture after short delay
       setTimeout(() => {
         if (!isFinished) {
-          console.log(`🔄 RETRY CAPTURE: ${timeLabel} - VIOLATIONS DIABAIKAN`);
+          console.log(`🔄 RETRY CAPTURE: ${timeLabel} - INDEPENDEN`);
           const retryPhoto = capturePhoto();
           if (retryPhoto) {
-            console.log(`✅ RETRY BERHASIL: Foto ${timeLabel} berhasil (retry) - VIOLATIONS DIABAIKAN`);
-            saveAttendancePhoto(retryPhoto, timeLabel);
+            console.log(`✅ RETRY SUCCESS: Foto ${timeLabel} berhasil (retry)`);
+            saveIndependentAttendancePhoto(retryPhoto, timeLabel, photoNumber);
           }
         }
       }, 500);
       return;
     }
     
-    console.log(`✅ FOTO BERHASIL: ${timeLabel} - VIOLATIONS TIDAK MEMPENGARUHI!`);
-    saveAttendancePhoto(photoData, timeLabel);
+    console.log(`✅ PHOTO SUCCESS: ${timeLabel} - INDEPENDEN DARI VIOLATIONS!`);
+    await saveIndependentAttendancePhoto(photoData, timeLabel, photoNumber);
   };
 
-  // Separate function to save attendance photo
-  const saveAttendancePhoto = async (photoData: string, timeLabel: string) => {
-    attendancePhotoCount.current += 1;
-    const currentCount = attendancePhotoCount.current;
+  // INDEPENDENT function to save attendance photo
+  const saveIndependentAttendancePhoto = async (photoData: string, timeLabel: string, photoNumber: number) => {
+    console.log(`💾 SAVING: Foto absensi ${photoNumber}/25 di ${timeLabel}`);
     
     try {
       const attendanceData = {
-        [`attendanceSnapshot_${currentCount}`]: {
+        [`attendanceSnapshot_${photoNumber}`]: {
           imageData: photoData,
           timestamp: new Date().toISOString(),
           timeLabel: timeLabel,
@@ -392,24 +369,29 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ TERSIMPAN: Foto absensi ${currentCount}/25 berhasil disimpan di ${timeLabel}`);
-      console.log(`🔥 KONFIRMASI: FOTO ABSENSI TIDAK TERPENGARUH OLEH VIOLATIONS!`);
-      console.log(`📊 PROGRESS: ${currentCount}/25 foto absensi telah diambil`);
+      
+      // Update counter
+      attendancePhotoCount.current = photoNumber;
+      
+      console.log(`✅ SAVED SUCCESS: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
+      console.log(`🔥 INDEPENDEN: Foto absensi berhasil - TIDAK TERPENGARUH VIOLATIONS!`);
+      console.log(`📊 PROGRESS: ${photoNumber}/25 foto absensi telah diambil`);
     } catch (error) {
-      console.error(`❌ GAGAL SIMPAN: Foto absensi ${timeLabel}:`, error);
+      console.error(`❌ SAVE FAILED: Foto absensi ${timeLabel}:`, error);
       // Retry save
       setTimeout(() => {
         updateDoc(sessionDocRef, {
-          [`attendanceSnapshot_${currentCount}`]: {
+          [`attendanceSnapshot_${photoNumber}`]: {
             imageData: photoData,
             timestamp: new Date().toISOString(),
             timeLabel: timeLabel,
             type: 'attendance'
           }
         }).then(() => {
-          console.log(`✅ RETRY SIMPAN BERHASIL: Foto ${timeLabel} tersimpan (retry) - VIOLATIONS DIABAIKAN`);
+          attendancePhotoCount.current = photoNumber;
+          console.log(`✅ RETRY SAVE SUCCESS: Foto ${timeLabel} tersimpan (retry)`);
         }).catch(retryError => {
-          console.error(`❌ RETRY GAGAL: ${timeLabel}:`, retryError);
+          console.error(`❌ RETRY FAILED: ${timeLabel}:`, retryError);
         });
       }, 1000);
     }
@@ -667,11 +649,16 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       clearInterval(timer);
       clearInterval(devToolsInterval);
       
-      // Cleanup attendance timeouts
+      // Cleanup attendance system
       attendanceTimeouts.current.forEach(timeoutId => {
         clearTimeout(timeoutId);
       });
       attendanceTimeouts.current = [];
+      
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        attendanceIntervalRef.current = null;
+      }
       
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
@@ -720,24 +707,30 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setViolations(newViolations);
     setViolationReason(reason);
     
-    console.log(`🚨 PELANGGARAN ${newViolations}/3: ${reason}`);
-    console.log(`📅 FOTO ABSENSI STATUS: ${newViolations < 3 ? 'TETAP AKTIF' : 'AKAN BERHENTI'}`);
+    console.log(`🚨 VIOLATION ${newViolations}/3: ${reason}`);
+    console.log(`📅 FOTO ABSENSI: SISTEM INDEPENDEN - TIDAK TERPENGARUH!`);
     
     if (newViolations < 3) {
-      console.log(`🔥 PENTING: Foto absensi TETAP BERJALAN! ${newViolations}/3 pelanggaran`);
-      console.log(`📅 JADWAL ABSENSI: Tetap aktif di menit 1,5,10,15...120 meskipun ${newViolations} pelanggaran`);
-      console.log(`✅ GUARANTEED: Foto absensi akan tetap diambil sesuai jadwal!`);
+      console.log(`🔥 INDEPENDEN: Foto absensi TETAP AKTIF! ${newViolations}/3 pelanggaran`);
+      console.log(`📅 SISTEM TERPISAH: Jadwal foto absensi tidak terpengaruh violations!`);
+      console.log(`✅ GARANTSI: Foto absensi akan tetap diambil sesuai jadwal 1,5,10...120 menit!`);
     } else {
-      console.log(`🚨 DISKUALIFIKASI: Foto absensi akan berhenti karena ${newViolations} pelanggaran tercapai`);
-      console.log(`📅 JADWAL ABSENSI: Akan dihentikan setelah diskualifikasi`);
+      console.log(`🚨 DISQUALIFICATION: ${newViolations} pelanggaran - DISKUALIFIKASI!`);
+      console.log(`🛑 STOP ATTENDANCE: Foto absensi berhenti karena diskualifikasi`);
       
-      // Stop attendance schedule when disqualified
+      // ONLY stop attendance when disqualified (3 violations)
       setAttendanceScheduleActive(false);
       attendanceTimeouts.current.forEach(timeoutId => {
         clearTimeout(timeoutId);
       });
       attendanceTimeouts.current = [];
-      console.log(`🛑 ATTENDANCE STOPPED: Jadwal foto absensi dihentikan karena diskualifikasi`);
+      
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        attendanceIntervalRef.current = null;
+      }
+      
+      console.log(`🛑 SYSTEM STOPPED: Sistem foto absensi dihentikan karena diskualifikasi`);
     }
     
     // Update violations data attribute for timeout access
@@ -803,8 +796,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     if (newViolations >= 3) {
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
-      console.log(`✅ ATTENDANCE CONTINUES: Foto absensi tetap berjalan (${newViolations}/3 pelanggaran)`);
-      console.log(`🔥 IMPORTANT: Jadwal foto absensi TIDAK TERPENGARUH oleh pelanggaran ini!`);
+      console.log(`✅ INDEPENDEN: Foto absensi tetap berjalan (${newViolations}/3 pelanggaran)`);
+      console.log(`🔥 SISTEM TERPISAH: Jadwal foto absensi TIDAK TERPENGARUHI oleh pelanggaran ini!`);
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
       
@@ -882,27 +875,33 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
-    console.log(`🏁 MENYELESAIKAN UJIAN: ${reason}`);
-    console.log(`📊 FINAL STATUS: Foto absensi diambil ${attendancePhotoCount.current}/25`);
+    console.log(`🏁 FINISHING EXAM: ${reason}`);
+    console.log(`📊 ATTENDANCE FINAL: ${attendancePhotoCount.current}/25 foto absensi berhasil diambil`);
+    
     setIsFinished(true);
     setAttendanceScheduleActive(false);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
     
-    // Take final attendance photo before finishing (only if not disqualified)
-    if (!reason.startsWith("Diskualifikasi")) {
-      console.log("📷 FOTO FINAL: Mengambil foto terakhir sebelum selesai...");
-      await takeAttendancePhoto('Selesai Ujian');
-    } else {
-      console.log("🚨 DISKUALIFIKASI: Tidak mengambil foto final");
-    }
-    
-    // Cleanup attendance timeouts
-    console.log(`🧹 CLEANUP: Membersihkan ${attendanceTimeouts.current.length} jadwal foto absensi...`);
+    // STOP all attendance timeouts when exam finishes
+    console.log(`🛑 STOPPING: Menghentikan ${attendanceTimeouts.current.length} jadwal foto absensi...`);
     attendanceTimeouts.current.forEach(timeoutId => {
       clearTimeout(timeoutId);
     });
     attendanceTimeouts.current = [];
+    
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+      attendanceIntervalRef.current = null;
+    }
+    
+    // Take final attendance photo (26th photo) if not disqualified
+    if (!reason.startsWith("Diskualifikasi")) {
+      console.log("📷 FINAL PHOTO: Mengambil foto ke-26 (foto final)...");
+      await takeIndependentAttendancePhoto('Selesai Ujian', 26);
+    } else {
+      console.log("🚨 DISQUALIFIED: Tidak mengambil foto final karena diskualifikasi");
+    }
     
     // Exit fullscreen when exam is finished
     if (isInFullscreen()) {
@@ -1127,22 +1126,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
-          Foto Absensi: {attendancePhotoCount.current}/26
+          Foto Absensi: {attendancePhotoCount.current}/25
         </div>
         <div className={`text-xs ${attendanceScheduleActive ? 'text-green-400' : 'text-red-400'}`}>
-          Jadwal: {attendanceScheduleActive ? 'AKTIF' : 'BERHENTI'}
+          Sistem: {attendanceScheduleActive ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
         </div>
         <div className="text-xs text-blue-400">
           Status: {isFinished ? 'Selesai' : 'Berjalan'}
         </div>
         {violations > 0 && violations < 3 && (
           <div className="text-xs text-yellow-400 mt-1">
-            🔥 Foto Absensi TETAP AKTIF!
+            🔥 Absensi INDEPENDEN AKTIF!
           </div>
         )}
         {violations >= 3 && (
           <div className="text-xs text-red-400 mt-1">
-            🚨 Foto Absensi BERHENTI!
+            🚨 Absensi BERHENTI (Diskualifikasi)!
           </div>
         )}
       </div>
