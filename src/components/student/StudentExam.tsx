@@ -1116,19 +1116,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           Foto Absensi: {attendancePhotoCount.current}/25
         </div>
         <div className={`text-xs ${attendanceSystemActive.current ? 'text-green-400' : 'text-red-400'}`}>
-          Sistem: {attendanceSystemActive.current ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
+          Absensi: {attendanceSystemActive.current ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
         </div>
         <div className="text-xs text-blue-400">
           Status: {isFinished ? 'Selesai' : 'Berjalan'}
         </div>
         {violations > 0 && violations < 3 && (
           <div className="text-xs text-yellow-400 mt-1">
-            🔥 Absensi TETAP AKTIF (INDEPENDEN)!
+            🔥 Foto Absensi TETAP AKTIF!
           </div>
         )}
         {violations >= 3 && (
           <div className="text-xs text-red-400 mt-1">
-            🚨 Absensi BERHENTI (Diskualifikasi)!
+            🚨 Foto Absensi BERHENTI!
           </div>
         )}
       </div>
