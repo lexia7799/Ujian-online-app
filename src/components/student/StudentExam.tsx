@@ -291,19 +291,25 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     schedules.forEach((schedule, index) => {
       const timeoutId = setTimeout(() => {
         console.log(`⏰ JADWAL FOTO: Menit ${schedule.minutes} - Mengambil foto absensi ${index + 1}/25`);
-        console.log(`📊 KONDISI SAAT INI: Pelanggaran=${violations}/3, Selesai=${isFinished}, Status=${violations >= 3 ? 'DISKUALIFIKASI' : 'NORMAL'}`);
         
-        // CRITICAL: Foto absensi tetap berjalan jika:
-        // 1. Ujian belum selesai (isFinished = false)
-        // 2. Belum diskualifikasi (violations < 3)
-        if (!isFinished && violations < 3) {
-          console.log(`📷 MENGAMBIL: Foto absensi ${index + 1}/25 di ${schedule.label}`);
-          console.log(`🔥 KONFIRMASI: ${violations} pelanggaran - FOTO ABSENSI TETAP AKTIF!`);
+        // Get current violations from state at execution time
+        const getCurrentViolations = () => {
+          // Access violations from DOM or state
+          const violationElement = document.querySelector('[data-violations]');
+          return violationElement ? parseInt(violationElement.getAttribute('data-violations') || '0') : 0;
+        };
+        
+        const currentViolations = getCurrentViolations();
+        console.log(`📊 KONDISI SAAT INI: Pelanggaran=${currentViolations}/3, Selesai=${isFinished}`);
+        
+        // CRITICAL: Foto absensi HANYA berhenti jika ujian selesai
+        // VIOLATIONS 1-2 TIDAK MEMPENGARUHI FOTO ABSENSI!
+        if (!isFinished) {
+          console.log(`📷 EXECUTING: Mengambil foto absensi ${index + 1}/25 di ${schedule.label}`);
+          console.log(`🔥 VIOLATIONS: ${currentViolations} pelanggaran - FOTO ABSENSI TIDAK TERPENGARUH!`);
           takeAttendancePhoto(schedule.label);
-        } else if (violations >= 3) {
-          console.log(`❌ DISKUALIFIKASI: Foto absensi berhenti karena 3 pelanggaran tercapai`);
         } else {
-          console.log(`❌ BERHENTI: Ujian sudah selesai di ${schedule.label}`);
+          console.log(`❌ STOPPED: Ujian sudah selesai di ${schedule.label}`);
         }
       }, schedule.time);
       
@@ -312,27 +318,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     });
     
     console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${schedules.map(s => s.minutes).join(', ')}`);
-    console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran!`);
+    console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran 1-2!`);
   };
 
   // Take attendance photo (separate from violation photos)
   const takeAttendancePhoto = async (timeLabel: string) => {
     console.log(`📸 FOTO ABSENSI DIMULAI: ${timeLabel}`);
-    console.log(`📊 KONDISI SAAT INI: Selesai=${isFinished}, Pelanggaran=${violations}/3, Kamera=${isCameraReady}`);
+    console.log(`📊 KONDISI SAAT INI: Selesai=${isFinished}, Kamera=${isCameraReady}`);
     
-    // CRITICAL: Foto absensi berhenti jika ujian selesai ATAU diskualifikasi (3 pelanggaran)
-    if (isFinished || violations >= 3) {
-      if (isFinished) {
-        console.log(`❌ BERHENTI: Ujian sudah selesai, tidak ambil foto di ${timeLabel}`);
-      } else {
-        console.log(`❌ BERHENTI: Diskualifikasi (${violations} pelanggaran), tidak ambil foto di ${timeLabel}`);
-      }
+    // CRITICAL: Foto absensi HANYA berhenti jika ujian selesai
+    // VIOLATIONS 1-2 TIDAK MEMPENGARUHI SAMA SEKALI!
+    if (isFinished) {
+      console.log(`❌ BERHENTI: Ujian sudah selesai, tidak ambil foto di ${timeLabel}`);
       return;
     }
     
-    // FORCE FOTO MESKIPUN ADA PELANGGARAN 1-2 KALI
-    console.log(`🔥 FORCE FOTO: Mengambil foto absensi meskipun ada ${violations}/3 pelanggaran!`);
-    console.log(`✅ AMAN: ${violations} < 3 pelanggaran, foto absensi tetap berjalan!`);
+    // FORCE FOTO - VIOLATIONS TIDAK MEMPENGARUHI
+    console.log(`🔥 FORCE FOTO: Mengambil foto absensi di ${timeLabel} - VIOLATIONS DIABAIKAN!`);
+    console.log(`✅ GUARANTEED: Foto absensi akan diambil meskipun ada pelanggaran!`);
     
     if (!videoRef.current || !canvasRef.current || !isCameraReady) {
       console.log(`⚠️ MASALAH TEKNIS: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, kamera=${isCameraReady}`);
@@ -340,8 +343,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       if (!isCameraReady) {
         console.log(`🔄 RETRY FOTO: Mencoba lagi ${timeLabel} dalam 1 detik...`);
         setTimeout(() => {
-          if (!isFinished && violations < 3) {
-            console.log(`🔄 RETRY EXECUTING: ${timeLabel} - Pelanggaran saat ini: ${violations}`);
+          if (!isFinished) {
+            console.log(`🔄 RETRY EXECUTING: ${timeLabel} - VIOLATIONS DIABAIKAN`);
             takeAttendancePhoto(timeLabel);
           }
         }, 1000);
@@ -350,18 +353,18 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
     
     console.log(`📷 MENGAMBIL FOTO: Absensi ${attendancePhotoCount.current + 1}/25 di ${timeLabel}`);
-    console.log(`🔥 STATUS PELANGGARAN: ${violations}/3 - FOTO ABSENSI TETAP JALAN KARENA < 3!`);
+    console.log(`🔥 STATUS: FOTO ABSENSI BERJALAN - VIOLATIONS TIDAK MEMPENGARUHI!`);
     
     const photoData = capturePhoto();
     if (!photoData) {
       console.log(`❌ GAGAL CAPTURE: Foto ${timeLabel} gagal, mencoba lagi...`);
       // Retry capture after short delay
       setTimeout(() => {
-        if (!isFinished && violations < 3) {
-          console.log(`🔄 RETRY CAPTURE: ${timeLabel} - Pelanggaran: ${violations}`);
+        if (!isFinished) {
+          console.log(`🔄 RETRY CAPTURE: ${timeLabel} - VIOLATIONS DIABAIKAN`);
           const retryPhoto = capturePhoto();
           if (retryPhoto) {
-            console.log(`✅ RETRY BERHASIL: Foto ${timeLabel} berhasil (retry) - Pelanggaran: ${violations}/3`);
+            console.log(`✅ RETRY BERHASIL: Foto ${timeLabel} berhasil (retry) - VIOLATIONS DIABAIKAN`);
             saveAttendancePhoto(retryPhoto, timeLabel);
           }
         }
@@ -369,7 +372,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return;
     }
     
-    console.log(`✅ FOTO BERHASIL: ${timeLabel} - Meskipun ada ${violations} pelanggaran!`);
+    console.log(`✅ FOTO BERHASIL: ${timeLabel} - VIOLATIONS TIDAK MEMPENGARUHI!`);
     saveAttendancePhoto(photoData, timeLabel);
   };
 
@@ -390,7 +393,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       await updateDoc(sessionDocRef, attendanceData);
       console.log(`✅ TERSIMPAN: Foto absensi ${currentCount}/25 berhasil disimpan di ${timeLabel}`);
-      console.log(`🔥 KONFIRMASI: ${violations}/3 pelanggaran - FOTO ABSENSI TIDAK TERPENGARUH KARENA < 3!`);
+      console.log(`🔥 KONFIRMASI: FOTO ABSENSI TIDAK TERPENGARUH OLEH VIOLATIONS!`);
       console.log(`📊 PROGRESS: ${currentCount}/25 foto absensi telah diambil`);
     } catch (error) {
       console.error(`❌ GAGAL SIMPAN: Foto absensi ${timeLabel}:`, error);
@@ -404,7 +407,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             type: 'attendance'
           }
         }).then(() => {
-          console.log(`✅ RETRY SIMPAN BERHASIL: Foto ${timeLabel} tersimpan (retry) - Pelanggaran: ${violations}/3`);
+          console.log(`✅ RETRY SIMPAN BERHASIL: Foto ${timeLabel} tersimpan (retry) - VIOLATIONS DIABAIKAN`);
         }).catch(retryError => {
           console.error(`❌ RETRY GAGAL: ${timeLabel}:`, retryError);
         });
@@ -711,21 +714,35 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   const handleViolation = (reason = "Unknown") => {
+    console.log(`🚨 PELANGGARAN DETECTED: ${reason}`);
+    
     const newViolations = violations + 1;
     setViolations(newViolations);
     setViolationReason(reason);
     
     console.log(`🚨 PELANGGARAN ${newViolations}/3: ${reason}`);
+    console.log(`📅 FOTO ABSENSI STATUS: ${newViolations < 3 ? 'TETAP AKTIF' : 'AKAN BERHENTI'}`);
     
     if (newViolations < 3) {
-      console.log(`🔥 PENTING: Foto absensi TETAP BERJALAN! ${newViolations} < 3 pelanggaran`);
+      console.log(`🔥 PENTING: Foto absensi TETAP BERJALAN! ${newViolations}/3 pelanggaran`);
       console.log(`📅 JADWAL ABSENSI: Tetap aktif di menit 1,5,10,15...120 meskipun ${newViolations} pelanggaran`);
+      console.log(`✅ GUARANTEED: Foto absensi akan tetap diambil sesuai jadwal!`);
     } else {
       console.log(`🚨 DISKUALIFIKASI: Foto absensi akan berhenti karena ${newViolations} pelanggaran tercapai`);
       console.log(`📅 JADWAL ABSENSI: Akan dihentikan setelah diskualifikasi`);
+      
+      // Stop attendance schedule when disqualified
+      setAttendanceScheduleActive(false);
+      attendanceTimeouts.current.forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+      attendanceTimeouts.current = [];
+      console.log(`🛑 ATTENDANCE STOPPED: Jadwal foto absensi dihentikan karena diskualifikasi`);
     }
     
-    console.log(`📊 KONFIRMASI: attendanceScheduleActive=${attendanceScheduleActive}, setupDone=${attendanceSetupDone.current}`);
+    // Update violations data attribute for timeout access
+    const violationElement = document.querySelector('[data-violations]') || document.body;
+    violationElement.setAttribute('data-violations', newViolations.toString());
     
     // Try to capture photo with retry mechanism
     let photoData = null;
@@ -784,16 +801,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     playWarningSound();
     
     if (newViolations >= 3) {
-      console.log(`🛑 STOPPING ATTENDANCE: Menghentikan jadwal foto absensi karena diskualifikasi`);
-      setAttendanceScheduleActive(false);
-      // Clear attendance timeouts when disqualified
-      attendanceTimeouts.current.forEach(timeoutId => {
-        clearTimeout(timeoutId);
-      });
-      attendanceTimeouts.current = [];
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       console.log(`✅ ATTENDANCE CONTINUES: Foto absensi tetap berjalan (${newViolations}/3 pelanggaran)`);
+      console.log(`🔥 IMPORTANT: Jadwal foto absensi TIDAK TERPENGARUH oleh pelanggaran ini!`);
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
       
@@ -878,9 +889,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
     
-    // Take final attendance photo before finishing
-    console.log("📷 FOTO FINAL: Mengambil foto terakhir sebelum selesai...");
-    await takeAttendancePhoto('Selesai Ujian');
+    // Take final attendance photo before finishing (only if not disqualified)
+    if (!reason.startsWith("Diskualifikasi")) {
+      console.log("📷 FOTO FINAL: Mengambil foto terakhir sebelum selesai...");
+      await takeAttendancePhoto('Selesai Ujian');
+    } else {
+      console.log("🚨 DISKUALIFIKASI: Tidak mengambil foto final");
+    }
     
     // Cleanup attendance timeouts
     console.log(`🧹 CLEANUP: Membersihkan ${attendanceTimeouts.current.length} jadwal foto absensi...`);
@@ -931,7 +946,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       totalAttendancePhotos: attendancePhotoCount.current
     });
     
-    console.log(`🏁 UJIAN SELESAI: Total ${attendancePhotoCount.current} foto absensi berhasil diambil`);
+    const finalPhotoCount = reason.startsWith("Diskualifikasi") ? attendancePhotoCount.current : attendancePhotoCount.current + 1;
+    console.log(`🏁 UJIAN SELESAI: Total ${finalPhotoCount} foto absensi berhasil diambil`);
   };
 
   if (isLoading) {
@@ -1105,7 +1121,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       />
       
       {/* Camera status indicator with more detail */}
-      <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-40 border">
+      <div className="fixed top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded text-xs z-40 border" data-violations={violations}>
         <div className="text-green-400">📷 Monitoring Aktif</div>
         <div className="text-xs text-gray-400 mt-1">
           Pelanggaran: {violations}/3
@@ -1121,12 +1137,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         </div>
         {violations > 0 && violations < 3 && (
           <div className="text-xs text-yellow-400 mt-1">
-            🔥 Absensi TETAP AKTIF!
+            🔥 Foto Absensi TETAP AKTIF!
           </div>
         )}
         {violations >= 3 && (
           <div className="text-xs text-red-400 mt-1">
-            🚨 Absensi BERHENTI!
+            🚨 Foto Absensi BERHENTI!
           </div>
         )}
       </div>
