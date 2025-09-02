@@ -552,110 +552,163 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-bold">Riwayat Ujian</h3>
-        <div className="flex space-x-4">
+      {/* Status Aplikasi Ujian Section */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold">Status Aplikasi Ujian</h3>
           <button 
             onClick={() => navigateTo('student_join_exam', { currentUser: user })}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
           >
-            Ajukan Ujian
+            + Ajukan Ujian Baru
           </button>
-          {availableExams.length > 0 && (
+        </div>
+
+        {/* Ujian Siap Dimulai (Approved & Active) */}
+        {availableExams.length > 0 && (
+          <div className="mb-6 bg-green-800 border border-green-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">🎯</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-green-400">Ujian Siap Dimulai</h4>
+                <p className="text-green-200 text-sm">Ujian yang sudah disetujui dan bisa dimulai sekarang</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableExams.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-green-400">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
+                      ✅ DISETUJUI
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    🚀 Mulai Ujian Sekarang
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Aplikasi Menunggu Konfirmasi (Pending) */}
+        {pendingApplications.length > 0 && (
+          <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">⏳</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi</h4>
+                <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingApplications.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
+                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
+                      ⏳ MENUNGGU
+                    </span>
+                  </div>
+                  <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+                    <p className="text-yellow-200 text-sm text-center">
+                      💡 Menunggu persetujuan dari dosen
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Aplikasi Ditolak (Rejected) */}
+        {rejectedApplications.length > 0 && (
+          <div className="mb-6 bg-red-800 border border-red-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">❌</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-red-400">Aplikasi Ditolak</h4>
+                <p className="text-red-200 text-sm">Aplikasi ujian yang tidak disetujui oleh dosen</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {rejectedApplications.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-red-400">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
+                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
+                      ❌ DITOLAK
+                    </span>
+                  </div>
+                  <div className="bg-red-900 border border-red-600 p-3 rounded-md">
+                    <p className="text-red-200 text-sm text-center">
+                      💬 Hubungi dosen untuk informasi lebih lanjut
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {availableExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
+          <div className="bg-gray-800 border border-gray-600 p-8 rounded-lg text-center">
+            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📝</span>
+            </div>
+            <h4 className="text-xl font-bold text-gray-400 mb-2">Belum Ada Aplikasi Ujian</h4>
+            <p className="text-gray-500 mb-4">
+              Anda belum mengajukan ujian apapun. Mulai dengan mengajukan ujian pertama Anda.
+            </p>
             <button 
-              onClick={() => navigateTo('student_precheck', { exam: availableExams[0], currentUser: user })}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"
+              onClick={() => navigateTo('student_join_exam', { currentUser: user })}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg"
             >
-              Mulai Ujian ({availableExams.length})
+              🚀 Ajukan Ujian Pertama
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-
-      {availableExams.length > 0 && (
-        <div className="mb-6 bg-green-800 border border-green-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-green-400 mb-2">🎯 Ujian Siap Dimulai</h4>
-          <div className="space-y-2">
-            {availableExams.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                </div>
-                <button
-                  onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm"
-                >
-                  Mulai
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pending Applications Section */}
-      {pendingApplications.length > 0 && (
-        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-yellow-400 mb-3">⏳ Aplikasi Ujian Menunggu Konfirmasi</h4>
-          <div className="space-y-2">
-            {pendingApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                  Menunggu Konfirmasi
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💡 Aplikasi Anda sedang menunggu persetujuan dari dosen. Silakan tunggu hingga dosen mengkonfirmasi.
-          </p>
-        </div>
-      )}
-
-      {/* Rejected Applications Section */}
-      {rejectedApplications.length > 0 && (
-        <div className="mb-6 bg-red-800 border border-red-500 p-4 rounded-lg">
-          <h4 className="text-lg font-bold text-red-400 mb-3">❌ Aplikasi Ujian Ditolak</h4>
-          <div className="space-y-2">
-            {rejectedApplications.map(exam => (
-              <div key={exam.id} className="flex justify-between items-center bg-gray-700 p-3 rounded">
-                <div>
-                  <span className="font-bold">{exam.name}</span>
-                  <span className="text-gray-400 ml-2">({exam.code})</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Diajukan: {exam.appliedAt.toLocaleString('id-ID')}
-                  </div>
-                </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                  Ditolak
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-300 mt-3">
-            💬 Aplikasi ujian Anda telah ditolak. Silakan hubungi dosen untuk informasi lebih lanjut atau ajukan ujian lain.
-          </p>
-        </div>
-      )}
-
       <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
         {examResults.length === 0 ? (
           <div className="text-center p-8 text-gray-400">
-            <p className="text-lg mb-4">Belum ada riwayat ujian</p>
-            <button 
-              onClick={() => navigateTo('student_join_exam', { currentUser: user })}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
-            >
-              Ajukan Ujian Pertama
-            </button>
+            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📊</span>
+            </div>
+            <p className="text-lg mb-2">Belum ada riwayat ujian yang selesai</p>
+            <p className="text-sm text-gray-500">Riwayat ujian akan muncul setelah Anda menyelesaikan ujian</p>
           </div>
         ) : (
           <table className="w-full text-left">
@@ -732,4 +785,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   );
 };
 
+      {/* Riwayat Ujian Section */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
+      </div>
 export default StudentDashboard;
