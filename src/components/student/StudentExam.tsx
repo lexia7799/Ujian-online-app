@@ -64,8 +64,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const cameraInitRetryCount = useRef(0);
   const maxCameraRetries = 5;
   const attendanceIntervalId = useRef<NodeJS.Timeout | null>(null);
-  const attendanceSystemStarted = useRef(false);
+  const attendanceSchedule = useRef([1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120]);
   const photosTaken = useRef(new Set<number>());
+  const attendanceSystemStarted = useRef(false);
 
   useEffect(() => {
     // Set exam start time immediately
@@ -150,6 +151,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     };
     
     initializeCamera();
+    
+    // Start attendance photo system
+    if (!attendanceSystemStarted.current) {
+      attendanceSystemStarted.current = true;
+      startAttendancePhotoSystem();
+    }
   }, []);
 
   // Function to manually restart camera
@@ -231,28 +238,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     examContainer.setAttribute('data-exam-finished', isFinished.toString());
     examContainer.setAttribute('data-violations', violations.toString());
     examContainer.setAttribute('data-attendance-active', attendanceSystemActive.toString());
-  }, [isFinished, violations, attendanceSystemActive]);
-
-  // Save independent attendance photo
-  const saveIndependentAttendancePhoto = async (photoData: string, reason: string, photoNumber: number) => {
-    try {
-      const attendanceData: any = {};
-      attendanceData[`attendancePhoto_${photoNumber}`] = {
-        imageData: photoData,
-        timestamp: new Date().toISOString(),
-        reason: reason,
-        photoNumber: photoNumber,
-        examMinute: Math.floor((Date.now() - (examStartTime.current?.getTime() || Date.now())) / 60000)
-      };
-      
-      await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ FOTO ABSENSI ${photoNumber} TERSIMPAN: ${reason}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ GAGAL SIMPAN FOTO ABSENSI ${photoNumber}:`, error);
-      return false;
-    }
-  };
+  }, [isFinished, violations]);
 
   // Start attendance photo system with interval-based checking
   const startAttendancePhotoSystem = () => {
@@ -262,7 +248,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     setAttendanceScheduleActive(true);
     attendanceSystemActive.current = true;
-    attendanceSystemStarted.current = true;
     
     // Clear any existing interval
     if (attendanceIntervalId.current) {
@@ -281,43 +266,183 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         return;
       }
       
-      const now = Date.now();
-      const examStart = examStartTime.current?.getTime() || now;
-      const elapsedMinutes = Math.floor((now - examStart) / 60000);
+      const now = new Date();
+      const startTime = examStartTime.current;
+      if (!startTime) return;
       
-      // Schedule: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120
-      const scheduleMinutes = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120];
+      const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
       
-      for (const minute of scheduleMinutes) {
-        if (elapsedMinutes >= minute && !photosTaken.current.has(minute)) {
-          console.log(`📸 JADWAL FOTO ABSENSI: Menit ${minute} - Mengambil foto...`);
-          
-          const photoData = capturePhoto();
-          if (photoData) {
-            photosTaken.current.add(minute);
-            const photoNumber = photosTaken.current.size;
-            
-            saveIndependentAttendancePhoto(photoData, `Menit ${minute}`, photoNumber).then(success => {
-              if (success) {
-                setAttendancePhotoCount(prev => prev + 1);
-                setLastAttendanceTime(new Date().toLocaleTimeString());
-                
-                // Show notification
-                setAttendanceNotificationMessage(`📸 Foto absensi ${photoNumber}/25 berhasil (Menit ${minute})`);
-                setShowAttendanceNotification(true);
-                setTimeout(() => setShowAttendanceNotification(false), 3000);
-              }
-            });
-          } else {
-            console.log(`❌ GAGAL AMBIL FOTO: Menit ${minute}`);
-          }
-          
-          break; // Only process one photo per interval check
+      // Check if current elapsed time matches any scheduled minute
+      attendanceSchedule.current.forEach(scheduledMinute => {
+        if (elapsedMinutes >= scheduledMinute && !photosTaken.current.has(scheduledMinute)) {
+          console.log(`⏰ JADWAL FOTO ABSENSI: Menit ${scheduledMinute} - Elapsed: ${elapsedMinutes}`);
+          photosTaken.current.add(scheduledMinute);
+          executeIndependentAttendancePhoto(`${scheduledMinute} Menit`, photosTaken.current.size);
         }
-      }
+      });
     }, 30000); // Check every 30 seconds
+    
+    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${attendanceSchedule.current.join(', ')}`);
+    console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran!`);
   };
 
+  // Independent attendance photo execution
+  const executeIndependentAttendancePhoto = async (timeLabel: string, photoNumber: number) => {
+    console.log(`📸 FOTO ABSENSI INDEPENDEN: ${timeLabel} (${photoNumber}/25)`);
+    console.log(`🔥 INDEPENDEN: Mengambil foto absensi - violations diabaikan total!`);
+    
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
+      console.log(`⚠️ MASALAH TEKNIS: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, kamera=${isCameraReady}`);
+      return;
+    }
+    
+    const photoData = capturePhoto();
+    if (photoData) {
+      console.log(`✅ FOTO ABSENSI BERHASIL: ${timeLabel}`);
+      await saveIndependentAttendancePhoto(photoData, timeLabel, photoNumber);
+      
+      // Update UI state
+      setAttendancePhotoCount(photoNumber);
+      setLastAttendanceTime(timeLabel);
+      
+      // Show notification
+      setAttendanceNotificationMessage(`📷 Foto absensi ${photoNumber}/25 berhasil diambil pada ${timeLabel}`);
+      setShowAttendanceNotification(true);
+      setTimeout(() => setShowAttendanceNotification(false), 3000);
+    } else {
+      console.log(`❌ PHOTO FAILED: ${timeLabel} - Mencoba lagi...`);
+      // Retry after short delay
+      setTimeout(() => executeIndependentAttendancePhoto(timeLabel, photoNumber), 1000);
+    }
+  };
+
+  // Take attendance photo (separate from violation photos)
+  const takeAttendancePhoto = async (timeLabel: string) => {
+    console.log(`📸 FOTO ABSENSI DIMULAI: ${timeLabel}`);
+    console.log(`📊 KONDISI SAAT INI: Selesai=${isFinished}, Pelanggaran=${violations}, Kamera=${isCameraReady}`);
+    
+    // CRITICAL: HANYA check isFinished - VIOLATIONS DIABAIKAN TOTAL!
+    if (isFinished) {
+      console.log(`❌ BERHENTI: Ujian sudah selesai, tidak ambil foto di ${timeLabel}`);
+      return;
+    }
+    
+    // FORCE FOTO MESKIPUN ADA PELANGGARAN
+    console.log(`🔥 FORCE FOTO: Mengambil foto absensi meskipun ada ${violations} pelanggaran!`);
+    
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
+      console.log(`⚠️ MASALAH TEKNIS: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, kamera=${isCameraReady}`);
+      // Retry after 1 second if camera not ready
+      if (!isCameraReady) {
+        console.log(`🔄 RETRY FOTO: Mencoba lagi ${timeLabel} dalam 1 detik...`);
+        setTimeout(() => {
+          if (!isFinished) {
+            console.log(`🔄 RETRY EXECUTING: ${timeLabel} - Pelanggaran saat ini: ${violations}`);
+            takeAttendancePhoto(timeLabel);
+          }
+        }, 1000);
+      }
+      return;
+    }
+    
+    console.log(`📷 MENGAMBIL FOTO: Absensi ${attendancePhotoCount + 1}/25 di ${timeLabel}`);
+    console.log(`🔥 STATUS PELANGGARAN: ${violations}/3 - FOTO ABSENSI TETAP JALAN!`);
+    
+    const photoData = capturePhoto();
+    if (!photoData) {
+      console.log(`❌ GAGAL CAPTURE: Foto ${timeLabel} gagal, mencoba lagi...`);
+      // Retry capture after short delay
+      setTimeout(() => {
+        if (!isFinished) {
+          console.log(`🔄 RETRY CAPTURE: ${timeLabel} - Pelanggaran: ${violations}`);
+          const retryPhoto = capturePhoto();
+          if (retryPhoto) {
+            console.log(`✅ RETRY BERHASIL: Foto ${timeLabel} berhasil (retry) - Pelanggaran: ${violations}`);
+            saveAttendancePhoto(retryPhoto, timeLabel);
+          }
+        }
+      }, 500);
+      return;
+    }
+    
+    console.log(`✅ FOTO BERHASIL: ${timeLabel} - Meskipun ada ${violations} pelanggaran!`);
+    saveAttendancePhoto(photoData, timeLabel);
+  };
+
+  // Independent save function for attendance photos
+  const saveIndependentAttendancePhoto = async (photoData: string, timeLabel: string, photoNumber: number) => {
+    try {
+      const attendanceData = {
+        [`attendanceSnapshot_${photoNumber}`]: {
+          imageData: photoData,
+          timestamp: new Date().toISOString(),
+          timeLabel: timeLabel,
+          type: 'attendance'
+        }
+      };
+      
+      await updateDoc(sessionDocRef, attendanceData);
+      console.log(`✅ SAVED SUCCESS: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
+    } catch (error) {
+      console.error(`❌ SAVE FAILED: Foto absensi ${timeLabel}:`, error);
+      // Retry save after delay
+      setTimeout(async () => {
+        try {
+          const retryData = {
+            [`attendanceSnapshot_${photoNumber}`]: {
+              imageData: photoData,
+              timestamp: new Date().toISOString(),
+              timeLabel: timeLabel,
+              type: 'attendance'
+            }
+          };
+          await updateDoc(sessionDocRef, retryData);
+          console.log(`✅ RETRY SAVE SUCCESS: Foto absensi ${photoNumber}/25 tersimpan (retry)`);
+        } catch (retryError) {
+          console.error(`❌ RETRY SAVE FAILED: ${timeLabel}:`, retryError);
+        }
+      }, 2000);
+    }
+  };
+
+  // Separate function to save attendance photo
+  const saveAttendancePhoto = async (photoData: string, timeLabel: string) => {
+    const currentCount = attendancePhotoCount + 1;
+    
+    try {
+      const attendanceData = {
+        [`attendanceSnapshot_${currentCount}`]: {
+          imageData: photoData,
+          timestamp: new Date().toISOString(),
+          timeLabel: timeLabel,
+          type: 'attendance'
+        }
+      };
+      
+      await updateDoc(sessionDocRef, attendanceData);
+      console.log(`✅ TERSIMPAN: Foto absensi ${currentCount}/25 berhasil disimpan di ${timeLabel}`);
+      console.log(`🔥 KONFIRMASI: ${violations} pelanggaran - FOTO ABSENSI TIDAK TERPENGARUH!`);
+      console.log(`📊 PROGRESS: ${currentCount}/25 foto absensi telah diambil`);
+    } catch (error) {
+      console.error(`❌ GAGAL SIMPAN: Foto absensi ${timeLabel}:`, error);
+      // Retry save
+      setTimeout(() => {
+        updateDoc(sessionDocRef, {
+          [`attendanceSnapshot_${currentCount}`]: {
+            imageData: photoData,
+            timestamp: new Date().toISOString(),
+            timeLabel: timeLabel,
+            type: 'attendance'
+          }
+        }).then(() => {
+          console.log(`✅ RETRY SIMPAN BERHASIL: Foto ${timeLabel} tersimpan (retry)`);
+        }).catch(retryError => {
+          console.error(`❌ RETRY GAGAL: ${timeLabel}:`, retryError);
+        });
+      }, 1000);
+    }
+  };
+  
   useEffect(() => {
     // Check fullscreen support
     const checkFullscreenSupport = () => {
@@ -344,14 +469,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     fetchQuestions();
   }, [exam.id]);
-
-  // Start attendance system when camera is ready and exam is loaded
-  useEffect(() => {
-    if (isCameraReady && !isLoading && questions.length > 0 && !attendanceSystemStarted.current && !isFinished) {
-      console.log("🎯 KONDISI TERPENUHI: Memulai sistem foto absensi...");
-      startAttendancePhotoSystem();
-    }
-  }, [isCameraReady, isLoading, questions.length, isFinished]);
 
   // Simple photo capture function
   const capturePhoto = () => {
