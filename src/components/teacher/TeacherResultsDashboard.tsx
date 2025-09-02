@@ -13,6 +13,9 @@ interface Session {
   id: string;
   studentInfo: {
     name: string;
+    nim: string;
+    major: string;
+    className: string;
   };
   status: string;
   violations: number;
@@ -29,8 +32,14 @@ interface TeacherResultsDashboardProps {
 const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navigateTo, navigateBack, appState }) => {
   const { exam, parentExam } = appState;
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterKelas, setFilterKelas] = useState('');
+  const [filterJurusan, setFilterJurusan] = useState('');
+  const [availableKelas, setAvailableKelas] = useState<string[]>([]);
+  const [availableJurusan, setAvailableJurusan] = useState<string[]>([]);
 
   const handleBackNavigation = () => {
     navigateBack();
@@ -46,12 +55,57 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     const unsub = onSnapshot(sessionsRef, snapshot => {
-      setSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session)));
+      const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
+      setSessions(sessionsData);
+      
+      // Extract unique kelas and jurusan for filter options
+      const kelasSet = new Set<string>();
+      const jurusanSet = new Set<string>();
+      
+      sessionsData.forEach(session => {
+        if (session.studentInfo.className) kelasSet.add(session.studentInfo.className);
+        if (session.studentInfo.major) jurusanSet.add(session.studentInfo.major);
+      });
+      
+      setAvailableKelas(Array.from(kelasSet).sort());
+      setAvailableJurusan(Array.from(jurusanSet).sort());
     });
     
     return () => unsub();
   }, [exam?.id]);
 
+  // Filter and search logic
+  useEffect(() => {
+    let filtered = sessions;
+    
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(session => {
+        const name = (session.studentInfo.name || session.studentInfo.fullName || '').toLowerCase();
+        const nim = (session.studentInfo.nim || '').toLowerCase();
+        const major = (session.studentInfo.major || '').toLowerCase();
+        const className = (session.studentInfo.className || '').toLowerCase();
+        
+        return name.includes(search) || 
+               nim.includes(search) || 
+               major.includes(search) || 
+               className.includes(search);
+      });
+    }
+    
+    // Apply kelas filter
+    if (filterKelas) {
+      filtered = filtered.filter(session => session.studentInfo.className === filterKelas);
+    }
+    
+    // Apply jurusan filter
+    if (filterJurusan) {
+      filtered = filtered.filter(session => session.studentInfo.major === filterJurusan);
+    }
+    
+    setFilteredSessions(filtered);
+  }, [sessions, searchTerm, filterKelas, filterJurusan]);
   const calculateTotalScore = (session: Session) => {
     const mcScore = session.finalScore || 0;
     const mcQuestionCount = questions.filter(q => q.type === 'mc').length;
@@ -74,6 +128,9 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   };
 
   const downloadResultsPDF = () => {
+    // Use filtered sessions instead of all sessions
+    const sessionsToExport = filteredSessions;
+    
     const doc = new jsPDF();
     
     // Add title
@@ -84,6 +141,31 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     doc.setFontSize(12);
     doc.text(`Kode Ujian: ${exam.code}`, 14, 32);
     doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 14, 42);
+    
+    // Add filter info if any filters are applied
+    let yPos = 52;
+    if (searchTerm || filterKelas || filterJurusan) {
+      doc.setFontSize(10);
+      doc.text('Filter yang diterapkan:', 14, yPos);
+      yPos += 6;
+      
+      if (searchTerm) {
+        doc.text(`- Pencarian: "${searchTerm}"`, 14, yPos);
+        yPos += 4;
+      }
+      if (filterKelas) {
+        doc.text(`- Kelas: ${filterKelas}`, 14, yPos);
+        yPos += 4;
+      }
+      if (filterJurusan) {
+        doc.text(`- Jurusan: ${filterJurusan}`, 14, yPos);
+        yPos += 4;
+      }
+      yPos += 4;
+    }
+    
+    doc.text(`Total Siswa: ${sessionsToExport.length}`, 14, yPos);
+    yPos += 10;
     
     // Helper function to truncate text if too long
     const truncateText = (text: string, maxLength: number) => {
@@ -97,7 +179,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     // Add table headers
     const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Akhir'];
-    let yPosition = 52;
+    let yPosition = yPos;
     
     // Draw header background
     doc.setFillColor(240, 240, 240);
@@ -147,9 +229,9 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     doc.setFont(undefined, 'normal');
     doc.setFontSize(9);
     
-    sessions.forEach((session, sessionIndex) => {
+    sessionsToExport.forEach((session, sessionIndex) => {
       // Prepare row data with text wrapping for name
-      const studentName = session.studentInfo.name || session.studentInfo.fullName || 'N/A';
+      const studentName = session.studentInfo.name || 'N/A';
       const nameLines = wrapText(studentName, colWidths[1] - 2, 9);
       const rowHeight = Math.max(12, nameLines.length * 4 + 4);
       
@@ -195,7 +277,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         doc.setFontSize(9);
         
         // Recalculate row height for new page
-        const newNameLines = wrapText(session.studentInfo.name || '', colWidths[1] - 2, 9);
+        const newNameLines = wrapText(session.studentInfo.name || 'N/A', colWidths[1] - 2, 9);
         const newRowHeight = Math.max(12, newNameLines.length * 4 + 4);
         
         // Redraw current row background if needed
@@ -234,7 +316,8 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     }
     
     // Save the PDF
-    doc.save(`Hasil_Ujian_${exam.code}_${new Date().toISOString().split('T')[0]}.pdf`);
+    const filterSuffix = (searchTerm || filterKelas || filterJurusan) ? '_filtered' : '';
+    doc.save(`Hasil_Ujian_${exam.code}_${new Date().toISOString().split('T')[0]}${filterSuffix}.pdf`);
   };
   if (selectedSession) {
     return (
@@ -242,6 +325,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         session={selectedSession} 
         questions={questions}
         examId={exam.id}
+        navigateBack={handleBackNavigation}
         onBack={() => setSelectedSession(null)}
       />
     );
@@ -264,7 +348,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         <h2 className="text-3xl font-bold">Hasil Ujian: {exam.name}</h2>
         <button 
           onClick={downloadResultsPDF}
-          disabled={sessions.length === 0}
+          disabled={filteredSessions.length === 0}
           className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -272,6 +356,95 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
           </svg>
           Download PDF
         </button>
+      </div>
+      
+      {/* Search and Filter Section */}
+      <div className="mb-6 bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h3 className="text-lg font-bold mb-4">🔍 Filter & Pencarian</h3>
+        
+        {/* Search Bar */}
+        <div className="mb-4">
+          <label htmlFor="search" className="block text-sm font-medium text-gray-300 mb-2">
+            Cari Siswa (Nama, NIM, Kelas, atau Jurusan)
+          </label>
+          <input
+            id="search"
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Ketik nama, NIM, kelas, atau jurusan siswa..."
+            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+        
+        {/* Filter Dropdowns */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="filterKelas" className="block text-sm font-medium text-gray-300 mb-2">
+              Filter Kelas
+            </label>
+            <select
+              id="filterKelas"
+              value={filterKelas}
+              onChange={(e) => setFilterKelas(e.target.value)}
+              className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Semua Kelas</option>
+              {availableKelas.map(kelas => (
+                <option key={kelas} value={kelas}>{kelas}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label htmlFor="filterJurusan" className="block text-sm font-medium text-gray-300 mb-2">
+              Filter Jurusan
+            </label>
+            <select
+              id="filterJurusan"
+              value={filterJurusan}
+              onChange={(e) => setFilterJurusan(e.target.value)}
+              className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Semua Jurusan</option>
+              {availableJurusan.map(jurusan => (
+                <option key={jurusan} value={jurusan}>{jurusan}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setFilterKelas('');
+                setFilterJurusan('');
+              }}
+              className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg"
+            >
+              Reset Filter
+            </button>
+          </div>
+        </div>
+        
+        {/* Filter Summary */}
+        <div className="mt-4 flex justify-between items-center text-sm text-gray-400">
+          <div>
+            Menampilkan {filteredSessions.length} dari {sessions.length} siswa
+            {(searchTerm || filterKelas || filterJurusan) && (
+              <span className="ml-2 text-blue-400">
+                (dengan filter)
+              </span>
+            )}
+          </div>
+          {(searchTerm || filterKelas || filterJurusan) && (
+            <div className="text-xs">
+              {searchTerm && <span className="bg-blue-600 px-2 py-1 rounded mr-1">Cari: "{searchTerm}"</span>}
+              {filterKelas && <span className="bg-green-600 px-2 py-1 rounded mr-1">Kelas: {filterKelas}</span>}
+              {filterJurusan && <span className="bg-purple-600 px-2 py-1 rounded mr-1">Jurusan: {filterJurusan}</span>}
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="mt-6 bg-gray-800 rounded-lg shadow-xl overflow-x-auto">
@@ -291,16 +464,19 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             </tr>
           </thead>
           <tbody>
-            {sessions.length === 0 ? (
+            {filteredSessions.length === 0 ? (
               <tr>
                 <td colSpan={10} className="text-center p-8 text-gray-400">
-                  Belum ada siswa yang menyelesaikan ujian.
+                  {sessions.length === 0 
+                    ? "Belum ada siswa yang menyelesaikan ujian."
+                    : "Tidak ada siswa yang sesuai dengan filter."
+                  }
                 </td>
               </tr>
             ) : (
-              sessions.map(session => (
+              filteredSessions.map(session => (
                 <tr key={session.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4 font-semibold">{session.studentInfo.name || session.studentInfo.fullName || 'N/A'}</td>
+                  <td className="p-4 font-semibold">{session.studentInfo.name || 'N/A'}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.nim}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.className}</td>
