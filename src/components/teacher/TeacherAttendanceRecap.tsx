@@ -79,7 +79,7 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
         return name.includes(search) || 
                nim.includes(search) || 
                major.includes(search) || 
-        studentName: studentName || 'Siswa'
+               className.includes(search);
       });
       setFilteredSessions(filtered);
     }
