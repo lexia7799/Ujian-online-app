@@ -21,6 +21,7 @@ interface Session {
   violations: number;
   finalScore?: number;
   essayScores?: { [key: string]: number };
+  scoreReduction?: number;
 }
 
 interface TeacherResultsDashboardProps {
@@ -46,6 +47,10 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   const [currentPage, setCurrentPage] = useState(1);
   const [totalSessions, setTotalSessions] = useState(0);
   const SESSIONS_PER_PAGE = 50;
+  const [editingScoreSession, setEditingScoreSession] = useState<Session | null>(null);
+  const [scoreReduction, setScoreReduction] = useState(0);
+  const [isUpdatingScore, setIsUpdatingScore] = useState(false);
+  const [scoreError, setScoreError] = useState('');
 
   const handleBackNavigation = () => {
     navigateBack();
@@ -165,6 +170,9 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     const mcQuestionCount = questions.filter(q => q.type === 'mc').length;
     const essayQuestions = questions.filter(q => q.type === 'essay');
     
+    // Apply score reduction
+    const reduction = session.scoreReduction || 0;
+    
     if (essayQuestions.length === 0) return mcScore.toFixed(2);
     
     let totalEssayScore = 0;
@@ -175,10 +183,69 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     const avgEssayScore = essayQuestions.length > 0 ? totalEssayScore / essayQuestions.length : 0;
     
     if (mcQuestionCount > 0) {
-      return ((mcScore * 0.5) + (avgEssayScore * 0.5)).toFixed(2);
+      const baseScore = (mcScore * 0.5) + (avgEssayScore * 0.5);
+      const finalScore = Math.max(0, baseScore - reduction);
+      return finalScore.toFixed(2);
     }
     
-    return avgEssayScore.toFixed(2);
+    const finalScore = Math.max(0, avgEssayScore - reduction);
+    return finalScore.toFixed(2);
+  };
+
+  const handleEditScore = (session: Session) => {
+    setEditingScoreSession(session);
+    setScoreReduction(session.scoreReduction || 0);
+    setScoreError('');
+  };
+
+  const handleSaveScoreReduction = async () => {
+    if (!editingScoreSession) return;
+    
+    setIsUpdatingScore(true);
+    setScoreError('');
+    
+    try {
+      // Validate score reduction
+      if (scoreReduction < 0 || scoreReduction > 100) {
+        setScoreError('Pengurangan nilai harus antara 0-100');
+        setIsUpdatingScore(false);
+        return;
+      }
+      
+      // Calculate if final score would be negative
+      const currentTotalScore = parseFloat(calculateTotalScore(editingScoreSession));
+      const originalScore = currentTotalScore + (editingScoreSession.scoreReduction || 0);
+      const newFinalScore = originalScore - scoreReduction;
+      
+      if (newFinalScore < 0) {
+        setScoreError(`Pengurangan terlalu besar. Nilai akhir akan menjadi ${newFinalScore.toFixed(2)}. Maksimal pengurangan: ${originalScore.toFixed(2)}`);
+        setIsUpdatingScore(false);
+        return;
+      }
+      
+      // Update session with score reduction
+      const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, editingScoreSession.id);
+      await updateDoc(sessionDocRef, { 
+        scoreReduction: scoreReduction 
+      });
+      
+      // Update local state
+      setSessions(prev => prev.map(session => 
+        session.id === editingScoreSession.id 
+          ? { ...session, scoreReduction: scoreReduction }
+          : session
+      ));
+      
+      setEditingScoreSession(null);
+      setScoreReduction(0);
+      alert('Pengurangan nilai berhasil disimpan!');
+      
+    } catch (error) {
+      console.error('Error updating score reduction:', error);
+      setScoreError('Gagal menyimpan pengurangan nilai. Silakan coba lagi.');
+    } finally {
+      setIsUpdatingScore(false);
+    }
   };
 
   const downloadResultsPDF = () => {
@@ -506,6 +573,144 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         </div>
       </div>
       
+      {/* Score Reduction Modal */}
+      {editingScoreSession && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">Edit Pengurangan Nilai</h3>
+              <button
+                onClick={() => {
+                  setEditingScoreSession(null);
+                  setScoreReduction(0);
+                  setScoreError('');
+                }}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <h4 className="font-bold text-lg text-white mb-2">{editingScoreSession.studentInfo.name}</h4>
+                <p className="text-gray-300 text-sm">NIM: {editingScoreSession.studentInfo.nim}</p>
+                <p className="text-gray-300 text-sm">Kelas: {editingScoreSession.studentInfo.className}</p>
+              </div>
+              
+              <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
+                <h5 className="text-blue-300 font-bold mb-2">📊 Informasi Nilai</h5>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-blue-200">Nilai PG:</span>
+                    <span className="text-white font-bold">{editingScoreSession.finalScore?.toFixed(2) || 'N/A'}</span>
+                  </div>
+                  {(() => {
+                    const essayQuestions = questions.filter(q => q.type === 'essay');
+                    if (essayQuestions.length > 0) {
+                      let essayScore = 'Belum dinilai';
+                      if (editingScoreSession.essayScores) {
+                        const totalEssayScore = Object.values(editingScoreSession.essayScores).reduce((sum, s) => sum + s, 0);
+                        const avgEssayScore = totalEssayScore / essayQuestions.length;
+                        essayScore = avgEssayScore.toFixed(2);
+                      }
+                      return (
+                        <div className="flex justify-between">
+                          <span className="text-blue-200">Nilai Essay:</span>
+                          <span className="text-white font-bold">{essayScore}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <div className="flex justify-between">
+                    <span className="text-blue-200">Pengurangan Saat Ini:</span>
+                    <span className="text-red-400 font-bold">-{editingScoreSession.scoreReduction || 0}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-blue-600 pt-2">
+                    <span className="text-blue-200">Nilai Akhir Saat Ini:</span>
+                    <span className="text-green-400 font-bold">{calculateTotalScore(editingScoreSession)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Pengurangan Nilai (0-100)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={scoreReduction}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    setScoreReduction(Math.max(0, Math.min(100, value)));
+                    setScoreError('');
+                  }}
+                  className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Masukkan nilai pengurangan"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Nilai akan dikurangi dari total nilai akhir
+                </p>
+              </div>
+              
+              {/* Preview New Score */}
+              {scoreReduction > 0 && (
+                <div className="bg-yellow-900 border border-yellow-500 p-3 rounded-lg">
+                  <h5 className="text-yellow-300 font-bold mb-2">🔍 Preview Nilai Baru</h5>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-yellow-200">Nilai Sebelum Pengurangan:</span>
+                      <span className="text-white font-bold">
+                        {(parseFloat(calculateTotalScore(editingScoreSession)) + (editingScoreSession.scoreReduction || 0)).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-yellow-200">Pengurangan:</span>
+                      <span className="text-red-400 font-bold">-{scoreReduction}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-yellow-600 pt-1">
+                      <span className="text-yellow-200">Nilai Akhir Baru:</span>
+                      <span className="text-green-400 font-bold">
+                        {Math.max(0, (parseFloat(calculateTotalScore(editingScoreSession)) + (editingScoreSession.scoreReduction || 0)) - scoreReduction).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {scoreError && (
+                <div className="bg-red-900 border border-red-500 p-3 rounded-md">
+                  <p className="text-red-200 text-sm">{scoreError}</p>
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-4 pt-4">
+                <button
+                  onClick={() => {
+                    setEditingScoreSession(null);
+                    setScoreReduction(0);
+                    setScoreError('');
+                  }}
+                  className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSaveScoreReduction}
+                  disabled={isUpdatingScore}
+                  className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-orange-400"
+                >
+                  {isUpdatingScore ? 'Menyimpan...' : 'Simpan Pengurangan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="mt-6 bg-gray-800 rounded-lg shadow-xl overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-gray-700">
@@ -519,13 +724,14 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
               <th className="p-4">Nilai PG</th>
               <th className="p-4">Nilai Essay</th>
               <th className="p-4">Nilai Akhir</th>
+              <th className="p-4">Pengurangan</th>
               <th className="p-4">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {filteredSessions.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center p-8 text-gray-400">
+                <td colSpan={11} className="text-center p-8 text-gray-400">
                   {sessions.length === 0 
                     ? "Belum ada siswa yang menyelesaikan ujian."
                     : "Tidak ada siswa yang sesuai dengan filter."
@@ -556,13 +762,30 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
                   </td>
                   <td className="p-4 font-bold">{calculateTotalScore(session)}</td>
                   <td className="p-4">
-                    <button 
-                      onClick={() => setSelectedSession(session)} 
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-1 px-3 rounded-lg" 
-                      disabled={questions.filter(q => q.type === 'essay').length === 0}
-                    >
-                      Nilai Esai
-                    </button>
+                    <span className={`px-2 py-1 text-xs rounded ${
+                      (session.scoreReduction || 0) > 0 
+                        ? 'bg-red-600 text-white' 
+                        : 'bg-gray-600 text-gray-300'
+                    }`}>
+                      -{session.scoreReduction || 0}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => setSelectedSession(session)} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded" 
+                        disabled={questions.filter(q => q.type === 'essay').length === 0}
+                      >
+                        Nilai Esai
+                      </button>
+                      <button 
+                        onClick={() => handleEditScore(session)} 
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-1 px-2 rounded"
+                      >
+                        Edit Nilai
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
