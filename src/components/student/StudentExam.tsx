@@ -630,7 +630,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     // Monitor screen changes
     const handleScreenChange = () => {
-      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight) {
+      // Only trigger violation if exam has actually started and questions are loaded
+      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight && questions.length > 0 && timeLeft > 0) {
         handleViolation("Screen Configuration Change");
       }
     };
