@@ -1017,8 +1017,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         {violations >= 3 && (
-          <div className="text-xs text-red-400 mt-1 font-bold">
-            🚨 Absensi Berhenti!
+          <div className="text-xs text-red-400 mt-1">
+            ❌ Absensi Berhenti!
           </div>
         )}
       </div>
