@@ -140,6 +140,8 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
             <li>• Username harus unik dan tidak boleh sama dengan yang sudah ada</li>
             <li>• Nomor WhatsApp akan ditampilkan jika terjadi konflik NIM/NIS</li>
             <li>• Password minimal 6 karakter</li>
+            <li>• <strong>Kelas:</strong> Gunakan singkatan seperti A, B, C, atau TI-A, SI-B</li>
+            <li>• <strong>Jurusan:</strong> Gunakan singkatan seperti RPL, TKJ, MM, TI, SI</li>
             <li>• Pastikan semua data yang dimasukkan benar dan valid</li>
           </ul>
         </div>
