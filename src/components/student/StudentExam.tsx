@@ -559,12 +559,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
         handleViolation("Exited Fullscreen");
-        // Auto re-enter fullscreen after violation
-        setTimeout(() => {
-          if (!isFinished) {
-            enterFullscreen();
-          }
-        }, 1000);
       }
     };
     
@@ -811,13 +805,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         setShowAttendanceNotification(true);
         setTimeout(() => setShowAttendanceNotification(false), 3000);
       }, 3500);
-      
-      // Auto re-enter fullscreen after violation
-      setTimeout(() => {
-        if (!isFinished && !isInFullscreen()) {
-          enterFullscreen();
-        }
-      }, 1500);
     }
   };
 
