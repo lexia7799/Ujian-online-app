@@ -40,7 +40,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     return diff > 0 ? Math.round(diff) : 0;
   };
   
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft());
   const [violations, setViolations] = useState(0);
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -66,6 +66,38 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const maxCameraRetries = 5;
 
   useEffect(() => {
+    // Validate exam data first
+    if (!exam || !exam.endTime) {
+      console.error("Missing exam data:", exam);
+      return;
+    }
+
+    // Check if exam time is valid
+    const now = new Date();
+    const endTime = new Date(exam.endTime);
+    const startTime = new Date(exam.startTime);
+    
+    console.log("Exam time validation:", {
+      now: now.toISOString(),
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      timeLeft: Math.floor((endTime.getTime() - now.getTime()) / 1000)
+    });
+    
+    // If exam has already ended, don't start
+    if (now > endTime) {
+      console.log("Exam has already ended");
+      setIsFinished(true);
+      setFinalScore(0);
+      return;
+    }
+    
+    // If exam hasn't started yet
+    if (now < startTime) {
+      console.log("Exam hasn't started yet");
+      return;
+    }
+
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
@@ -370,10 +402,18 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setIsFullscreenSupported(checkFullscreenSupport());
     
     const fetchQuestions = async () => {
+      if (!exam || !exam.id) {
+        console.error("Missing exam ID for fetching questions");
+        setIsLoading(false);
+        return;
+      }
+      
       try {
         const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
         const querySnapshot = await getDocs(questionsRef);
-        setQuestions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
+        const questionsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+        console.log("Loaded questions:", questionsData.length);
+        setQuestions(questionsData);
       } catch (error) {
         console.error("Gagal memuat soal:", error);
       } finally {
@@ -583,14 +623,28 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     const devToolsInterval = setInterval(checkDevTools, 1000);
     
+    // Initialize timer with proper validation
+    const initialTimeLeft = calculateTimeLeft();
+    console.log("Initial time left:", initialTimeLeft, "seconds");
+    
+    if (initialTimeLeft <= 0) {
+      console.log("Time already expired, finishing exam");
+      finishExam("Waktu Habis");
+      return;
+    }
+    
     const timer = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
+        const newTimeLeft = prev - 1;
+        console.log("Timer tick:", newTimeLeft, "seconds left");
+        
+        if (newTimeLeft <= 0) {
           clearInterval(timer);
+          console.log("Timer expired, finishing exam");
           finishExam("Waktu Habis");
           return 0;
         }
-        return prev - 1;
+        return newTimeLeft;
       });
     }, 1000);
     
@@ -803,6 +857,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
   
   const finishExam = async (reason = "Selesai") => {
+    console.log("finishExam called with reason:", reason);
+    
     if (isFinished) return;
     
     // Take final attendance photo before finishing
@@ -861,7 +917,32 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   if (isLoading) {
-    return <div className="text-center p-8">Memuat soal ujian...</div>;
+    return (
+      <div className="text-center p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+        <p>Memuat soal ujian...</p>
+      </div>
+    );
+  }
+  
+  // Add validation for exam data
+  if (!exam || !exam.id || !exam.endTime) {
+    return (
+      <div className="text-center h-screen flex flex-col justify-center items-center -mt-16">
+        <div className="bg-red-800 p-8 rounded-lg shadow-xl max-w-md">
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Data Ujian Tidak Valid</h2>
+          <p className="text-gray-300 mb-4">
+            Data ujian tidak lengkap atau tidak valid. Silakan coba lagi.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Muat Ulang
+          </button>
+        </div>
+      </div>
+    );
   }
   
   if (!isFullscreenSupported) {
