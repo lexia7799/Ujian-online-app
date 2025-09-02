@@ -66,6 +66,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const attendanceIntervalId = useRef<NodeJS.Timeout | null>(null);
   const attendanceSchedule = useRef([1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120]);
   const photosTaken = useRef(new Set<number>());
+  const attendancePhotoCountRef = useRef(0);
   const attendanceSystemStarted = useRef(false);
 
   useEffect(() => {
@@ -157,6 +158,23 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       attendanceSystemStarted.current = true;
       startAttendancePhotoSystem();
     }
+    
+    return () => {
+      // Cleanup camera
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      // Cleanup audio context
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+      
+      // Cleanup attendance interval
+      if (attendanceIntervalId.current) {
+        clearInterval(attendanceIntervalId.current);
+      }
+    };
   }, []);
 
   // Function to manually restart camera
@@ -247,7 +265,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     console.log("📅 JADWAL: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120 menit (25 foto total)");
     
     setAttendanceScheduleActive(true);
-    attendanceSystemActive.current = true;
+    setAttendanceSystemActive(true);
     
     // Clear any existing interval
     if (attendanceIntervalId.current) {
@@ -261,7 +279,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         return;
       }
       
-      if (!attendanceSystemActive.current) {
+      if (!attendanceSystemActive) {
         console.log("❌ INTERVAL STOP: Sistem tidak aktif");
         return;
       }
@@ -345,7 +363,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return;
     }
     
-    console.log(`📷 MENGAMBIL FOTO: Absensi ${attendancePhotoCount + 1}/25 di ${timeLabel}`);
+    console.log(`📷 MENGAMBIL FOTO: Absensi ${attendancePhotoCountRef.current + 1}/25 di ${timeLabel}`);
     console.log(`🔥 STATUS PELANGGARAN: ${violations}/3 - FOTO ABSENSI TETAP JALAN!`);
     
     const photoData = capturePhoto();
@@ -407,7 +425,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Separate function to save attendance photo
   const saveAttendancePhoto = async (photoData: string, timeLabel: string) => {
-    const currentCount = attendancePhotoCount + 1;
+    attendancePhotoCountRef.current += 1;
+    const currentCount = attendancePhotoCountRef.current;
     
     try {
       const attendanceData = {
@@ -809,7 +828,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     if (newViolations >= 3) {
       // Stop attendance system ONLY on disqualification (3 violations)
       console.log(`🚨 DISKUALIFIKASI: Menghentikan semua sistem karena 3 pelanggaran!`);
-      attendanceSystemActive.current = false;
+      setAttendanceSystemActive(false);
       setAttendanceScheduleActive(false);
       if (attendanceIntervalId.current) {
         clearInterval(attendanceIntervalId.current);
@@ -906,7 +925,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     console.log(`🏁 MENYELESAIKAN UJIAN: ${reason}`);
     console.log(`📊 FINAL STATUS: Foto absensi diambil ${attendancePhotoCount}/25`);
     setIsFinished(true);
-    attendanceSystemActive.current = false;
+    setAttendanceSystemActive(false);
     setAttendanceScheduleActive(false);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
@@ -1169,8 +1188,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div className="text-xs text-gray-400">
           Foto Absensi: {attendancePhotoCount}/25
         </div>
-        <div className={`text-xs ${attendanceSystemStarted.current && attendanceSystemActive.current ? 'text-cyan-400' : 'text-red-400'}`}>
-          Sistem: {attendanceSystemStarted.current && attendanceSystemActive.current ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
+        <div className={`text-xs ${attendanceSystemStarted.current && attendanceSystemActive ? 'text-cyan-400' : 'text-red-400'}`}>
+          Sistem: {attendanceSystemStarted.current && attendanceSystemActive ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
         </div>
         {lastAttendanceTime && (
           <div className="text-xs text-cyan-400">
