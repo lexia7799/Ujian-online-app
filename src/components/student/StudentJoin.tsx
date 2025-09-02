@@ -26,7 +26,7 @@ const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, can
     }
     
     const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
-    const q = query(examsRef, where("code", "==", examCode.toUpperCase()));
+    const q = query(examsRef, where("code", "==", examCode.toUpperCase()), limit(1));
     
     try {
       const querySnapshot = await getDocs(q);
@@ -36,11 +36,12 @@ const StudentJoin: React.FC<StudentJoinProps> = ({ navigateTo, navigateBack, can
         const examDoc = querySnapshot.docs[0];
         const examData = { id: examDoc.id, ...examDoc.data() };
         
-        // Check if student has already completed this exam
+        // Optimized duplicate check
         if (user && user.id) {
           const sessionsQuery = query(
             collection(db, `artifacts/${appId}/public/data/exams/${examDoc.id}/sessions`),
-            where('studentId', '==', user.id)
+            where('studentId', '==', user.id),
+            limit(3)
           );
           
           const sessionsSnapshot = await getDocs(sessionsQuery);

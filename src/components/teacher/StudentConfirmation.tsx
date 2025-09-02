@@ -35,7 +35,8 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
     if (!exam?.id) return;
     
     const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`);
-    const unsubscribe = onSnapshot(applicationsRef, (snapshot) => {
+    // Limit applications for performance
+    const unsubscribe = onSnapshot(query(applicationsRef, limit(200)), (snapshot) => {
       const apps = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),

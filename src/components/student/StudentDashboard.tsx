@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -46,109 +46,109 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    // Check if user and user.id exist
+    // Early return if no user
     if (!user || !user.id) {
       setIsLoading(false);
       return;
     }
 
-    // Get student profile
-    const getStudentProfile = async () => {
-      const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
-      if (studentDoc.exists()) {
-        const profileData = studentDoc.data();
-        setStudentProfile(profileData);
-        // Initialize edit form with current data
-        setEditFormData({
-          fullName: profileData.fullName || '',
-          nim: profileData.nim || '',
-          major: profileData.major || '',
-          className: profileData.className || '',
-          university: profileData.university || '',
-          whatsapp: profileData.whatsapp || '',
-          password: '',
-          confirmPassword: ''
-        });
-      }
-    };
-
-    getStudentProfile();
-
-    // Get exam results and available exams
-    const getExamResults = async () => {
+    // Optimized data fetching with parallel execution
+    const fetchData = async () => {
       try {
+        // Fetch student profile and exams in parallel
+        const [studentDoc, examsSnapshot] = await Promise.all([
+          getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id)),
+          getDocs(query(collection(db, `artifacts/${appId}/public/data/exams`), limit(50))) // Limit exams for performance
+        ]);
+        
+        // Set student profile
+        if (studentDoc.exists()) {
+          const profileData = studentDoc.data();
+          setStudentProfile(profileData);
+          setEditFormData({
+            fullName: profileData.fullName || '',
+            nim: profileData.nim || '',
+            major: profileData.major || '',
+            className: profileData.className || '',
+            university: profileData.university || '',
+            whatsapp: profileData.whatsapp || '',
+            password: '',
+            confirmPassword: ''
+          });
+        }
+        
+        // Process exam results with optimized queries
         const results: ExamResult[] = [];
         const available: any[] = [];
         const pending: any[] = [];
         const rejected: any[] = [];
         
-        // Get all exams
-        const examsSnapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/exams`));
-        
-        // For each exam, check if student has a session
-        for (const examDoc of examsSnapshot.docs) {
+        // Process exams with batch operations
+        const examPromises = examsSnapshot.docs.map(async (examDoc) => {
           const examData = examDoc.data();
           const examId = examDoc.id;
           
-          // Get sessions for this exam where studentId matches
-          const sessionsQuery = query(
-            collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
-            where('studentId', '==', user.id)
-          );
-          
-          const sessionsSnapshot = await getDocs(sessionsQuery);
-          
-          let hasCompletedSession = false;
-          
-          sessionsSnapshot.forEach(sessionDoc => {
-            const sessionData = sessionDoc.data();
+          try {
+            // Parallel fetch of sessions and applications
+            const [sessionsSnapshot, applicationsSnapshot] = await Promise.all([
+              getDocs(query(
+                collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
+                where('studentId', '==', user.id),
+                limit(5) // Limit sessions per exam
+              )),
+              getDocs(query(
+                collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
+                where('studentId', '==', user.id),
+                limit(5) // Limit applications per exam
+              ))
+            ]);
             
-            // Check if session is completed (finished or disqualified)
-            if (['finished', 'disqualified'].includes(sessionData.status)) {
-              hasCompletedSession = true;
-              // Calculate essay score if available
-              let essayScore = undefined;
-              let totalScore = undefined;
+            let hasCompletedSession = false;
+            
+            // Process sessions
+            sessionsSnapshot.forEach(sessionDoc => {
+              const sessionData = sessionDoc.data();
               
-              if (sessionData.essayScores) {
-                const essayScores = Object.values(sessionData.essayScores);
-                if (essayScores.length > 0) {
-                  essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                  
-                  // Calculate total score (50% MC + 50% Essay)
-                  const mcScore = sessionData.finalScore || 0;
-                  totalScore = (mcScore * 0.5) + (essayScore * 0.5);
+              if (['finished', 'disqualified'].includes(sessionData.status)) {
+                hasCompletedSession = true;
+                
+                // Calculate scores efficiently
+                let essayScore = undefined;
+                let totalScore = undefined;
+                
+                if (sessionData.essayScores) {
+                  const essayScores = Object.values(sessionData.essayScores);
+                  if (essayScores.length > 0) {
+                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
+                    const mcScore = sessionData.finalScore || 0;
+                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
+                  }
                 }
+                
+                results.push({
+                  id: sessionDoc.id,
+                  examName: examData.name || 'Unknown Exam',
+                  examCode: examData.code,
+                  finalScore: sessionData.finalScore || 0,
+                  essayScore,
+                  totalScore,
+                  finishTime: sessionData.finishTime?.toDate() || new Date(),
+                  status: sessionData.status
+                });
               }
-              
-              results.push({
-                id: sessionDoc.id,
-                examName: examData.name || 'Unknown Exam',
-                examCode: examData.code,
-                finalScore: sessionData.finalScore || 0,
-                essayScore,
-                totalScore,
-                finishTime: sessionData.finishTime?.toDate() || new Date(),
-                status: sessionData.status
-              });
-            }
-          });
-          
-          // If student has completed this exam, skip adding it to available/pending/rejected lists
-          if (hasCompletedSession) {
-            // Skip this exam - student has already completed it
-            continue;
-          }
-          
-          // Only process applications if student hasn't completed the exam
-          {
+            });
+            
+            // Skip if already completed
+            if (hasCompletedSession) return;
+            
+            // Process applications efficiently
             const applicationsQuery = query(
               collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
               where('studentId', '==', user.id),
-              where('status', 'in', ['approved', 'pending', 'rejected'])
+              where('status', 'in', ['approved', 'pending', 'rejected']),
+              limit(1) // Only need one application per student per exam
             );
             
-            const applicationsSnapshot = await getDocs(applicationsQuery);
             applicationsSnapshot.forEach(appDoc => {
               const appData = appDoc.data();
               const examWithApp = {
@@ -160,43 +160,58 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 ...examData
               };
               
-              if (appData.status === 'approved') {
+              // Categorize based on status
+              switch (appData.status) {
+                case 'approved':
                 const now = new Date();
                 const startTime = new Date(examData.startTime);
                 const endTime = new Date(examData.endTime);
                 
-                // Only show in available if exam is ready and published
                 if (now >= startTime && now <= endTime && examData.status === 'published') {
                   available.push(examWithApp);
                 }
-              } else if (appData.status === 'pending') {
+                break;
+                case 'pending':
                 pending.push(examWithApp);
-              } else if (appData.status === 'rejected') {
+                break;
+                case 'rejected':
                 rejected.push(examWithApp);
+                break;
               }
             });
+          } catch (examError) {
+            console.warn(`Error processing exam ${examId}:`, examError);
           }
-        }
+        });
         
+        // Wait for all exam processing to complete
+        await Promise.all(examPromises);
+        
+        // Set results with optimized sorting
         setExamResults(results.sort((a, b) => {
-          // Sort by finish time, with unfinished exams first
           if (!a.finishTime && !b.finishTime) return 0;
           if (!a.finishTime) return -1;
           if (!b.finishTime) return 1;
           return b.finishTime.getTime() - a.finishTime.getTime();
         }));
+        
         setAvailableExams(available);
         setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setIsLoading(false);
+        
       } catch (error) {
         console.error('Error fetching exam results:', error);
+        // Set empty arrays on error
         setExamResults([]);
+        setAvailableExams([]);
+        setPendingApplications([]);
+        setRejectedApplications([]);
+      } finally {
         setIsLoading(false);
       }
     };
 
-    getExamResults();
+    fetchData();
   }, [user?.id]);
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {

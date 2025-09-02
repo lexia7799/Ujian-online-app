@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
-import { collection, getDocs, query, where, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc, doc, getDoc, limit } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface StudentJoinExamProps {
@@ -30,7 +30,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
     try {
       // Find exam by code
       const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
-      const q = query(examsRef, where("code", "==", examCode.toUpperCase()));
+      const q = query(examsRef, where("code", "==", examCode.toUpperCase()), limit(1));
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
@@ -44,7 +44,7 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
 
       // Check if student has already taken this exam
       const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${examDoc.id}/sessions`);
-      const sessionsQuery = query(sessionsRef, where("studentId", "==", user.id));
+      const sessionsQuery = query(sessionsRef, where("studentId", "==", user.id), limit(5));
       const sessionsSnapshot = await getDocs(sessionsQuery);
       
       if (!sessionsSnapshot.empty) {

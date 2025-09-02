@@ -309,7 +309,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   useEffect(() => {
-    // Check fullscreen support
+    // Optimized initialization
     const checkFullscreenSupport = () => {
       const elem = document.documentElement;
       return !!(elem.requestFullscreen || 
@@ -322,8 +322,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     const fetchQuestions = async () => {
       try {
+        // Limit questions for faster loading
         const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
-        const querySnapshot = await getDocs(questionsRef);
+        const querySnapshot = await getDocs(query(questionsRef, limit(100)));
         setQuestions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
       } catch (error) {
         console.error("Gagal memuat soal:", error);

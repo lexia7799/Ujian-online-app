@@ -55,7 +55,8 @@ const TeacherProctoringDashboard: React.FC<TeacherProctoringDashboardProps> = ({
     if (!exam?.id) return;
     
     const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
-    const unsubSessions = onSnapshot(query(sessionsRef), (snapshot) => {
+    // Limit sessions for better performance
+    const unsubSessions = onSnapshot(query(sessionsRef, limit(100)), (snapshot) => {
       setSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session)));
     });
     

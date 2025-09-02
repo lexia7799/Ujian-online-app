@@ -44,7 +44,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     setInputPassword('');
     
     const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
-    const q = query(examsRef, where("code", "==", searchCode.toUpperCase()));
+    const q = query(examsRef, where("code", "==", searchCode.toUpperCase()), limit(1));
     
     try {
       const querySnapshot = await getDocs(q);

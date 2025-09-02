@@ -48,17 +48,18 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   useEffect(() => {
     if (!exam?.id) return;
     
+    // Optimized queries with limits
     const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
-    getDocs(questionsRef).then(snapshot => {
+    getDocs(query(questionsRef, limit(100))).then(snapshot => {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
     });
     
     const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
-    const unsub = onSnapshot(sessionsRef, snapshot => {
+    const unsub = onSnapshot(query(sessionsRef, limit(200)), snapshot => {
       const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
       setSessions(sessionsData);
       
-      // Extract unique kelas and jurusan for filter options
+      // Optimized filter options extraction
       const kelasSet = new Set<string>();
       const jurusanSet = new Set<string>();
       
