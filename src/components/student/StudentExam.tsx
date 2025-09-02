@@ -1286,6 +1286,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               <div className="text-xs text-gray-400">
                 Debug: {timeLeft}s left | Status: {isFinished ? 'Finished' : 'Active'} | Violations: {violations}/3
               </div>
+              <div className="text-xs text-gray-400">
+                Exam Started: {isExamStarted ? 'Yes' : 'No'} | Questions: {questions.length}
+              </div>
               <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
             </div>
           </div>
