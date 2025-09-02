@@ -30,7 +30,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     return diff > 0 ? Math.round(diff) : 0;
   };
   
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const initialTime = calculateTimeLeft();
+    console.log("Initial time left:", initialTime, "seconds");
+    return initialTime;
+  });
   const [violations, setViolations] = useState(0);
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -537,12 +541,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     const timer = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
+        const newTime = prev - 1;
+        console.log("Timer tick - Time left:", newTime, "seconds");
+        
+        if (newTime <= 0) {
           clearInterval(timer);
           finishExam("Waktu Habis");
           return 0;
         }
-        return prev - 1;
+        return newTime;
       });
     }, 1000);
     
@@ -745,6 +752,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
     
+    console.log("Finishing exam with reason:", reason);
+    
     // Capture final attendance photo before finishing
     const finalLabel = "Selesai";
     await captureAttendancePhoto(finalLabel);
@@ -792,12 +801,16 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
     
     setFinalScore(score);
+    console.log("Final score calculated:", score);
+    
     await updateDoc(sessionDocRef, { 
       status, 
       finishTime: new Date(), 
       finalScore: score, 
       answers 
     });
+    
+    console.log("Exam finished successfully");
   };
 
   if (isLoading) {

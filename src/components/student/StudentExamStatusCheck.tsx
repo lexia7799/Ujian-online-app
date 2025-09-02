@@ -16,6 +16,11 @@ const StudentExamStatusCheck: React.FC<StudentExamStatusCheckProps> = ({ navigat
       const startTime = new Date(exam.startTime);
       const endTime = new Date(exam.endTime);
 
+      console.log("Status check:");
+      console.log("Current time:", now.toISOString());
+      console.log("Exam start:", startTime.toISOString());
+      console.log("Exam end:", endTime.toISOString());
+      console.log("Exam status:", exam.status);
       if (exam.status !== 'published') {
         setStatusMessage(`Ujian "${exam.name}" belum dipublikasikan oleh dosen.`);
       } else if (now < startTime) {
@@ -23,6 +28,7 @@ const StudentExamStatusCheck: React.FC<StudentExamStatusCheckProps> = ({ navigat
       } else if (now > endTime) {
         setStatusMessage('Waktu untuk mengikuti ujian ini telah berakhir.');
       } else {
+        console.log("Exam is ready to start, navigating to precheck...");
         navigateTo('student_precheck', { exam: exam, studentInfo: studentInfo });
       }
     };

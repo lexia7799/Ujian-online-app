@@ -96,9 +96,33 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     };
 
     const { exam } = appState;
+    
+    // Validate exam time
+    const now = new Date();
+    const startTime = new Date(exam.startTime);
+    const endTime = new Date(exam.endTime);
+    
+    console.log("Exam time validation:");
+    console.log("Current time:", now.toISOString());
+    console.log("Exam start time:", startTime.toISOString());
+    console.log("Exam end time:", endTime.toISOString());
+    
+    if (now < startTime) {
+      alert("Ujian belum dimulai. Silakan tunggu hingga waktu yang ditentukan.");
+      navigateBack();
+      return;
+    }
+    
+    if (now > endTime) {
+      alert("Waktu ujian telah berakhir. Anda tidak dapat lagi mengikuti ujian ini.");
+      navigateBack();
+      return;
+    }
+    
     const sessionRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     
     try {
+      console.log("Creating exam session...");
       const docRef = await addDoc(sessionRef, {
         studentId: user.id,
         studentInfo: finalStudentInfo,
@@ -108,7 +132,9 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         answers: {},
         finalScore: null
       });
-      navigateTo('student_exam', { sessionId: docRef.id });
+      
+      console.log("Session created with ID:", docRef.id);
+      
       navigateTo('student_exam', { 
         sessionId: docRef.id, 
         exam: exam,
