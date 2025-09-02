@@ -379,11 +379,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               <span className="text-2xl">⏳</span>
             </div>
             <div>
-              <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi Dosen</h4>
-              <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
+              <h4 className="text-xl font-bold text-yellow-400">
+                {pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`}
+              </h4>
+              <p className="text-yellow-200 text-sm">
+                {pendingApplications.length === 1 
+                  ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
+                  : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen'
+                }
+              </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${
+            pendingApplications.length === 1 
+              ? 'grid-cols-1' 
+              : pendingApplications.length === 2 
+              ? 'grid-cols-1 md:grid-cols-2' 
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+          }`}>
             {pendingApplications.map(exam => (
               <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
                 <div className="flex justify-between items-start mb-3">
@@ -394,10 +407,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
                       <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
                       <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                      <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
+                      {exam.hasCompletedSession && (
+                        <p className="text-green-400 text-xs mt-1">✅ Sudah pernah mengikuti ujian ini</p>
+                      )}
                     </div>
                   </div>
                   <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                    ⏳ PENDING
+                    ⏳ MENUNGGU
                   </span>
                 </div>
                 <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
@@ -408,6 +425,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               </div>
             ))}
           </div>
+          
+          {/* Summary for multiple pending */}
+          {pendingApplications.length > 1 && (
+            <div className="mt-4 bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+              <p className="text-yellow-200 text-sm text-center">
+                📋 <strong>Total:</strong> {pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen.
+                Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -766,11 +793,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 <span className="text-2xl">❌</span>
               </div>
               <div>
-                <h4 className="text-xl font-bold text-red-400">Aplikasi Ditolak</h4>
-                <p className="text-red-200 text-sm">Aplikasi ujian yang tidak disetujui oleh dosen</p>
+                <h4 className="text-xl font-bold text-red-400">
+                  {rejectedApplications.length === 1 ? 'Aplikasi Ditolak' : `${rejectedApplications.length} Aplikasi Ditolak`}
+                </h4>
+                <p className="text-red-200 text-sm">
+                  {rejectedApplications.length === 1 
+                    ? 'Aplikasi ujian yang tidak disetujui oleh dosen'
+                    : 'Beberapa aplikasi ujian tidak disetujui oleh dosen'
+                  }
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${
+              rejectedApplications.length === 1 
+                ? 'grid-cols-1' 
+                : rejectedApplications.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
               {rejectedApplications.map(exam => (
                 <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-red-400">
                   <div className="flex justify-between items-start mb-3">
@@ -780,6 +820,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       <div className="mt-2 text-xs text-gray-400">
                         <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
                         <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
                       </div>
                     </div>
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
@@ -794,6 +836,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 </div>
               ))}
             </div>
+            
+            {/* Summary for multiple rejected */}
+            {rejectedApplications.length > 1 && (
+              <div className="mt-4 bg-red-900 border border-red-600 p-3 rounded-md">
+                <p className="text-red-200 text-sm text-center">
+                  📞 <strong>Tindak Lanjut:</strong> {rejectedApplications.length} aplikasi ujian ditolak.
+                  Silakan hubungi dosen yang bersangkutan untuk mengetahui alasan penolakan.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
