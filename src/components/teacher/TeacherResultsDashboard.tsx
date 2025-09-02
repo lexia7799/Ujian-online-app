@@ -646,7 +646,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             
             <div className="space-y-4">
               <div className="bg-gray-700 p-3 rounded-lg">
-                <h4 className="font-bold text-lg text-white mb-2">{editingScoreSession.studentInfo.name}</h4>
+                <h4 className="font-bold text-lg text-white text-center">{editingScoreSession.studentInfo.name || editingScoreSession.studentInfo.fullName || 'N/A'}</h4>
               </div>
               
               <div className="grid grid-cols-2 gap-3 text-sm">
