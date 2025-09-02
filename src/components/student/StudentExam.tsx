@@ -23,14 +23,30 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [answers, setAnswers] = useState<{ [key: string]: any }>({});
   const [isFullscreenSupported, setIsFullscreenSupported] = useState(true);
   
+  // Attendance photo system states
+  const [attendancePhotos, setAttendancePhotos] = useState<{ [key: string]: string }>({});
+  const [attendanceNotification, setAttendanceNotification] = useState<string>('');
+  const [showAttendanceNotification, setShowAttendanceNotification] = useState(false);
+  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const examStartTimeRef = useRef<Date | null>(null);
+  
+  // Attendance schedule: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120 minutes
+  const attendanceSchedule = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120];
+  
   const calculateTimeLeft = () => {
     const endTime = new Date(exam.endTime).getTime();
     const now = new Date().getTime();
     const diff = (endTime - now) / 1000;
+    console.log("🕐 calculateTimeLeft:", {
+      endTime: new Date(exam.endTime).toISOString(),
+      now: new Date().toISOString(),
+      diffSeconds: diff,
+      diffMinutes: diff / 60
+    });
     return diff > 0 ? Math.round(diff) : 0;
   };
   
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft());
   const [violations, setViolations] = useState(0);
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -41,6 +57,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [violationReason, setViolationReason] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showCameraControls, setShowCameraControls] = useState(false);
+  const [isExamStarted, setIsExamStarted] = useState(false);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -56,8 +73,51 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const maxCameraRetries = 5;
 
   useEffect(() => {
+    // Validate exam data first
+    if (!exam || !exam.endTime) {
+      console.error("Missing exam data:", exam);
+      return;
+    }
+
+    // Check if exam time is valid
+    const now = new Date();
+    const endTime = new Date(exam.endTime);
+    const startTime = new Date(exam.startTime);
+    
+    console.log("Exam time validation:", {
+      now: now.toISOString(),
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      timeLeftSeconds: Math.floor((endTime.getTime() - now.getTime()) / 1000),
+      examDurationMinutes: Math.floor((endTime.getTime() - startTime.getTime()) / 60000)
+    });
+    
+    // If exam has already ended, don't start
+    if (now > endTime) {
+      console.log("Exam has already ended");
+      setIsFinished(true);
+      setFinalScore(0);
+      return;
+    }
+    
+    // If exam hasn't started yet - ALLOW EARLY ACCESS
+    if (now < startTime) {
+      console.log("Exam hasn't started yet, but allowing early access");
+      // Don't return - allow student to enter exam early
+    }
+
+    // Initialize exam state
+    console.log("🎯 Initializing exam state...");
+    setViolations(0);
+    setIsFinished(false);
+    setIsExamStarted(false);
+    
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Set exam start time for attendance system
+    examStartTimeRef.current = new Date();
+    console.log("🎯 Exam started at:", examStartTimeRef.current.toISOString());
     
     // Initialize camera with retry mechanism
     const initializeCamera = async (retryCount = 0) => {
@@ -98,6 +158,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               console.log("📷 Camera ready:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
               setIsCameraReady(true);
               cameraInitRetryCount.current = 0; // Reset retry count on success
+              
+              // Start attendance system when camera is ready
+              startAttendanceSystem();
             } else {
               setTimeout(checkVideoReady, 100);
             }
@@ -112,6 +175,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               console.log("📷 Camera timeout, forcing ready state");
               setIsCameraReady(true);
               cameraInitRetryCount.current = 0;
+              
+              // Start attendance system even if camera timeout
+              startAttendanceSystem();
             }
           }, 5000);
         }
@@ -143,6 +209,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           track.stop();
           console.log("🛑 Camera track stopped");
         });
+      }
+      
+      // Cleanup attendance system
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        console.log("🛑 Attendance system stopped");
       }
     };
   }, []);
@@ -220,6 +292,128 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
   }, [isCameraReady, isFinished]);
 
+  // Attendance photo system functions
+  const startAttendanceSystem = () => {
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+    }
+    
+    console.log("🎯 Starting attendance photo system...");
+    console.log("📅 Attendance schedule:", attendanceSchedule);
+    
+    // Set exam start time for attendance system
+    if (!examStartTimeRef.current) {
+      examStartTimeRef.current = new Date();
+      console.log("🎯 Exam start time set:", examStartTimeRef.current.toISOString());
+    }
+    
+    // Check every 30 seconds for scheduled photos
+    attendanceIntervalRef.current = setInterval(() => {
+      if (isFinished) {
+        console.log("🛑 Exam finished, stopping attendance system");
+        clearInterval(attendanceIntervalRef.current!);
+        return;
+      }
+      
+      if (!examStartTimeRef.current) {
+        console.log("❌ No exam start time recorded");
+        return;
+      }
+      
+      const now = new Date();
+      const elapsedMinutes = Math.floor((now.getTime() - examStartTimeRef.current.getTime()) / 60000);
+      
+      if (elapsedMinutes % 5 === 0) { // Log every 5 minutes
+        console.log(`🕐 Attendance check: ${elapsedMinutes} minutes elapsed`);
+      }
+      
+      // Check if current elapsed time matches any scheduled minute
+      const scheduledMinute = attendanceSchedule.find(minute => 
+        minute === elapsedMinutes && !attendancePhotos[`minute_${minute}`]
+      );
+      
+      if (scheduledMinute) {
+        console.log(`📸 Taking attendance photo at minute ${scheduledMinute}`);
+        takeAttendancePhoto(scheduledMinute);
+      }
+    }, 30000); // Check every 30 seconds
+  };
+  
+  const takeAttendancePhoto = (minute: number) => {
+    const photoData = capturePhoto();
+    
+    if (photoData) {
+      const photoKey = `minute_${minute}`;
+      const newAttendancePhotos = { ...attendancePhotos, [photoKey]: photoData };
+      setAttendancePhotos(newAttendancePhotos);
+      
+      // Save to Firebase
+      const attendanceData = {
+        [`attendance_snapshots.${photoKey}`]: {
+          imageData: photoData,
+          timestamp: new Date().toISOString(),
+          minute: minute,
+          type: 'scheduled'
+        }
+      };
+      
+      updateDoc(sessionDocRef, attendanceData).then(() => {
+        console.log(`✅ Attendance photo saved for minute ${minute}`);
+        
+        // Show notification
+        const photoCount = Object.keys(newAttendancePhotos).length;
+        const totalScheduled = attendanceSchedule.length;
+        setAttendanceNotification(`📷 Foto absensi ${photoCount}/${totalScheduled} berhasil diambil pada ${minute} Menit`);
+        setShowAttendanceNotification(true);
+        
+        // Hide notification after 4 seconds
+        setTimeout(() => {
+          setShowAttendanceNotification(false);
+        }, 4000);
+        
+        // Show continuation message if there are violations but less than 3
+        if (violations > 0 && violations < 3) {
+          setTimeout(() => {
+            setAttendanceNotification(`🔥 Foto absensi tetap berlanjut meskipun ada ${violations} pelanggaran`);
+            setShowAttendanceNotification(true);
+            setTimeout(() => setShowAttendanceNotification(false), 3000);
+          }, 4500);
+        }
+      }).catch(error => {
+        console.error(`❌ Failed to save attendance photo for minute ${minute}:`, error);
+      });
+    } else {
+      console.log(`❌ Failed to capture attendance photo for minute ${minute}`);
+    }
+  };
+  
+  const takeFinalAttendancePhoto = () => {
+    console.log("📸 Taking final attendance photo...");
+    const photoData = capturePhoto();
+    
+    if (photoData) {
+      const photoKey = 'finished';
+      const newAttendancePhotos = { ...attendancePhotos, [photoKey]: photoData };
+      setAttendancePhotos(newAttendancePhotos);
+      
+      // Save to Firebase
+      const attendanceData = {
+        [`attendance_snapshots.${photoKey}`]: {
+          imageData: photoData,
+          timestamp: new Date().toISOString(),
+          minute: 'finished',
+          type: 'final'
+        }
+      };
+      
+      updateDoc(sessionDocRef, attendanceData).then(() => {
+        console.log("✅ Final attendance photo saved");
+      }).catch(error => {
+        console.error("❌ Failed to save final attendance photo:", error);
+      });
+    }
+  };
+
   useEffect(() => {
     // Check fullscreen support
     const checkFullscreenSupport = () => {
@@ -233,10 +427,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setIsFullscreenSupported(checkFullscreenSupport());
     
     const fetchQuestions = async () => {
+      if (!exam || !exam.id) {
+        console.error("Missing exam ID for fetching questions");
+        setIsLoading(false);
+        return;
+      }
+      
       try {
         const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
         const querySnapshot = await getDocs(questionsRef);
-        setQuestions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
+        const questionsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+        console.log("Loaded questions:", questionsData.length);
+        setQuestions(questionsData);
+        
+        // Start exam after questions are loaded
+        setTimeout(() => {
+          console.log("🎯 Exam officially started - enabling violation detection");
+          setIsExamStarted(true);
+        }, 3000); // Wait 3 seconds after questions load
       } catch (error) {
         console.error("Gagal memuat soal:", error);
       } finally {
@@ -347,25 +555,29 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   }, [isLoading, questions.length, isFullscreenSupported, isFinished]);
 
   useEffect(() => {
-    if (isFinished || isLoading) return;
+    if (isFinished || isLoading || questions.length === 0 || !isExamStarted) {
+      console.log("🚫 Skipping violation detection setup:", {
+        isFinished,
+        isLoading,
+        questionsLength: questions.length,
+        isExamStarted
+      });
+      return;
+    }
+    
+    console.log("🎯 Setting up violation detection - exam is ready");
     
     // Enhanced security monitoring
     const handleVisibilityChange = () => {
-      if (document.hidden && !isFinished) {
+      if (document.hidden && !isFinished && isExamStarted) {
         handleViolation("Tab/Window Switch");
       }
     };
     
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
-      if (!isInFullscreen() && !isFinished) {
+      if (!isInFullscreen() && !isFinished && isExamStarted) {
         handleViolation("Exited Fullscreen");
-        // Auto re-enter fullscreen after violation
-        setTimeout(() => {
-          if (!isFinished) {
-            enterFullscreen();
-          }
-        }, 1000);
       }
     };
     
@@ -374,14 +586,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     };
     
     const handleBlur = () => {
-      if (!isFinished) {
+      if (!isFinished && isExamStarted) {
         handleViolation("Focus Lost");
       }
     };
     
     // Detect multiple tabs
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'examTabCount' && !isFinished) {
+      if (e.key === 'examTabCount' && !isFinished && isExamStarted) {
         const currentCount = parseInt(localStorage.getItem('examTabCount') || '1');
         if (currentCount > 1) {
           handleViolation("Multiple Tabs Detected");
@@ -394,14 +606,16 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     localStorage.setItem('examTabCount', currentTabCount.toString());
     tabCountRef.current = currentTabCount;
     
-    if (currentTabCount > 1) {
+    if (currentTabCount > 1 && isExamStarted) {
       handleViolation("Multiple Tabs Detected");
     }
     
     // Prevent right-click and common shortcuts
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
-      handleViolation("Right Click Attempt");
+      if (isExamStarted) {
+        handleViolation("Right Click Attempt");
+      }
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -419,25 +633,29 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         e.altKey && e.key === 'Tab'
       ) {
         e.preventDefault();
-        if (e.key === 'PrintScreen') {
-          handleViolation("Screenshot Attempt");
-        } else if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a')) {
-          handleViolation("Copy/Paste Attempt");
-        } else {
-          handleViolation("Prohibited Shortcut");
+        if (isExamStarted) {
+          if (e.key === 'PrintScreen') {
+            handleViolation("Screenshot Attempt");
+          } else if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a')) {
+            handleViolation("Copy/Paste Attempt");
+          } else {
+            handleViolation("Prohibited Shortcut");
+          }
         }
       }
     };
     
     // Monitor screen changes
     const handleScreenChange = () => {
-      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight) {
+      // Only trigger violation if exam has actually started and questions are loaded
+      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight && questions.length > 0 && timeLeft > 0 && isExamStarted) {
         handleViolation("Screen Configuration Change");
       }
     };
     
     // Check for developer tools
     const checkDevTools = () => {
+      if (!isExamStarted) return;
       const threshold = 160;
       if (window.outerHeight - window.innerHeight > threshold || window.outerWidth - window.innerWidth > threshold) {
         handleViolation("Developer Tools Detected");
@@ -446,14 +664,33 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     const devToolsInterval = setInterval(checkDevTools, 1000);
     
+    // Initialize timer with proper validation
+    const initialTimeLeft = Math.max(0, calculateTimeLeft());
+    console.log("🕐 Initial time left:", initialTimeLeft, "seconds");
+    
+    if (initialTimeLeft <= 0) {
+      console.log("Time already expired, finishing exam");
+      finishExam("Waktu Habis");
+      return;
+    }
+    
+    // Set initial time left
+    setTimeLeft(initialTimeLeft);
+    
     const timer = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
+        const newTimeLeft = prev - 1;
+        if (newTimeLeft % 60 === 0) { // Log every minute
+          console.log("🕐 Timer tick:", newTimeLeft, "seconds left");
+        }
+        
+        if (newTimeLeft <= 0) {
           clearInterval(timer);
+          console.log("Timer expired, finishing exam");
           finishExam("Waktu Habis");
           return 0;
         }
-        return prev - 1;
+        return newTimeLeft;
       });
     }, 1000);
     
@@ -492,7 +729,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         localStorage.setItem('examTabCount', newCount.toString());
       }
     };
-  }, [isFinished, isLoading, violations]);
+  }, [isFinished, isLoading, questions.length, isExamStarted, timeLeft, violations]);
 
   const playWarningSound = () => {
     if (!audioContextRef.current) return;
@@ -513,7 +750,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   const handleViolation = (reason = "Unknown") => {
+    // CRITICAL: Don't process violations if exam hasn't officially started
+    if (!isExamStarted) {
+      console.log("🚫 Ignoring violation (exam not started):", reason);
+      return;
+    }
+    
+    if (isFinished) {
+      console.log("🚫 Ignoring violation (exam finished):", reason);
+      return;
+    }
+    
     const newViolations = violations + 1;
+    console.log("🚨 Processing violation:", reason, "- New count:", newViolations);
     setViolations(newViolations);
     setViolationReason(reason);
     
@@ -576,17 +825,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     playWarningSound();
     
     if (newViolations >= 3) {
+      // Stop attendance system only when disqualified
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        console.log("🛑 Attendance system stopped due to disqualification");
+      }
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
       
-      // Auto re-enter fullscreen after violation
+      // Show attendance continuation message for violations 1-2
       setTimeout(() => {
-        if (!isFinished && !isInFullscreen()) {
-          enterFullscreen();
-        }
-      }, 1500);
+        setAttendanceNotification(`🔥 Foto absensi tetap berlanjut meskipun ada ${newViolations} pelanggaran`);
+        setShowAttendanceNotification(true);
+        setTimeout(() => setShowAttendanceNotification(false), 3000);
+      }, 3500);
     }
   };
 
@@ -654,10 +908,29 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
   
   const finishExam = async (reason = "Selesai") => {
+    console.log("finishExam called with reason:", reason);
+    
     if (isFinished) return;
+    
+    console.log("🏁 Finishing exam - current state:", {
+      timeLeft,
+      violations,
+      attendancePhotos: Object.keys(attendancePhotos).length,
+      reason
+    });
+    
+    // Take final attendance photo before finishing
+    takeFinalAttendancePhoto();
+    
     setIsFinished(true);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
+    
+    // Stop attendance system
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+      console.log("🛑 Attendance system stopped - exam finished");
+    }
     
     // Exit fullscreen when exam is finished
     if (isInFullscreen()) {
@@ -693,6 +966,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
     
     setFinalScore(score);
+    
+    console.log("💾 Saving exam results:", {
+      status,
+      finalScore: score,
+      violations,
+      reason
+    });
+    
     await updateDoc(sessionDocRef, { 
       status, 
       finishTime: new Date(), 
@@ -702,7 +983,38 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   if (isLoading) {
-    return <div className="text-center p-8">Memuat soal ujian...</div>;
+    return (
+      <div className="text-center p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+        <p>Memuat soal ujian...</p>
+      </div>
+    );
+  }
+  
+  // Add validation for exam data
+  if (!exam || !exam.id || !exam.endTime) {
+    return (
+      <div className="text-center h-screen flex flex-col justify-center items-center -mt-16">
+        <div className="bg-red-800 p-8 rounded-lg shadow-xl max-w-md">
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Data Ujian Tidak Valid</h2>
+          <p className="text-gray-300 mb-4">
+            Data ujian tidak lengkap atau tidak valid. Silakan coba lagi.
+          </p>
+          <div className="text-xs text-gray-400 mb-4 text-left">
+            <p>Debug info:</p>
+            <p>- Exam ID: {exam?.id || 'Missing'}</p>
+            <p>- End Time: {exam?.endTime || 'Missing'}</p>
+            <p>- Start Time: {exam?.startTime || 'Missing'}</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Muat Ulang
+          </button>
+        </div>
+      </div>
+    );
   }
   
   if (!isFullscreenSupported) {
@@ -733,6 +1045,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-2xl font-bold mt-4">
               Nilai Anda: <span className="text-red-500">0</span>
             </p>
+            <div className="mt-4 text-sm text-gray-400 bg-gray-800 p-4 rounded-lg">
+              <p>Debug Info:</p>
+              <p>- Violations: {violations}/3</p>
+              <p>- Final Score: {finalScore}</p>
+              <p>- Time Left: {timeLeft}s</p>
+            </div>
           </>
         ) : (
           <>
@@ -744,6 +1062,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-lg text-gray-400 mt-2">
               Nilai esai (jika ada) akan diperiksa oleh dosen.
             </p>
+            <div className="mt-4 text-sm text-gray-400 bg-gray-800 p-4 rounded-lg">
+              <p>Debug Info:</p>
+              <p>- Violations: {violations}/3</p>
+              <p>- Final Score: {finalScore}</p>
+              <p>- Time Left: {timeLeft}s</p>
+            </div>
           </>
         )}
       </div>
@@ -796,6 +1120,20 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-sm text-gray-400 mt-2">
               Foto telah diambil sebagai bukti pelanggaran
             </p>
+            {violations < 3 && (
+              <p className="text-sm text-green-400 mt-2 font-bold">
+                🔥 Foto absensi tetap berlanjut sesuai jadwal
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Attendance notification */}
+      {showAttendanceNotification && (
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+          <div className="bg-green-800 border-2 border-green-500 p-6 rounded-lg text-center shadow-2xl">
+            <p className="text-lg font-bold text-green-400">{attendanceNotification}</p>
           </div>
         </div>
       )}
@@ -896,6 +1234,31 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             )}
           </div>
         )}
+        
+        {/* Attendance system status */}
+        <div className="border-t border-gray-600 mt-2 pt-2">
+          <div className="text-xs text-cyan-400 font-bold">
+            📸 Foto Absensi: {Object.keys(attendancePhotos).length}/{attendanceSchedule.length + 1}
+          </div>
+          <div className="text-xs text-gray-400">
+            Status: {violations >= 3 ? (
+              <span className="text-red-400">🚨 BERHENTI</span>
+            ) : (
+              <span className="text-cyan-400">🔥 INDEPENDEN AKTIF</span>
+            )}
+          </div>
+          {violations > 0 && violations < 3 && (
+            <div className="text-xs text-green-400 font-bold">
+              🔥 Absensi Berlanjut!
+            </div>
+          )}
+          {violations >= 3 && (
+            <div className="text-xs text-red-400 font-bold">
+              🚨 Absensi Berhenti!
+            </div>
+          )}
+        </div>
+        
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>
@@ -914,6 +1277,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 {Math.floor(timeLeft / 3600).toString().padStart(2, '0')}:
                 {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
                 {(timeLeft % 60).toString().padStart(2, '0')}
+              </div>
+              <div className="text-xs text-gray-400">
+                Debug: {timeLeft}s left | Status: {isFinished ? 'Finished' : 'Active'} | Violations: {violations}/3
               </div>
               <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
             </div>
