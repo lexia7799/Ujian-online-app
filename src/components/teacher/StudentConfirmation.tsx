@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, updateDoc, doc, deleteDoc, query, limit } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, limit, startAfter, orderBy, DocumentSnapshot } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface Application {
@@ -26,6 +26,11 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreData, setHasMoreData] = useState(true);
+  const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const APPLICATIONS_PER_PAGE = 50;
 
   const handleBackNavigation = () => {
     navigateBack();
@@ -34,20 +39,69 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   useEffect(() => {
     if (!exam?.id) return;
     
-    const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`);
-    // Limit applications for performance
-    const unsubscribe = onSnapshot(query(applicationsRef, limit(200)), (snapshot) => {
-      const apps = snapshot.docs.map(doc => ({
+    // Load first page of applications
+    loadApplications(true);
+    
+    // Set up auto-refresh every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (!isLoadingMore) {
+        loadApplications(true);
+      }
+    }, 30000);
+    
+    return () => clearInterval(refreshInterval);
+  }, [exam?.id]);
+
+  const loadApplications = async (isFirstLoad = false) => {
+    if (!exam?.id) return;
+    
+    if (!isFirstLoad && !hasMoreData) return;
+    
+    setIsLoadingMore(true);
+    
+    try {
+      const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`);
+      let applicationsQuery = query(
+        applicationsRef, 
+        orderBy('appliedAt', 'desc'),
+        limit(APPLICATIONS_PER_PAGE)
+      );
+      
+      if (!isFirstLoad && lastDoc) {
+        applicationsQuery = query(
+          applicationsRef,
+          orderBy('appliedAt', 'desc'),
+          startAfter(lastDoc),
+          limit(APPLICATIONS_PER_PAGE)
+        );
+      }
+      
+      const snapshot = await getDocs(applicationsQuery);
+      const newApplications = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         appliedAt: doc.data().appliedAt?.toDate() || new Date()
       } as Application));
       
-      setApplications(apps.sort((a, b) => a.appliedAt.getTime() - b.appliedAt.getTime()));
-    });
-    
-    return () => unsubscribe();
-  }, [exam?.id]);
+      if (isFirstLoad) {
+        setApplications(newApplications);
+        setCurrentPage(1);
+        setSelectedStudents(new Set()); // Reset selection on refresh
+      } else {
+        setApplications(prev => [...prev, ...newApplications]);
+        setCurrentPage(prev => prev + 1);
+      }
+      
+      // Update pagination state
+      setHasMoreData(snapshot.docs.length === APPLICATIONS_PER_PAGE);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      
+    } catch (error) {
+      console.error('Error loading applications:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const handleSelectStudent = (studentId: string) => {
     const newSelected = new Set(selectedStudents);
@@ -148,6 +202,14 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
             <div className="text-sm">Ditolak</div>
           </div>
         </div>
+        
+        {hasMoreData && (
+          <div className="mb-4 bg-blue-900 border border-blue-500 p-3 rounded-lg">
+            <p className="text-blue-300 text-sm">
+              📄 Menampilkan {applications.length} aplikasi (Halaman {currentPage}) - Ada data lainnya
+            </p>
+          </div>
+        )}
       </div>
 
       {pendingApplications.length > 0 && (
@@ -183,6 +245,14 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
                 </button>
               </div>
             )}
+            
+            <button
+              onClick={() => loadApplications(true)}
+              disabled={isLoadingMore}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-blue-400"
+            >
+              {isLoadingMore ? '🔄' : '🔄'} Refresh
+            </button>
           </div>
         </div>
       )}
@@ -193,81 +263,110 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
             Belum ada siswa yang mengajukan untuk ujian ini.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th className="p-4">Pilih</th>
-                  <th className="p-4">Foto</th>
-                  <th className="p-4">Nama Lengkap</th>
-                  <th className="p-4">Username</th>
-                  <th className="p-4">Program Studi</th>
-                  <th className="p-4">Kelas</th>
-                  <th className="p-4">Universitas</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.map(app => (
-                  <tr key={app.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                    <td className="p-4">
-                      {app.status === 'pending' && (
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.has(app.id)}
-                          onChange={() => handleSelectStudent(app.id)}
-                          className="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
-                        />
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-bold text-white">
-                          {app.studentData.fullName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4 font-semibold">{app.studentData.fullName}</td>
-                    <td className="p-4 text-gray-400">{app.studentData.username}</td>
-                    <td className="p-4">{app.studentData.major}</td>
-                    <td className="p-4">{app.studentData.className}</td>
-                    <td className="p-4">{app.studentData.university}</td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                        app.status === 'pending' 
-                          ? 'bg-yellow-600 text-white' 
-                          : app.status === 'approved'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-red-600 text-white'
-                      }`}>
-                        {app.status === 'pending' ? 'Menunggu' : 
-                         app.status === 'approved' ? 'Disetujui' : 'Ditolak'}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {app.status === 'pending' && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleIndividualAction(app.id, 'approve')}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded"
-                          >
-                            Setujui
-                          </button>
-                          <button
-                            onClick={() => handleIndividualAction(app.id, 'reject')}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-3 rounded"
-                          >
-                            Tolak
-                          </button>
-                        </div>
-                      )}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="p-4">Pilih</th>
+                    <th className="p-4">Foto</th>
+                    <th className="p-4">Nama Lengkap</th>
+                    <th className="p-4">Username</th>
+                    <th className="p-4">Program Studi</th>
+                    <th className="p-4">Kelas</th>
+                    <th className="p-4">Universitas</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {applications.map(app => (
+                    <tr key={app.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                      <td className="p-4">
+                        {app.status === 'pending' && (
+                          <input
+                            type="checkbox"
+                            checked={selectedStudents.has(app.id)}
+                            onChange={() => handleSelectStudent(app.id)}
+                            className="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                          />
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">
+                            {app.studentData.fullName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 font-semibold">{app.studentData.fullName}</td>
+                      <td className="p-4 text-gray-400">{app.studentData.username}</td>
+                      <td className="p-4">{app.studentData.major}</td>
+                      <td className="p-4">{app.studentData.className}</td>
+                      <td className="p-4">{app.studentData.university}</td>
+                      <td className="p-4">
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                          app.status === 'pending' 
+                            ? 'bg-yellow-600 text-white' 
+                            : app.status === 'approved'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-red-600 text-white'
+                        }`}>
+                          {app.status === 'pending' ? 'Menunggu' : 
+                           app.status === 'approved' ? 'Disetujui' : 'Ditolak'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {app.status === 'pending' && (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleIndividualAction(app.id, 'approve')}
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded"
+                            >
+                              Setujui
+                            </button>
+                            <button
+                              onClick={() => handleIndividualAction(app.id, 'reject')}
+                              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-3 rounded"
+                            >
+                              Tolak
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Controls */}
+            {hasMoreData && (
+              <div className="p-6 bg-gray-700 border-t border-gray-600">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-400">
+                    Menampilkan {applications.length} aplikasi (Halaman {currentPage})
+                  </div>
+                  <button
+                    onClick={() => loadApplications(false)}
+                    disabled={isLoadingMore}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-indigo-400 flex items-center"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Memuat...
+                      </>
+                    ) : (
+                      <>
+                        📄 Muat Lebih Banyak ({APPLICATIONS_PER_PAGE} aplikasi)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, onSnapshot, query, limit } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, limit, startAfter, orderBy, DocumentSnapshot } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import jsPDF from 'jspdf';
 import EssayGradingView from './EssayGradingView';
@@ -40,6 +40,12 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   const [filterJurusan, setFilterJurusan] = useState('');
   const [availableKelas, setAvailableKelas] = useState<string[]>([]);
   const [availableJurusan, setAvailableJurusan] = useState<string[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreData, setHasMoreData] = useState(true);
+  const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalSessions, setTotalSessions] = useState(0);
+  const SESSIONS_PER_PAGE = 50;
 
   const handleBackNavigation = () => {
     navigateBack();
@@ -48,32 +54,79 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   useEffect(() => {
     if (!exam?.id) return;
     
-    // Optimized queries with limits
+    // Load questions (limit 100 is fine for questions)
     const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
     getDocs(query(questionsRef, limit(100))).then(snapshot => {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
     });
     
-    const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
-    const unsub = onSnapshot(query(sessionsRef, limit(200)), snapshot => {
-      const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
-      setSessions(sessionsData);
+    // Load first page of sessions
+    loadSessions(true);
+    
+  }, [exam?.id]);
+
+  const loadSessions = async (isFirstLoad = false) => {
+    if (!exam?.id) return;
+    
+    if (!isFirstLoad && !hasMoreData) return;
+    
+    setIsLoadingMore(true);
+    
+    try {
+      const sessionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
+      let sessionsQuery = query(
+        sessionsRef, 
+        orderBy('startTime', 'desc'),
+        limit(SESSIONS_PER_PAGE)
+      );
       
-      // Optimized filter options extraction
+      if (!isFirstLoad && lastDoc) {
+        sessionsQuery = query(
+          sessionsRef,
+          orderBy('startTime', 'desc'),
+          startAfter(lastDoc),
+          limit(SESSIONS_PER_PAGE)
+        );
+      }
+      
+      const snapshot = await getDocs(sessionsQuery);
+      const newSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
+      
+      if (isFirstLoad) {
+        setSessions(newSessions);
+        setCurrentPage(1);
+      } else {
+        setSessions(prev => [...prev, ...newSessions]);
+        setCurrentPage(prev => prev + 1);
+      }
+      
+      // Update pagination state
+      setHasMoreData(snapshot.docs.length === SESSIONS_PER_PAGE);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      
+      // Update filter options
+      const allSessions = isFirstLoad ? newSessions : [...sessions, ...newSessions];
       const kelasSet = new Set<string>();
       const jurusanSet = new Set<string>();
       
-      sessionsData.forEach(session => {
+      allSessions.forEach(session => {
         if (session.studentInfo.className) kelasSet.add(session.studentInfo.className);
         if (session.studentInfo.major) jurusanSet.add(session.studentInfo.major);
       });
       
       setAvailableKelas(Array.from(kelasSet).sort());
       setAvailableJurusan(Array.from(jurusanSet).sort());
-    });
-    
-    return () => unsub();
-  }, [exam?.id]);
+      
+      if (isFirstLoad) {
+        setTotalSessions(allSessions.length);
+      }
+      
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   // Filter and search logic
   useEffect(() => {
@@ -432,6 +485,11 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         <div className="mt-4 flex justify-between items-center text-sm text-gray-400">
           <div>
             Menampilkan {filteredSessions.length} dari {sessions.length} siswa
+            {hasMoreData && (
+              <span className="ml-2 text-yellow-400">
+                (Halaman {currentPage}, ada data lainnya)
+              </span>
+            )}
             {(searchTerm || filterKelas || filterJurusan) && (
               <span className="ml-2 text-blue-400">
                 (dengan filter)
@@ -511,6 +569,33 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             )}
           </tbody>
         </table>
+        
+        {/* Pagination Controls */}
+        {hasMoreData && (
+          <div className="p-6 bg-gray-700 border-t border-gray-600">
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-400">
+                Menampilkan {sessions.length} siswa (Halaman {currentPage})
+              </div>
+              <button
+                onClick={() => loadSessions(false)}
+                disabled={isLoadingMore}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-indigo-400 flex items-center"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Memuat...
+                  </>
+                ) : (
+                  <>
+                    📄 Muat Lebih Banyak ({SESSIONS_PER_PAGE} siswa)
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
