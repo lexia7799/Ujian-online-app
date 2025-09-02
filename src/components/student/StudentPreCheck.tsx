@@ -103,7 +103,9 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
       studentInfo: finalStudentInfo,
       examTimes: {
         startTime: exam.startTime,
-        endTime: exam.endTime
+        endTime: exam.endTime,
+        currentTime: new Date().toISOString(),
+        timeUntilEnd: Math.floor((new Date(exam.endTime).getTime() - new Date().getTime()) / 60000) + " minutes"
       }
     });
     

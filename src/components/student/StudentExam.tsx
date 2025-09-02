@@ -37,6 +37,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const endTime = new Date(exam.endTime).getTime();
     const now = new Date().getTime();
     const diff = (endTime - now) / 1000;
+    console.log("🕐 calculateTimeLeft:", {
+      endTime: new Date(exam.endTime).toISOString(),
+      now: new Date().toISOString(),
+      diffSeconds: diff,
+      diffMinutes: diff / 60
+    });
     return diff > 0 ? Math.round(diff) : 0;
   };
   
@@ -81,7 +87,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       now: now.toISOString(),
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
-      timeLeft: Math.floor((endTime.getTime() - now.getTime()) / 1000)
+      timeLeftSeconds: Math.floor((endTime.getTime() - now.getTime()) / 1000),
+      examDurationMinutes: Math.floor((endTime.getTime() - startTime.getTime()) / 60000)
     });
     
     // If exam has already ended, don't start
@@ -92,10 +99,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return;
     }
     
-    // If exam hasn't started yet
+    // If exam hasn't started yet - ALLOW EARLY ACCESS
     if (now < startTime) {
-      console.log("Exam hasn't started yet");
-      return;
+      console.log("Exam hasn't started yet, but allowing early access");
+      // Don't return - allow student to enter exam early
     }
 
     // Initialize audio context
@@ -287,10 +294,17 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     console.log("🎯 Starting attendance photo system...");
     console.log("📅 Attendance schedule:", attendanceSchedule);
     
+    // Set exam start time for attendance system
+    if (!examStartTimeRef.current) {
+      examStartTimeRef.current = new Date();
+      console.log("🎯 Exam start time set:", examStartTimeRef.current.toISOString());
+    }
+    
     // Check every 30 seconds for scheduled photos
     attendanceIntervalRef.current = setInterval(() => {
       if (isFinished) {
         console.log("🛑 Exam finished, stopping attendance system");
+        clearInterval(attendanceIntervalId.current!);
         return;
       }
       
@@ -301,6 +315,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       const now = new Date();
       const elapsedMinutes = Math.floor((now.getTime() - examStartTimeRef.current.getTime()) / 60000);
+      
+      if (elapsedMinutes % 5 === 0) { // Log every 5 minutes
+        console.log(`🕐 Attendance check: ${elapsedMinutes} minutes elapsed`);
+      }
       
       // Check if current elapsed time matches any scheduled minute
       const scheduledMinute = attendanceSchedule.find(minute => 
@@ -624,8 +642,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const devToolsInterval = setInterval(checkDevTools, 1000);
     
     // Initialize timer with proper validation
-    const initialTimeLeft = calculateTimeLeft();
-    console.log("Initial time left:", initialTimeLeft, "seconds");
+    const initialTimeLeft = Math.max(0, calculateTimeLeft());
+    console.log("🕐 Initial time left:", initialTimeLeft, "seconds");
     
     if (initialTimeLeft <= 0) {
       console.log("Time already expired, finishing exam");
@@ -633,10 +651,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return;
     }
     
+    // Set initial time left
+    setTimeLeft(initialTimeLeft);
+    
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         const newTimeLeft = prev - 1;
-        console.log("Timer tick:", newTimeLeft, "seconds left");
+        if (newTimeLeft % 60 === 0) { // Log every minute
+          console.log("🕐 Timer tick:", newTimeLeft, "seconds left");
+        }
         
         if (newTimeLeft <= 0) {
           clearInterval(timer);
@@ -861,6 +884,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     if (isFinished) return;
     
+    console.log("🏁 Finishing exam - current state:", {
+      timeLeft,
+      violations,
+      attendancePhotos: Object.keys(attendancePhotos).length,
+      reason
+    });
+    
     // Take final attendance photo before finishing
     takeFinalAttendancePhoto();
     
@@ -934,6 +964,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           <p className="text-gray-300 mb-4">
             Data ujian tidak lengkap atau tidak valid. Silakan coba lagi.
           </p>
+          <div className="text-xs text-gray-400 mb-4 text-left">
+            <p>Debug info:</p>
+            <p>- Exam ID: {exam?.id || 'Missing'}</p>
+            <p>- End Time: {exam?.endTime || 'Missing'}</p>
+            <p>- Start Time: {exam?.startTime || 'Missing'}</p>
+          </div>
           <button
             onClick={() => window.location.reload()}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
@@ -1193,6 +1229,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 {Math.floor(timeLeft / 3600).toString().padStart(2, '0')}:
                 {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
                 {(timeLeft % 60).toString().padStart(2, '0')}
+              </div>
+              <div className="text-xs text-gray-400">
+                Debug: {timeLeft}s left | Status: {isFinished ? 'Finished' : 'Active'}
               </div>
               <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
             </div>
