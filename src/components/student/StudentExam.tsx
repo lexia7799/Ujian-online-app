@@ -228,11 +228,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const executeAttendancePhoto = async (timeLabel: string, photoNumber: number) => {
     console.log(`📸 FOTO ABSENSI INDEPENDEN: ${timeLabel} (${photoNumber}/25)`);
     console.log(`🔥 INDEPENDEN: Mengambil foto absensi - violations diabaikan total!`);
-    
-    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
-      console.log(`⚠️ MASALAH TEKNIS: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, kamera=${isCameraReady}`);
+    // CRITICAL: Only check if exam is finished and camera is ready
+    // Violations should NEVER stop attendance photos
+    if (isFinished) {
+      console.log(`❌ Cannot take attendance photo at ${timeLabel}: exam finished`);
       return;
     }
+    
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
+      console.log(`❌ Cannot take attendance photo at ${timeLabel}: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, cameraReady=${isCameraReady}`);
+      return;
+    }
+    
+    console.log(`📊 Status: Violations=${violations}, Finished=${isFinished}, Camera=${isCameraReady} - FOTO TETAP JALAN`);
     
     const photoData = capturePhoto();
     if (photoData) {
@@ -267,7 +275,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ SAVED SUCCESS: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
+      console.log(`✅ BERHASIL: Foto absensi ${attendancePhotoCount.current}/25 disimpan di ${timeLabel} (Pelanggaran: ${violations} - TIDAK MEMPENGARUHI)`);
     } catch (error) {
       console.error(`❌ SAVE FAILED: Foto absensi ${timeLabel}:`, error);
       // Retry save after delay
@@ -739,11 +747,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setAttendanceSystemActive(false);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
-    console.log(`📷 Taking final attendance photo: ${reason} (Total violations during exam: ${violations})`);
+    
     // Cleanup attendance system
     if (attendanceIntervalId.current) {
       clearInterval(attendanceIntervalId.current);
       attendanceIntervalId.current = null;
+      console.log("🛑 Attendance system stopped");
     }
     
     // Exit fullscreen when exam is finished
