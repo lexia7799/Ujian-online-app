@@ -46,13 +46,7 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     
     if (isMobile) return;
     
-    navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        width: { ideal: 1280, min: 640 },
-        height: { ideal: 720, min: 480 },
-        facingMode: 'user'
-      }
-    })
+    navigator.mediaDevices.getUserMedia({ video: true })
       .then(stream => {
         setChecks(c => ({ ...c, camera: true }));
         if (videoRef.current) {
@@ -193,13 +187,9 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         {checks.device && (
           <div className="mb-4 p-3 bg-blue-900 border border-blue-500 rounded-md">
             <p className="text-blue-300 text-sm">
-              ℹ️ <strong>Penting:</strong> Selama ujian berlangsung:
+              ℹ️ <strong>Penting:</strong> Ujian akan otomatis masuk mode fullscreen. 
+              Keluar dari fullscreen akan dianggap sebagai pelanggaran.
             </p>
-            <ul className="text-blue-200 text-xs mt-2 space-y-1">
-              <li>• Ujian akan otomatis masuk mode fullscreen</li>
-              <li>• Foto akan diambil secara berkala untuk absensi</li>
-              <li>• Keluar dari fullscreen akan dianggap pelanggaran</li>
-            </ul>
           </div>
         )}
         
