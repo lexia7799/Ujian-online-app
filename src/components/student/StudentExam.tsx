@@ -46,14 +46,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [lastAttendanceTime, setLastAttendanceTime] = useState<string>('');
   const [showAttendanceNotification, setShowAttendanceNotification] = useState(false);
   const [attendanceNotificationMessage, setAttendanceNotificationMessage] = useState('');
-  const [attendanceSystemStarted, setAttendanceSystemStarted] = useState(false);
+  const [attendanceSystemActive, setAttendanceSystemActive] = useState(false);
   
-  const attendanceIntervalId = useRef<NodeJS.Timeout | null>(null);
-  const attendanceSetupDone = useRef(false);
+  const attendanceInterval = useRef<NodeJS.Timeout | null>(null);
   const examStartTime = useRef<Date | null>(null);
-  const attendanceSystemActive = useRef(false);
-  const attendanceSchedule = useRef<number[]>([1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120]);
-  const photosTaken = useRef<Set<number>>(new Set());
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -69,6 +65,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const maxCameraRetries = 5;
 
   useEffect(() => {
+    // Set exam start time immediately
+    examStartTime.current = new Date();
+    console.log("🚀 UJIAN DIMULAI - Waktu mulai:", examStartTime.current.toLocaleString());
+    
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
@@ -146,37 +146,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       }
     };
     
-    // Start camera initialization immediately
-    initializeCamera();
-    
-    // Cleanup
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-          console.log("🛑 Camera track stopped");
-        });
-      }
-      
-      // Cleanup attendance timeouts
-      if (attendanceIntervalId.current) {
-        clearInterval(attendanceIntervalId.current);
-        attendanceIntervalId.current = null;
-      }
-    };
-  }, []);
-
-  // Setup attendance schedule when camera becomes ready
-  useEffect(() => {
-    if (isCameraReady && !attendanceSetupDone.current) {
-      console.log("📷 KAMERA SIAP: Memulai setup jadwal foto absensi...");
-      attendanceSetupDone.current = true;
-      attendanceSystemActive.current = true;
-      examStartTime.current = new Date();
-      setAttendanceSystemStarted(true);
-      startAttendancePhotoSystem();
-    }
-  }, [isCameraReady]);
 
   // Function to manually restart camera
   const restartCamera = async () => {
