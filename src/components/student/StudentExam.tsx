@@ -46,12 +46,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [lastAttendanceTime, setLastAttendanceTime] = useState<string>('');
   const [showAttendanceNotification, setShowAttendanceNotification] = useState(false);
   const [attendanceNotificationMessage, setAttendanceNotificationMessage] = useState('');
+  const [attendanceSystemStarted, setAttendanceSystemStarted] = useState(false);
   
-  const attendanceTimeouts = useRef<NodeJS.Timeout[]>([]);
+  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const attendanceSetupDone = useRef(false);
   const examStartTime = useRef<Date | null>(null);
   const attendanceSystemActive = useRef(false);
-  const attendancePhotoSchedule = useRef<any[]>([]);
+  const attendanceSchedule = useRef<number[]>([1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120]);
+  const photosTaken = useRef<Set<number>>(new Set());
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -171,7 +173,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       attendanceSetupDone.current = true;
       attendanceSystemActive.current = true;
       examStartTime.current = new Date();
-      setupIndependentAttendanceSystem();
+      setAttendanceSystemStarted(true);
+      startAttendancePhotoSystem();
     }
   }, [isCameraReady]);
 
@@ -256,74 +259,49 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     examContainer.setAttribute('data-attendance-active', attendanceSystemActive.current.toString());
   }, [isFinished, violations]);
 
-  // Setup independent attendance photo system
-  const setupIndependentAttendanceSystem = () => {
+  // Start attendance photo system with interval-based checking
+  const startAttendancePhotoSystem = () => {
     console.log("🔥 SISTEM FOTO ABSENSI INDEPENDEN - DIMULAI!");
     console.log("🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran!");
     console.log("📅 JADWAL: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120 menit (25 foto total)");
     
-    // Clear any existing timeouts first
-    attendanceTimeouts.current.forEach(timeoutId => {
-      clearTimeout(timeoutId);
-    });
-    attendanceTimeouts.current = [];
-    
     setAttendanceScheduleActive(true);
     attendanceSystemActive.current = true;
     
-    // Define exact schedule in SECONDS (not minutes)
-    const schedules = [
-      { minutes: 1, time: 60 * 1000, label: '1 Menit' },      // 1 minute
-      { minutes: 5, time: 5 * 60 * 1000, label: '5 Menit' },   // 5 minutes
-      { minutes: 10, time: 10 * 60 * 1000, label: '10 Menit' }, // 10 minutes
-      { minutes: 15, time: 15 * 60 * 1000, label: '15 Menit' }, // 15 minutes
-      { minutes: 20, time: 20 * 60 * 1000, label: '20 Menit' }, // 20 minutes
-      { minutes: 25, time: 25 * 60 * 1000, label: '25 Menit' }, // 25 minutes
-      { minutes: 30, time: 30 * 60 * 1000, label: '30 Menit' }, // 30 minutes
-      { minutes: 35, time: 35 * 60 * 1000, label: '35 Menit' }, // 35 minutes
-      { minutes: 40, time: 40 * 60 * 1000, label: '40 Menit' }, // 40 minutes
-      { minutes: 45, time: 45 * 60 * 1000, label: '45 Menit' }, // 45 minutes
-      { minutes: 50, time: 50 * 60 * 1000, label: '50 Menit' }, // 50 minutes
-      { minutes: 55, time: 55 * 60 * 1000, label: '55 Menit' }, // 55 minutes
-      { minutes: 60, time: 60 * 60 * 1000, label: '60 Menit' }, // 60 minutes
-      { minutes: 65, time: 65 * 60 * 1000, label: '65 Menit' }, // 65 minutes
-      { minutes: 70, time: 70 * 60 * 1000, label: '70 Menit' }, // 70 minutes
-      { minutes: 75, time: 75 * 60 * 1000, label: '75 Menit' }, // 75 minutes
-      { minutes: 80, time: 80 * 60 * 1000, label: '80 Menit' }, // 80 minutes
-      { minutes: 85, time: 85 * 60 * 1000, label: '85 Menit' }, // 85 minutes
-      { minutes: 90, time: 90 * 60 * 1000, label: '90 Menit' }, // 90 minutes
-      { minutes: 95, time: 95 * 60 * 1000, label: '95 Menit' }, // 95 minutes
-      { minutes: 100, time: 100 * 60 * 1000, label: '100 Menit' }, // 100 minutes
-      { minutes: 105, time: 105 * 60 * 1000, label: '105 Menit' }, // 105 minutes
-      { minutes: 110, time: 110 * 60 * 1000, label: '110 Menit' }, // 110 minutes
-      { minutes: 115, time: 115 * 60 * 1000, label: '115 Menit' }, // 115 minutes
-      { minutes: 120, time: 120 * 60 * 1000, label: '120 Menit' }, // 120 minutes
-    ];
+    // Clear any existing interval
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+    }
     
-    attendancePhotoSchedule.current = schedules;
-    console.log(`📅 SETUP COMPLETE: Menjadwalkan ${schedules.length} foto absensi`);
-    console.log(`🎯 JADWAL: ${schedules.map(s => s.minutes).join(', ')} menit`);
-    
-    schedules.forEach((schedule, index) => {
-      const timeoutId = setTimeout(() => {
-        console.log(`⏰ JADWAL FOTO ABSENSI: Menit ${schedule.minutes} - Foto ${index + 1}/25`);
-        
-        // HANYA check isFinished - violations diabaikan total!
-        const currentFinished = isFinished;
-        
-        if (!currentFinished) {
-          console.log(`📷 MENGAMBIL FOTO ABSENSI: ${index + 1}/25 di ${schedule.label}`);
-          executeIndependentAttendancePhoto(schedule.label, index + 1);
-        } else {
-          console.log(`❌ BERHENTI: Ujian sudah selesai di ${schedule.label}`);
-        }
-      }, schedule.time);
+    // Check every 30 seconds for scheduled photos
+    attendanceIntervalRef.current = setInterval(() => {
+      if (isFinished) {
+        console.log("❌ INTERVAL STOP: Ujian sudah selesai");
+        return;
+      }
       
-      attendanceTimeouts.current.push(timeoutId);
-      console.log(`✅ TERJADWAL: Foto ${index + 1}/25 di menit ${schedule.minutes}`);
-    });
+      if (!attendanceSystemActive.current) {
+        console.log("❌ INTERVAL STOP: Sistem tidak aktif");
+        return;
+      }
+      
+      const now = new Date();
+      const startTime = examStartTime.current;
+      if (!startTime) return;
+      
+      const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
+      
+      // Check if current elapsed time matches any scheduled minute
+      attendanceSchedule.current.forEach(scheduledMinute => {
+        if (elapsedMinutes >= scheduledMinute && !photosTaken.current.has(scheduledMinute)) {
+          console.log(`⏰ JADWAL FOTO ABSENSI: Menit ${scheduledMinute} - Elapsed: ${elapsedMinutes}`);
+          photosTaken.current.add(scheduledMinute);
+          executeIndependentAttendancePhoto(`${scheduledMinute} Menit`, photosTaken.current.size);
+        }
+      });
+    }, 30000); // Check every 30 seconds
     
-    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${schedules.map(s => s.minutes).join(', ')}`);
+    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${attendanceSchedule.current.join(', ')}`);
     console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran!`);
   };
 
@@ -340,7 +318,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const photoData = capturePhoto();
     if (photoData) {
       console.log(`✅ FOTO ABSENSI BERHASIL: ${timeLabel}`);
-      saveIndependentAttendancePhoto(photoData, timeLabel, photoNumber);
+      await saveIndependentAttendancePhoto(photoData, timeLabel, photoNumber);
       
       // Update UI state
       setAttendancePhotoCount(photoNumber);
@@ -426,6 +404,23 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       console.log(`✅ SAVED SUCCESS: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
     } catch (error) {
       console.error(`❌ SAVE FAILED: Foto absensi ${timeLabel}:`, error);
+      // Retry save after delay
+      setTimeout(async () => {
+        try {
+          const retryData = {
+            [`attendanceSnapshot_${photoNumber}`]: {
+              imageData: photoData,
+              timestamp: new Date().toISOString(),
+              timeLabel: timeLabel,
+              type: 'attendance'
+            }
+          };
+          await updateDoc(sessionDocRef, retryData);
+          console.log(`✅ RETRY SAVE SUCCESS: Foto absensi ${photoNumber}/25 tersimpan (retry)`);
+        } catch (retryError) {
+          console.error(`❌ RETRY SAVE FAILED: ${timeLabel}:`, retryError);
+        }
+      }, 2000);
     }
   };
 
@@ -720,11 +715,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       clearInterval(timer);
       clearInterval(devToolsInterval);
       
-      // Cleanup attendance timeouts
-      attendanceTimeouts.current.forEach(timeoutId => {
-        clearTimeout(timeoutId);
-      });
-      attendanceTimeouts.current = [];
+      // Cleanup attendance interval
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        attendanceIntervalRef.current = null;
+      }
       
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
@@ -834,10 +829,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Stop attendance system ONLY on disqualification (3 violations)
       console.log(`🚨 DISKUALIFIKASI: Menghentikan semua sistem karena 3 pelanggaran!`);
       attendanceSystemActive.current = false;
-      attendanceTimeouts.current.forEach(timeoutId => {
-        clearTimeout(timeoutId);
-      });
-      attendanceTimeouts.current = [];
+      setAttendanceScheduleActive(false);
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        attendanceIntervalRef.current = null;
+      }
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       console.log(`✅ FOTO ABSENSI BERLANJUT: Sistem tetap aktif (${newViolations}/3 pelanggaran)`);
@@ -938,16 +934,17 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     console.log("📷 FOTO FINAL: Mengambil foto absensi terakhir...");
     const finalPhotoData = capturePhoto();
     if (finalPhotoData) {
-      await saveIndependentAttendancePhoto(finalPhotoData, 'Selesai Ujian', attendancePhotoCount + 1);
+      const finalPhotoNumber = photosTaken.current.size + 1;
+      await saveIndependentAttendancePhoto(finalPhotoData, 'Selesai Ujian', finalPhotoNumber);
       setAttendancePhotoCount(prev => prev + 1);
     }
     
-    // Cleanup attendance timeouts
+    // Cleanup attendance interval
     console.log(`🧹 CLEANUP: Membersihkan jadwal foto absensi...`);
-    attendanceTimeouts.current.forEach(timeoutId => {
-      clearTimeout(timeoutId);
-    });
-    attendanceTimeouts.current = [];
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+      attendanceIntervalRef.current = null;
+    }
     
     // Exit fullscreen when exam is finished
     if (isInFullscreen()) {
@@ -988,10 +985,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       finishTime: new Date(), 
       finalScore: score, 
       answers,
-      totalAttendancePhotos: attendancePhotoCount + 1
+      totalAttendancePhotos: photosTaken.current.size + 1
     });
     
-    console.log(`🏁 UJIAN SELESAI: Total ${attendancePhotoCount + 1} foto absensi berhasil diambil`);
+    console.log(`🏁 UJIAN SELESAI: Total ${photosTaken.current.size + 1} foto absensi berhasil diambil`);
   };
 
   if (isLoading) {
@@ -1191,8 +1188,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div className="text-xs text-gray-400">
           Foto Absensi: {attendancePhotoCount}/25
         </div>
-        <div className={`text-xs ${attendanceSystemActive.current ? 'text-green-400' : 'text-red-400'}`}>
-          Sistem: {attendanceSystemActive.current ? 'AKTIF' : 'BERHENTI'}
+        <div className={`text-xs ${attendanceSystemStarted && attendanceSystemActive.current ? 'text-cyan-400' : 'text-red-400'}`}>
+          Sistem: {attendanceSystemStarted && attendanceSystemActive.current ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
         </div>
         {lastAttendanceTime && (
           <div className="text-xs text-cyan-400">
