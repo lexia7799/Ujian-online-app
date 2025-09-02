@@ -138,7 +138,7 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
     <div>
       <Modal 
         isOpen={!!selectedPhoto} 
-        title={`Foto Absen - ${selectedPhoto?.studentName}`}
+        title={`Foto Absen - ${selectedPhoto?.studentName || 'Siswa'}`}
         onCancel={() => setSelectedPhoto(null)}
         cancelText="Tutup"
       >
@@ -258,41 +258,26 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
                 className="bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700"
               >
                 {/* Student Info Header */}
-                <div className="p-4 bg-gray-700">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
-                      <span className="text-lg font-bold text-white">
-                        {(session.studentInfo.name || '').charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-grow">
-                      <h4 className="font-bold text-lg text-white">{session.studentInfo.name}</h4>
-                      <p className="text-sm text-gray-300">{session.studentInfo.nim}</p>
-                    </div>
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs text-gray-400">
-                      📚 {session.studentInfo.major || 'Jurusan tidak tersedia'}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      🏫 {session.studentInfo.className || 'Kelas tidak tersedia'}
-                    </p>
-                    <div className="flex justify-between items-center mt-2">
-                      <span 
-                        className={`px-2 py-1 text-xs font-bold rounded-full ${
-                          session.status === 'started' 
-                            ? 'bg-blue-600' 
-                            : session.status === 'finished' 
-                            ? 'bg-green-600' 
-                            : 'bg-red-600'
-                        }`}
-                      >
-                        {session.status}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {attendancePhotos.length} foto
-                      </span>
-                    </div>
+                <div className="p-4 bg-gray-700 space-y-2">
+                  <h4 className="font-bold text-lg text-white">{session.studentInfo.name}</h4>
+                  <p className="text-sm text-gray-300">NIM: {session.studentInfo.nim}</p>
+                  <p className="text-sm text-gray-300">Kelas: {session.studentInfo.className || 'Tidak tersedia'}</p>
+                  <p className="text-sm text-gray-300">Jurusan: {session.studentInfo.major || 'Tidak tersedia'}</p>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-600">
+                    <span 
+                      className={`px-2 py-1 text-xs font-bold rounded-full ${
+                        session.status === 'started' 
+                          ? 'bg-blue-600' 
+                          : session.status === 'finished' 
+                          ? 'bg-green-600' 
+                          : 'bg-red-600'
+                      }`}
+                    >
+                      {session.status}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {attendancePhotos.length} foto
+                    </span>
                   </div>
                 </div>
                 
