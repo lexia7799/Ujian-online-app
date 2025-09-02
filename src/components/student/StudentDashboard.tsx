@@ -529,6 +529,48 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                    <input 
+                      type="text"
+                      value={user.username}
+                      disabled
+                      className="w-full p-3 bg-gray-600 rounded-md border border-gray-500 text-gray-400 cursor-not-allowed" 
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Username tidak dapat diubah</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Password Baru (Opsional)</label>
+                    <input 
+                      name="password" 
+                      type="password"
+                      value={editFormData.password}
+                      onChange={handleEditChange} 
+                      placeholder="Kosongkan jika tidak ingin mengubah"
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Konfirmasi Password Baru</label>
+                    <input 
+                      name="confirmPassword" 
+                      type="password"
+                      value={editFormData.confirmPassword}
+                      onChange={handleEditChange} 
+                      placeholder="Ulangi password baru"
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {editError && (
+                <div className="bg-red-900 border border-red-500 p-3 rounded-md">
+                  <p className="text-red-200 text-sm">{editError}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-4 pt-6">
                 <button 
                   type="button"
                   onClick={() => {
@@ -589,11 +631,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                         <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
                       </div>
                     </div>
-    {/* Riwayat Ujian Section */}
-    <div className="flex justify-between items-center mb-6">
-      <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
-    </div>
-    
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
                       ✅ DISETUJUI
                     </span>
@@ -707,6 +744,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           </div>
         )}
       </div>
+
+      {/* Riwayat Ujian Section */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
+      </div>
+      
       <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
         {examResults.length === 0 ? (
           <div className="text-center p-8 text-gray-400">
