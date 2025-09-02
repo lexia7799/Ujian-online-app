@@ -317,7 +317,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     const colWidths = [4, 33, 18, 18, 18, 18, 13, 13, 13, 13, 15];
     
     // Add table headers
-    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Essay', 'Pengurangan', 'Akhir'];
+    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Warning', 'PG', 'Essay', 'Mines', 'Akhir'];
     let yPosition = yPos;
     
     // Draw header background
@@ -397,10 +397,10 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
           const essayQuestions = questions.filter(q => q.type === 'essay');
           if (essayQuestions.length === 0) return 'N/A';
           
-          if (!session.essayScores) return 'Belum dinilai';
+          if (!session.essayScores) return 'Waiting';
           
           const essayScoreValues = Object.values(session.essayScores);
-          if (essayScoreValues.length === 0) return 'Belum dinilai';
+          if (essayScoreValues.length === 0) return 'Waiting';
           
           const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
           const avgEssayScore = totalEssayScore / essayScoreValues.length;
