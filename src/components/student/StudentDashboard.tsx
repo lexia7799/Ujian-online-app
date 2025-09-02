@@ -52,11 +52,168 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       return;
     }
 
-    // Optimized data fetching with parallel execution
+    // Fetch all exam data and applications
     const fetchData = async () => {
       try {
-        // Fetch student profile and exams in parallel
-        const [studentDoc, examsSnapshot] = await Promise.all([
+        // Fetch student profile first
+        const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
+        
+        if (studentDoc.exists()) {
+          const profileData = studentDoc.data();
+          setStudentProfile(profileData);
+          setEditFormData({
+            fullName: profileData.fullName || '',
+            nim: profileData.nim || '',
+            major: profileData.major || '',
+            className: profileData.className || '',
+            university: profileData.university || '',
+            whatsapp: profileData.whatsapp || '',
+            password: '',
+            confirmPassword: ''
+          });
+        }
+
+        // Fetch all exams
+        const examsSnapshot = await getDocs(query(
+          collection(db, `artifacts/${appId}/public/data/exams`), 
+          limit(100)
+        ));
+        
+        console.log(`Found ${examsSnapshot.docs.length} total exams`);
+        
+        // Initialize arrays
+        const results: ExamResult[] = [];
+        const available: any[] = [];
+        const pending: any[] = [];
+        const rejected: any[] = [];
+        
+        // Process each exam
+        for (const examDoc of examsSnapshot.docs) {
+          const examData = examDoc.data();
+          const examId = examDoc.id;
+          
+          console.log(`Processing exam: ${examData.name} (${examId})`);
+          
+          try {
+            // Check for completed sessions first
+            const sessionsSnapshot = await getDocs(query(
+              collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
+              where('studentId', '==', user.id),
+              limit(5)
+            ));
+            
+            let hasCompletedSession = false;
+            
+            // Process sessions for results
+            sessionsSnapshot.forEach(sessionDoc => {
+              const sessionData = sessionDoc.data();
+              
+              if (['finished', 'disqualified'].includes(sessionData.status)) {
+                hasCompletedSession = true;
+                
+                // Calculate scores
+                let essayScore = undefined;
+                let totalScore = undefined;
+                
+                if (sessionData.essayScores) {
+                  const essayScores = Object.values(sessionData.essayScores);
+                  if (essayScores.length > 0) {
+                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
+                    const mcScore = sessionData.finalScore || 0;
+                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
+                  }
+                }
+                
+                results.push({
+                  id: sessionDoc.id,
+                  examName: examData.name || 'Unknown Exam',
+                  examCode: examData.code,
+                  finalScore: sessionData.finalScore || 0,
+                  essayScore,
+                  totalScore,
+                  finishTime: sessionData.finishTime?.toDate() || new Date(),
+                  status: sessionData.status
+                });
+              }
+            });
+            
+            // Check for applications regardless of completed sessions
+            const applicationsSnapshot = await getDocs(query(
+              collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
+              where('studentId', '==', user.id),
+              limit(5)
+            ));
+            
+            console.log(`Found ${applicationsSnapshot.docs.length} applications for exam ${examId}`);
+            
+            // Process applications
+            applicationsSnapshot.forEach(appDoc => {
+              const appData = appDoc.data();
+              console.log(`Application status: ${appData.status} for exam ${examData.name}`);
+              
+              const examWithApp = {
+                id: examId,
+                name: examData.name,
+                code: examData.code,
+                applicationStatus: appData.status,
+                appliedAt: appData.appliedAt?.toDate() || new Date(),
+                startTime: examData.startTime,
+                endTime: examData.endTime,
+                status: examData.status,
+                hasCompletedSession,
+                ...examData
+              };
+              
+              // Categorize based on application status
+              if (appData.status === 'pending') {
+                pending.push(examWithApp);
+                console.log(`Added to pending: ${examData.name}`);
+              } else if (appData.status === 'approved') {
+                // Only add to available if no completed session
+                if (!hasCompletedSession) {
+                  available.push(examWithApp);
+                  console.log(`Added to available: ${examData.name}`);
+                } else {
+                  console.log(`Skipped available (completed): ${examData.name}`);
+                }
+              } else if (appData.status === 'rejected') {
+                rejected.push(examWithApp);
+                console.log(`Added to rejected: ${examData.name}`);
+              }
+            });
+            
+          } catch (examError) {
+            console.warn(`Error processing exam ${examId}:`, examError);
+          }
+        }
+        
+        console.log(`Final counts - Pending: ${pending.length}, Available: ${available.length}, Rejected: ${rejected.length}, Results: ${results.length}`);
+        
+        // Set all results
+        setExamResults(results.sort((a, b) => {
+          if (!a.finishTime && !b.finishTime) return 0;
+          if (!a.finishTime) return -1;
+          if (!b.finishTime) return 1;
+          return b.finishTime.getTime() - a.finishTime.getTime();
+        }));
+        
+        setAvailableExams(available);
+        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
+        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
+        
+      } catch (error) {
+        console.error('Error fetching exam results:', error);
+        setExamResults([]);
+        setAvailableExams([]);
+        setPendingApplications([]);
+        setRejectedApplications([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.id]);
           getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id)),
           getDocs(query(collection(db, `artifacts/${appId}/public/data/exams`), limit(50))) // Limit exams for performance
         ]);
@@ -364,11 +521,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               <span className="text-2xl">⏳</span>
             </div>
             <div>
-              <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi Dosen</h4>
-              <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
+              <h4 className="text-xl font-bold text-yellow-400">
+                {pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`}
+              </h4>
+              <p className="text-yellow-200 text-sm">
+                {pendingApplications.length === 1 
+                  ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
+                  : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen'
+                }
+              </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${
+            pendingApplications.length === 1 
+              ? 'grid-cols-1' 
+              : pendingApplications.length === 2 
+              ? 'grid-cols-1 md:grid-cols-2' 
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+          }`}>
             {pendingApplications.map(exam => (
               <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
                 <div className="flex justify-between items-start mb-3">
@@ -379,10 +549,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
                       <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
                       <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                      <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
+                      {exam.hasCompletedSession && (
+                        <p className="text-green-400 text-xs mt-1">✅ Sudah pernah mengikuti ujian ini</p>
+                      )}
                     </div>
                   </div>
                   <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                    ⏳ PENDING
+                    ⏳ MENUNGGU
                   </span>
                 </div>
                 <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
@@ -393,6 +567,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               </div>
             ))}
           </div>
+          
+          {/* Summary for multiple pending */}
+          {pendingApplications.length > 1 && (
+            <div className="mt-4 bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+              <p className="text-yellow-200 text-sm text-center">
+                📋 <strong>Total:</strong> {pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen.
+                Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -751,11 +935,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 <span className="text-2xl">❌</span>
               </div>
               <div>
-                <h4 className="text-xl font-bold text-red-400">Aplikasi Ditolak</h4>
-                <p className="text-red-200 text-sm">Aplikasi ujian yang tidak disetujui oleh dosen</p>
+                <h4 className="text-xl font-bold text-red-400">
+                  {rejectedApplications.length === 1 ? 'Aplikasi Ditolak' : `${rejectedApplications.length} Aplikasi Ditolak`}
+                </h4>
+                <p className="text-red-200 text-sm">
+                  {rejectedApplications.length === 1 
+                    ? 'Aplikasi ujian yang tidak disetujui oleh dosen'
+                    : 'Beberapa aplikasi ujian tidak disetujui oleh dosen'
+                  }
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${
+              rejectedApplications.length === 1 
+                ? 'grid-cols-1' 
+                : rejectedApplications.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
               {rejectedApplications.map(exam => (
                 <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-red-400">
                   <div className="flex justify-between items-start mb-3">
@@ -765,6 +962,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       <div className="mt-2 text-xs text-gray-400">
                         <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
                         <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
                       </div>
                     </div>
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
@@ -779,6 +978,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 </div>
               ))}
             </div>
+            
+            {/* Summary for multiple rejected */}
+            {rejectedApplications.length > 1 && (
+              <div className="mt-4 bg-red-900 border border-red-600 p-3 rounded-md">
+                <p className="text-red-200 text-sm text-center">
+                  📞 <strong>Tindak Lanjut:</strong> {rejectedApplications.length} aplikasi ujian ditolak.
+                  Silakan hubungi dosen yang bersangkutan untuk mengetahui alasan penolakan.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
