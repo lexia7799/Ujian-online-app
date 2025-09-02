@@ -369,6 +369,46 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         )}
       </div>
 
+      {/* Aplikasi Menunggu Konfirmasi (Pending) */}
+      {pendingApplications.length > 0 && (
+        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
+              <span className="text-2xl">⏳</span>
+            </div>
+            <div>
+              <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi Dosen</h4>
+              <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingApplications.map(exam => (
+              <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-grow">
+                    <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                    <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                    <div className="mt-2 text-xs text-gray-400">
+                      <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
+                      <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                      <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
+                    ⏳ PENDING
+                  </span>
+                </div>
+                <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+                  <p className="text-yellow-200 text-sm text-center">
+                    💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Edit Profile Modal */}
       {showEditProfile && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
@@ -489,44 +529,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                    <input 
-                      type="text"
-                      value={studentProfile.username}
-                      className="w-full p-3 bg-gray-600 rounded-md border border-gray-500 text-gray-400 cursor-not-allowed" 
-                      disabled
-                    />
-                    <p className="text-xs text-gray-400 mt-1">Username tidak dapat diubah</p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Password Baru (Opsional)</label>
-                    <input 
-                      name="password" 
-                      type="password"
-                      value={editFormData.password}
-                      onChange={handleEditChange} 
-                      placeholder="Kosongkan jika tidak ingin mengubah password"
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Konfirmasi Password Baru</label>
-                    <input 
-                      name="confirmPassword" 
-                      type="password"
-                      value={editFormData.confirmPassword}
-                      onChange={handleEditChange} 
-                      placeholder="Konfirmasi password baru"
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {editError && <p className="text-red-500 text-sm">{editError}</p>}
-              
-              <div className="flex justify-end space-x-4 pt-4">
                 <button 
                   type="button"
                   onClick={() => {
@@ -587,6 +589,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                         <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
                       </div>
                     </div>
+    {/* Riwayat Ujian Section */}
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
+    </div>
+    
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
                       ✅ DISETUJUI
                     </span>
@@ -784,8 +791,4 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   );
 };
 
-      {/* Riwayat Ujian Section */}
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
-      </div>
 export default StudentDashboard;
