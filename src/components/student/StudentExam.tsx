@@ -48,7 +48,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [attendanceNotificationMessage, setAttendanceNotificationMessage] = useState('');
   const [attendanceSystemStarted, setAttendanceSystemStarted] = useState(false);
   
-  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const attendanceIntervalId = useRef<NodeJS.Timeout | null>(null);
   const attendanceSetupDone = useRef(false);
   const examStartTime = useRef<Date | null>(null);
   const attendanceSystemActive = useRef(false);
@@ -159,10 +159,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       }
       
       // Cleanup attendance timeouts
-      attendanceTimeouts.current.forEach(timeoutId => {
-        clearTimeout(timeoutId);
-      });
-      attendanceTimeouts.current = [];
+      if (attendanceIntervalId.current) {
+        clearInterval(attendanceIntervalId.current);
+        attendanceIntervalId.current = null;
+      }
     };
   }, []);
 
@@ -269,12 +269,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     attendanceSystemActive.current = true;
     
     // Clear any existing interval
-    if (attendanceIntervalRef.current) {
-      clearInterval(attendanceIntervalRef.current);
+    if (attendanceIntervalId.current) {
+      clearInterval(attendanceIntervalId.current);
     }
     
     // Check every 30 seconds for scheduled photos
-    attendanceIntervalRef.current = setInterval(() => {
+    attendanceIntervalId.current = setInterval(() => {
       if (isFinished) {
         console.log("❌ INTERVAL STOP: Ujian sudah selesai");
         return;
@@ -716,9 +716,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       clearInterval(devToolsInterval);
       
       // Cleanup attendance interval
-      if (attendanceIntervalRef.current) {
-        clearInterval(attendanceIntervalRef.current);
-        attendanceIntervalRef.current = null;
+      if (attendanceIntervalId.current) {
+        clearInterval(attendanceIntervalId.current);
+        attendanceIntervalId.current = null;
       }
       
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -830,9 +830,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       console.log(`🚨 DISKUALIFIKASI: Menghentikan semua sistem karena 3 pelanggaran!`);
       attendanceSystemActive.current = false;
       setAttendanceScheduleActive(false);
-      if (attendanceIntervalRef.current) {
-        clearInterval(attendanceIntervalRef.current);
-        attendanceIntervalRef.current = null;
+      if (attendanceIntervalId.current) {
+        clearInterval(attendanceIntervalId.current);
+        attendanceIntervalId.current = null;
       }
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
@@ -941,9 +941,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     
     // Cleanup attendance interval
     console.log(`🧹 CLEANUP: Membersihkan jadwal foto absensi...`);
-    if (attendanceIntervalRef.current) {
-      clearInterval(attendanceIntervalRef.current);
-      attendanceIntervalRef.current = null;
+    if (attendanceIntervalId.current) {
+      clearInterval(attendanceIntervalId.current);
+      attendanceIntervalId.current = null;
     }
     
     // Exit fullscreen when exam is finished
