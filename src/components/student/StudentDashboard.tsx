@@ -138,9 +138,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               }
             });
             
-            // Skip if already completed
-            if (hasCompletedSession) return;
-            
             // Process applications
             applicationsSnapshot.forEach(appDoc => {
               const appData = appDoc.data();
@@ -156,26 +153,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 ...examData
               };
               
-              // Categorize based on status
-              switch (appData.status) {
-                case 'approved':
-                  const now = new Date();
-                  const startTime = new Date(examData.startTime);
-                  const endTime = new Date(examData.endTime);
-                  
-                  if (now >= startTime && now <= endTime && examData.status === 'published') {
-                    available.push(examWithApp);
-                  } else {
-                    // Approved but not yet time to start or exam ended
-                    available.push(examWithApp);
-                  }
-                  break;
-                case 'pending':
-                  pending.push(examWithApp);
-                  break;
-                case 'rejected':
-                  rejected.push(examWithApp);
-                  break;
+              // Skip if already completed session exists
+              if (hasCompletedSession) return;
+              
+              // Categorize based on application status
+              if (appData.status === 'pending') {
+                pending.push(examWithApp);
+              } else if (appData.status === 'approved') {
+                available.push(examWithApp);
+              } else if (appData.status === 'rejected') {
+                rejected.push(examWithApp);
               }
             });
           } catch (examError) {
