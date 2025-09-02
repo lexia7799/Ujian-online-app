@@ -7,6 +7,7 @@ import StudentConfirmation from './StudentConfirmation';
 import TeacherResultsDashboard from './TeacherResultsDashboard';
 import TeacherProctoringDashboard from './TeacherProctoringDashboard';
 import QuestionManager from './QuestionManager';
+import TeacherAttendanceDashboard from './TeacherAttendanceDashboard';
 
 interface TeacherDashboardProps {
   user?: any;
@@ -17,7 +18,7 @@ interface TeacherDashboardProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
   const [view, setView] = useState('search');
-  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'teacher_attendance' | 'question_manager'>('main');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,6 +78,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
         break;
       case 'teacher_proctoring':
         setCurrentView('teacher_proctoring');
+        break;
+      case 'teacher_attendance':
+        setCurrentView('teacher_attendance');
         break;
       case 'question_manager':
         setCurrentView('question_manager');
@@ -143,6 +147,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     return (
       <TeacherProctoringDashboard 
         navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'teacher_attendance') {
+    return (
+      <TeacherAttendanceDashboard 
         navigateBack={handleBackToMain}
         appState={{ exam: currentExam }}
       />
@@ -268,6 +281,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                   className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Awasi Ujian
+                </button>
+                <button 
+                  onClick={() => handleNavigateToFeature('teacher_attendance', { exam: foundExam })} 
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                >
+                  Rekap Absen
                 </button>
                 <button 
                   onClick={() => handleNavigateToFeature('question_manager', { exam: foundExam })} 
