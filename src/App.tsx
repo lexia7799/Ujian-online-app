@@ -19,7 +19,6 @@ import StudentIdentity from './components/student/StudentIdentity';
 import StudentExamStatusCheck from './components/student/StudentExamStatusCheck';
 import StudentPreCheck from './components/student/StudentPreCheck';
 import StudentExam from './components/student/StudentExam';
-import AttendanceRecap from './components/teacher/AttendanceRecap';
 
 function App() {
   // Block mobile devices at app level
@@ -128,8 +127,6 @@ function App() {
         return <TeacherProctoringDashboard {...props} />;
       case 'teacher_results':
         return <TeacherResultsDashboard {...props} />;
-      case 'attendance_recap':
-        return <AttendanceRecap {...props} />;
       default:
         return <HomePage {...props} />;
     }

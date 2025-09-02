@@ -96,19 +96,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     };
 
     const { exam } = appState;
-    
-    console.log("Starting exam session with data:", {
-      examId: exam.id,
-      examName: exam.name,
-      studentInfo: finalStudentInfo,
-      examTimes: {
-        startTime: exam.startTime,
-        endTime: exam.endTime,
-        currentTime: new Date().toISOString(),
-        timeUntilEnd: Math.floor((new Date(exam.endTime).getTime() - new Date().getTime()) / 60000) + " minutes"
-      }
-    });
-    
     const sessionRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`);
     
     try {
@@ -119,9 +106,9 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         status: 'started',
         violations: 0,
         answers: {},
-        finalScore: null,
-        attendance_snapshots: {}
+        finalScore: null
       });
+      navigateTo('student_exam', { sessionId: docRef.id });
       navigateTo('student_exam', { 
         sessionId: docRef.id, 
         exam: exam,
