@@ -89,6 +89,10 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
   const getAttendancePhotos = (session: Session): AttendancePhoto[] => {
     const photos: AttendancePhoto[] = [];
     
+    // Define the expected photo schedule
+    const expectedPhotoTimes = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120];
+    const expectedLabels = [...expectedPhotoTimes.map(time => `Menit ke-${time}`), 'Selesai'];
+    
     Object.keys(session).forEach(key => {
       if (key.startsWith('attendancePhoto_')) {
         const photoData = session[key];
@@ -102,12 +106,16 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
       }
     });
     
-    // Sort photos by label (chronologically)
-    const sortOrder = ['Menit ke-1', 'Menit ke-5', 'Menit ke-10', 'Menit ke-15', 'Menit ke-20', 'Menit ke-25', 'Menit ke-30', 'Menit ke-35', 'Menit ke-40', 'Menit ke-45', 'Menit ke-50', 'Menit ke-55', 'Menit ke-60', 'Menit ke-65', 'Menit ke-70', 'Menit ke-75', 'Menit ke-80', 'Menit ke-85', 'Menit ke-90', 'Menit ke-95', 'Menit ke-100', 'Menit ke-105', 'Menit ke-110', 'Menit ke-115', 'Menit ke-120', 'Selesai'];
+    // Sort photos by expected order
+    const sortOrder = expectedLabels;
     
     photos.sort((a, b) => {
       const indexA = sortOrder.indexOf(a.label);
       const indexB = sortOrder.indexOf(b.label);
+      // If label not found in sortOrder, put it at the end
+      if (indexA === -1 && indexB === -1) return 0;
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
       return indexA - indexB;
     });
     

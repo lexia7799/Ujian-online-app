@@ -47,6 +47,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const attendancePhotoTimestamps = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120];
   const [attendancePhotos, setAttendancePhotos] = useState<{[key: string]: string}>({});
   const examStartTimeRef = useRef<Date | null>(null);
+  const [attendancePhotoCount, setAttendancePhotoCount] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -243,7 +244,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         
         // Check if current minute matches any of our scheduled photo times
         if (attendancePhotoTimestamps.includes(elapsedMinutes)) {
-          captureAttendancePhoto(`Menit ke-${elapsedMinutes}`);
+          const label = `Menit ke-${elapsedMinutes}`;
+          captureAttendancePhoto(label);
         }
       }, 60000); // Check every minute
     };
@@ -273,6 +275,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         ...prev,
         [label]: photoData
       }));
+      
+      // Update photo count
+      setAttendancePhotoCount(prev => prev + 1);
       
       // Save to Firebase
       const attendanceData: any = {};
@@ -730,7 +735,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     if (isFinished) return;
     
     // Capture final attendance photo before finishing
-    await captureAttendancePhoto("Selesai");
+    const finalLabel = "Selesai";
+    await captureAttendancePhoto(finalLabel);
     
     setIsFinished(true);
     setShowConfirmModal(false);
@@ -981,6 +987,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>
+        <div className="text-xs text-blue-400 mt-1">
+          📸 Foto Absen: {attendancePhotoCount}
+        </div>
         {streamRef.current && (
           <div className="text-xs text-gray-400">
             Stream: {streamRef.current.active ? '🟢 Active' : '🔴 Inactive'}
@@ -997,7 +1006,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 {Math.floor((timeLeft % 3600) / 60).toString().padStart(2, '0')}:
                 {(timeLeft % 60).toString().padStart(2, '0')}
               </div>
-              <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
+              <div className="flex justify-center space-x-4 text-sm">
+                <div className="text-red-500">Pelanggaran: {violations}/3</div>
+                <div className="text-blue-400">📸 Foto Absen: {attendancePhotoCount}</div>
+              </div>
             </div>
           </div>
           <div className="flex justify-between items-center">

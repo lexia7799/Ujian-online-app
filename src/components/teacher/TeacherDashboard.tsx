@@ -361,7 +361,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                 </button>
                 <button 
                   onClick={() => handleNavigateToFeature('attendance_recap', { exam: foundExam })} 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Rekap Absen
                 </button>
