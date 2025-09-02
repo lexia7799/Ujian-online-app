@@ -173,23 +173,30 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     // Apply score reduction
     const reduction = session.scoreReduction || 0;
     
-    if (essayQuestions.length === 0) return mcScore.toFixed(2);
-    
-    let totalEssayScore = 0;
-    if (session.essayScores) {
-      totalEssayScore = Object.values(session.essayScores).reduce((sum, s) => sum + s, 0);
-    }
-    
-    const avgEssayScore = essayQuestions.length > 0 ? totalEssayScore / essayQuestions.length : 0;
-    
-    if (mcQuestionCount > 0) {
-      const baseScore = (mcScore * 0.5) + (avgEssayScore * 0.5);
-      const finalScore = Math.max(0, baseScore - reduction);
+    if (essayQuestions.length === 0) {
+      const finalScore = Math.max(0, mcScore - reduction);
       return finalScore.toFixed(2);
     }
     
-    const finalScore = Math.max(0, avgEssayScore - reduction);
-    return finalScore.toFixed(2);
+    let avgEssayScore = 0;
+    if (session.essayScores) {
+      const essayScoreValues = Object.values(session.essayScores);
+      if (essayScoreValues.length > 0) {
+        const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
+        avgEssayScore = totalEssayScore / essayScoreValues.length;
+      }
+    }
+    
+    if (mcQuestionCount > 0) {
+      // Ada soal PG dan Essay: 50% PG + 50% Essay
+      const baseScore = (mcScore * 0.5) + (avgEssayScore * 0.5);
+      const finalScore = Math.max(0, baseScore - reduction);
+      return finalScore.toFixed(2);
+    } else {
+      // Hanya ada soal Essay: 100% Essay
+      const finalScore = Math.max(0, avgEssayScore - reduction);
+      return finalScore.toFixed(2);
+    }
   };
 
   const handleEditScore = (session: Session) => {
@@ -352,7 +359,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     sessionsToExport.forEach((session, sessionIndex) => {
       // Prepare row data with text wrapping for name
-      const studentName = session.studentInfo.name || 'N/A';
+      const studentName = session.studentInfo.name || session.studentInfo.fullName || 'N/A';
       const nameLines = wrapText(studentName, colWidths[1] - 2, 9);
       const rowHeight = Math.max(12, nameLines.length * 4 + 4);
       
@@ -610,9 +617,12 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
                     if (essayQuestions.length > 0) {
                       let essayScore = 'Belum dinilai';
                       if (editingScoreSession.essayScores) {
-                        const totalEssayScore = Object.values(editingScoreSession.essayScores).reduce((sum, s) => sum + s, 0);
-                        const avgEssayScore = totalEssayScore / essayQuestions.length;
-                        essayScore = avgEssayScore.toFixed(2);
+                        const essayScoreValues = Object.values(editingScoreSession.essayScores);
+                        if (essayScoreValues.length > 0) {
+                          const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
+                          const avgEssayScore = totalEssayScore / essayScoreValues.length;
+                          essayScore = avgEssayScore.toFixed(2);
+                        }
                       }
                       return (
                         <div className="flex justify-between">
@@ -741,7 +751,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             ) : (
               filteredSessions.map(session => (
                 <tr key={session.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4 font-semibold">{session.studentInfo.name || 'N/A'}</td>
+                  <td className="p-4 font-semibold">{session.studentInfo.name || session.studentInfo.fullName || 'N/A'}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.nim}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.className}</td>
@@ -755,8 +765,11 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
                       
                       if (!session.essayScores) return 'Belum dinilai';
                       
-                      const totalEssayScore = Object.values(session.essayScores).reduce((sum, s) => sum + s, 0);
-                      const avgEssayScore = totalEssayScore / essayQuestions.length;
+                      const essayScoreValues = Object.values(session.essayScores);
+                      if (essayScoreValues.length === 0) return 'Belum dinilai';
+                      
+                      const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
+                      const avgEssayScore = totalEssayScore / essayScoreValues.length;
                       return avgEssayScore.toFixed(2);
                     })()}
                   </td>
