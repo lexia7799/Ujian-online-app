@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, limit } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import { AlertIcon } from '../ui/Icons';
 import Modal from '../ui/Modal';

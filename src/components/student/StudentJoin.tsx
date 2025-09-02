@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, getDocs, query, where, collectionGroup } from 'firebase/firestore';
+import { collection, getDocs, query, where, collectionGroup, limit } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface StudentJoinProps {
