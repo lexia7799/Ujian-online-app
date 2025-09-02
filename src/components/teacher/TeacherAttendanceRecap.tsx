@@ -79,7 +79,7 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
         return name.includes(search) || 
                nim.includes(search) || 
                major.includes(search) || 
-               className.includes(search);
+        studentName: studentName || 'Siswa'
       });
       setFilteredSessions(filtered);
     }
@@ -259,7 +259,7 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
               >
                 {/* Student Info Header */}
                 <div className="p-4 bg-gray-700 space-y-2">
-                  <h4 className="font-bold text-lg text-white">{session.studentInfo.name}</h4>
+                  <h4 className="font-bold text-lg text-white">{session.studentInfo.name || session.studentInfo.fullName || 'Nama tidak tersedia'}</h4>
                   <p className="text-sm text-gray-300">NIM: {session.studentInfo.nim}</p>
                   <p className="text-sm text-gray-300">Kelas: {session.studentInfo.className || 'Tidak tersedia'}</p>
                   <p className="text-sm text-gray-300">Jurusan: {session.studentInfo.major || 'Tidak tersedia'}</p>
@@ -301,7 +301,7 @@ const TeacherAttendanceRecap: React.FC<TeacherAttendanceRecapProps> = ({ navigat
                             <img 
                               src={photo.imageData} 
                               alt={`Attendance ${photo.label}`}
-                              className="w-20 h-16 object-cover rounded-md border-2 border-gray-600 group-hover:border-indigo-500 transition-colors"
+                              className="w-24 h-20 object-cover rounded-md border-2 border-gray-600 group-hover:border-indigo-500 transition-colors"
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-md transition-opacity"></div>
                           </div>
