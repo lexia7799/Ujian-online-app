@@ -218,21 +218,36 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           executeAttendancePhoto(`${scheduledMinute} Menit`, photosTaken.current.size);
         }
       });
-    }, 30000); // Check every 30 seconds
-    
-    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${attendanceSchedule.current.join(', ')}`);
-    console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran!`);
+    }, 30000);
   };
 
-  // Execute attendance photo - COMPLETELY INDEPENDENT
   const executeAttendancePhoto = async (timeLabel: string, photoNumber: number) => {
     console.log(`📸 FOTO ABSENSI INDEPENDEN: ${timeLabel} (${photoNumber}/25)`);
-    console.log(`🔥 INDEPENDEN: Mengambil foto absensi - violations diabaikan total!`);
+    console.log(`📸 ATTENDANCE PHOTO START: ${timeLabel}`);
+    console.log(`📊 CONDITIONS: isFinished=${isFinished}, violations=${violations}, cameraReady=${isCameraReady}`);
     
-    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
-      console.log(`⚠️ MASALAH TEKNIS: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, kamera=${isCameraReady}`);
+    // CRITICAL: HANYA check isFinished - TIDAK check violations
+    if (isFinished) {
+      console.log(`❌ BLOCKED: Ujian sudah selesai, tidak ambil foto di ${timeLabel}`);
       return;
     }
+    
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
+      console.log(`❌ TECHNICAL ISSUE: video=${!!videoRef.current}, canvas=${!!canvasRef.current}, cameraReady=${isCameraReady}`);
+      // Retry after 1 second if camera not ready
+      if (!isCameraReady) {
+        console.log(`🔄 RETRY: Mencoba lagi foto ${timeLabel} dalam 1 detik...`);
+        setTimeout(() => {
+          if (!isFinished) {
+            executeAttendancePhoto(timeLabel, photoNumber);
+          }
+        }, 1000);
+      }
+      return;
+    }
+    
+    console.log(`📷 CAPTURING: Foto absensi ${attendancePhotoCount + 1}/25 di ${timeLabel}`);
+    console.log(`🔥 VIOLATIONS STATUS: ${violations} pelanggaran - FOTO TETAP JALAN!`);
     
     const photoData = capturePhoto();
     if (photoData) {
@@ -248,9 +263,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       setShowAttendanceNotification(true);
       setTimeout(() => setShowAttendanceNotification(false), 3000);
     } else {
-      console.log(`❌ PHOTO FAILED: ${timeLabel} - Mencoba lagi...`);
-      // Retry after short delay
-      setTimeout(() => executeAttendancePhoto(timeLabel, photoNumber), 1000);
+      console.log(`❌ CAPTURE FAILED: Gagal ambil foto di ${timeLabel}, mencoba lagi...`);
+      // Retry capture after short delay
+      setTimeout(() => {
+        if (!isFinished) {
+          executeAttendancePhoto(timeLabel, photoNumber);
+        }
+      }, 1000);
     }
   };
 
@@ -267,7 +286,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       };
       
       await updateDoc(sessionDocRef, attendanceData);
-      console.log(`✅ SAVED SUCCESS: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
+      console.log(`✅ SAVED: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
+      console.log(`🔥 VIOLATIONS: ${violations} pelanggaran - FOTO ABSENSI TIDAK TERPENGARUH!`);
     } catch (error) {
       console.error(`❌ SAVE FAILED: Foto absensi ${timeLabel}:`, error);
       // Retry save after delay
@@ -282,7 +302,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             }
           };
           await updateDoc(sessionDocRef, retryData);
-          console.log(`✅ RETRY SAVE SUCCESS: Foto absensi ${photoNumber}/25 tersimpan di ${timeLabel}`);
+          console.log(`✅ RETRY SAVE SUCCESS: Foto absensi ${photoNumber}/25 tersimpan (retry)`);
         } catch (retryError) {
           console.error(`❌ RETRY SAVE FAILED: ${timeLabel}:`, retryError);
         }
