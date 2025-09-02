@@ -599,16 +599,29 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           <div className="mb-6 bg-green-800 border border-green-500 p-6 rounded-lg shadow-lg">
             <div className="flex items-center mb-4">
               <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">🎯</span>
+                <span className="text-2xl">{availableExams.length > 1 ? '📚' : '🎯'}</span>
               </div>
               <div>
-                <h4 className="text-xl font-bold text-green-400">Ujian Siap Dimulai</h4>
-                <p className="text-green-200 text-sm">Ujian yang sudah disetujui dan bisa dimulai sekarang</p>
+                <h4 className="text-xl font-bold text-green-400">
+                  {availableExams.length > 1 ? `${availableExams.length} Ujian Siap Dimulai` : 'Ujian Siap Dimulai'}
+                </h4>
+                <p className="text-green-200 text-sm">
+                  {availableExams.length > 1 
+                    ? 'Beberapa ujian sudah disetujui dan bisa dimulai sekarang' 
+                    : 'Ujian yang sudah disetujui dan bisa dimulai sekarang'
+                  }
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${
+              availableExams.length === 1 
+                ? 'grid-cols-1' 
+                : availableExams.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
               {availableExams.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-green-400">
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-green-400 hover:bg-gray-600 transition-colors">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-grow">
                       <h5 className="font-bold text-lg text-white">{exam.name}</h5>
@@ -616,21 +629,78 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       <div className="mt-2 text-xs text-gray-400">
                         <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
                         <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
                       </div>
                     </div>
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
                       ✅ DISETUJUI
                     </span>
                   </div>
+                  
+                  {/* Exam Status Check */}
+                  {(() => {
+                    const now = new Date();
+                    const startTime = new Date(exam.startTime);
+                    const endTime = new Date(exam.endTime);
+                    
+                    if (now < startTime) {
+                      return (
+                        <div className="bg-blue-900 border border-blue-600 p-3 rounded-md mb-3">
+                          <p className="text-blue-200 text-sm text-center">
+                            ⏰ Ujian akan dimulai pada:<br/>
+                            <span className="font-bold">{startTime.toLocaleString('id-ID')}</span>
+                          </p>
+                        </div>
+                      );
+                    } else if (now > endTime) {
+                      return (
+                        <div className="bg-gray-900 border border-gray-600 p-3 rounded-md mb-3">
+                          <p className="text-gray-400 text-sm text-center">
+                            ⏰ Ujian telah berakhir
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
                   <button
                     onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
+                    disabled={(() => {
+                      const now = new Date();
+                      const startTime = new Date(exam.startTime);
+                      const endTime = new Date(exam.endTime);
+                      return now < startTime || now > endTime;
+                    })()}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center disabled:bg-gray-500 disabled:cursor-not-allowed"
                   >
-                    🚀 Mulai Ujian Sekarang
+                    {(() => {
+                      const now = new Date();
+                      const startTime = new Date(exam.startTime);
+                      const endTime = new Date(exam.endTime);
+                      
+                      if (now < startTime) {
+                        return '⏰ Belum Dimulai';
+                      } else if (now > endTime) {
+                        return '⏰ Sudah Berakhir';
+                      } else {
+                        return '🚀 Mulai Ujian Sekarang';
+                      }
+                    })()}
                   </button>
                 </div>
               ))}
             </div>
+            
+            {/* Summary Info */}
+            {availableExams.length > 1 && (
+              <div className="mt-4 bg-green-900 border border-green-600 p-3 rounded-md">
+                <p className="text-green-200 text-sm text-center">
+                  💡 <strong>Tips:</strong> Anda memiliki {availableExams.length} ujian yang disetujui. 
+                  Pastikan untuk mengerjakan semua ujian sesuai jadwal yang ditentukan.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
