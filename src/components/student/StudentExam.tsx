@@ -297,11 +297,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         }
       }
     }, 30000); // Check every 30 seconds
-      console.log(`✅ TERJADWAL: Foto ${index + 1}/25 di menit ${schedule.minutes}`);
-    });
-    
-    console.log(`🔥 GARANTSI: Foto akan diambil di menit: ${schedules.map(s => s.minutes).join(', ')}`);
-    console.log(`🚨 PENTING: Foto absensi TIDAK TERPENGARUH oleh pelanggaran!`);
   };
 
   const setupAttendanceSchedule = () => {
