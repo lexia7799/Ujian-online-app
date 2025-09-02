@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, updateDoc, doc, query, limit, startAfter, orderBy, DocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, limit, startAfter, orderBy, DocumentSnapshot, onSnapshot } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface Application {
