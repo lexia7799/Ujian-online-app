@@ -48,6 +48,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [attendancePhotos, setAttendancePhotos] = useState<{[key: string]: string}>({});
   const examStartTimeRef = useRef<Date | null>(null);
   const [attendancePhotoCount, setAttendancePhotoCount] = useState(0);
+  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const capturedMinutesRef = useRef<Set<number>>(new Set());
   const audioContextRef = useRef<AudioContext | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -227,37 +229,43 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Attendance photo capture system
   useEffect(() => {
-    if (isFinished || isLoading || questions.length === 0) return;
+    if (isFinished || isLoading || questions.length === 0 || !isCameraReady) return;
     
     // Set exam start time
     if (!examStartTimeRef.current) {
       examStartTimeRef.current = new Date();
+      console.log("📅 Exam started at:", examStartTimeRef.current.toLocaleTimeString());
     }
     
-    // Start attendance photo timer
-    const startAttendancePhotoTimer = () => {
-      attendancePhotoIntervalRef.current = setInterval(() => {
-        if (isFinished || !examStartTimeRef.current) return;
-        
-        const now = new Date();
-        const elapsedMinutes = Math.floor((now.getTime() - examStartTimeRef.current.getTime()) / (1000 * 60));
-        
-        // Check if current minute matches any of our scheduled photo times
-        if (attendancePhotoTimestamps.includes(elapsedMinutes)) {
-          const label = `Menit ke-${elapsedMinutes}`;
-          captureAttendancePhoto(label);
-        }
-      }, 60000); // Check every minute
-    };
+    // Clear any existing interval
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+    }
     
-    startAttendancePhotoTimer();
+    // Start attendance photo timer - check every 30 seconds for more precision
+    attendanceIntervalRef.current = setInterval(() => {
+      if (isFinished || !examStartTimeRef.current) return;
+      
+      const now = new Date();
+      const elapsedMinutes = Math.floor((now.getTime() - examStartTimeRef.current.getTime()) / (1000 * 60));
+      
+      console.log(`⏰ Elapsed minutes: ${elapsedMinutes}`);
+      
+      // Check if current minute matches any of our scheduled photo times and hasn't been captured yet
+      if (attendancePhotoTimestamps.includes(elapsedMinutes) && !capturedMinutesRef.current.has(elapsedMinutes)) {
+        console.log(`📸 Taking attendance photo at minute ${elapsedMinutes}`);
+        capturedMinutesRef.current.add(elapsedMinutes);
+        const label = `Menit ke-${elapsedMinutes}`;
+        captureAttendancePhoto(label);
+      }
+    }, 30000); // Check every 30 seconds for better precision
     
     return () => {
-      if (attendancePhotoIntervalRef.current) {
-        clearInterval(attendancePhotoIntervalRef.current);
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
       }
     };
-  }, [isFinished, isLoading, questions.length]);
+  }, [isFinished, isLoading, questions.length, isCameraReady]);
 
   // Capture attendance photo function
   const captureAttendancePhoto = async (label: string) => {
@@ -265,6 +273,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       console.log("❌ Cannot capture attendance photo - camera not ready");
       return;
     }
+    
+    console.log(`📸 Attempting to capture attendance photo: ${label}`);
     
     const photoData = capturePhoto();
     if (photoData) {
@@ -743,8 +753,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setShowUnansweredModal(false);
     
     // Clear attendance photo timer
-    if (attendancePhotoIntervalRef.current) {
-      clearInterval(attendancePhotoIntervalRef.current);
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
     }
     
     // Exit fullscreen when exam is finished
