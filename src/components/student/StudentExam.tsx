@@ -55,6 +55,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const attendanceTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const tabCountRef = useRef(1);
   const lastFocusTime = useRef(Date.now());
   const fullscreenRetryCount = useRef(0);
@@ -261,56 +263,40 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     console.log("🔥 SISTEM INDEPENDEN: Foto absensi tidak akan terpengaruh oleh pelanggaran!");
     console.log("📅 JADWAL: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120 menit (25 foto total)");
     console.log("🚨 INDEPENDEN: Tidak terpengaruh oleh pelanggaran apapun!");
+    // Setup interval-based system instead of timeout-based
+    let photoIndex = 0;
+    const attendanceSchedule = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120];
     
-    // Clear any existing timeouts first
-    attendanceTimeouts.current.forEach(timeoutId => {
-      clearTimeout(timeoutId);
-    });
-    attendanceTimeouts.current = [];
-    
-    setAttendanceScheduleActive(true);
-    attendanceSystemActive.current = true;
-    
-    // Define exact schedule in SECONDS (not minutes)
-    const schedules = [
-      { minutes: 1, time: 60 * 1000, label: '1 Menit' },      // 1 minute
-      { minutes: 5, time: 5 * 60 * 1000, label: '5 Menit' },   // 5 minutes
-      { minutes: 10, time: 10 * 60 * 1000, label: '10 Menit' }, // 10 minutes
-      { minutes: 15, time: 15 * 60 * 1000, label: '15 Menit' }, // 15 minutes
-      { minutes: 20, time: 20 * 60 * 1000, label: '20 Menit' }, // 20 minutes
-      { minutes: 25, time: 25 * 60 * 1000, label: '25 Menit' }, // 25 minutes
-      { minutes: 30, time: 30 * 60 * 1000, label: '30 Menit' }, // 30 minutes
-      { minutes: 35, time: 35 * 60 * 1000, label: '35 Menit' }, // 35 minutes
-      { minutes: 40, time: 40 * 60 * 1000, label: '40 Menit' }, // 40 minutes
-      { minutes: 45, time: 45 * 60 * 1000, label: '45 Menit' }, // 45 minutes
-      { minutes: 50, time: 50 * 60 * 1000, label: '50 Menit' }, // 50 minutes
-      { minutes: 55, time: 55 * 60 * 1000, label: '55 Menit' }, // 55 minutes
-      { minutes: 60, time: 60 * 60 * 1000, label: '60 Menit' }, // 60 minutes
-      { minutes: 65, time: 65 * 60 * 1000, label: '65 Menit' }, // 65 minutes
-      { minutes: 70, time: 70 * 60 * 1000, label: '70 Menit' }, // 70 minutes
-      { minutes: 75, time: 75 * 60 * 1000, label: '75 Menit' }, // 75 minutes
-      { minutes: 80, time: 80 * 60 * 1000, label: '80 Menit' }, // 80 minutes
-      { minutes: 85, time: 85 * 60 * 1000, label: '85 Menit' }, // 85 minutes
-      { minutes: 90, time: 90 * 60 * 1000, label: '90 Menit' }, // 90 minutes
-      { minutes: 95, time: 95 * 60 * 1000, label: '95 Menit' }, // 95 minutes
-      { minutes: 100, time: 100 * 60 * 1000, label: '100 Menit' }, // 100 minutes
-      { minutes: 105, time: 105 * 60 * 1000, label: '105 Menit' }, // 105 minutes
-      { minutes: 110, time: 110 * 60 * 1000, label: '110 Menit' }, // 110 minutes
-      { minutes: 115, time: 115 * 60 * 1000, label: '115 Menit' }, // 115 minutes
-      { minutes: 120, time: 120 * 60 * 1000, label: '120 Menit' }, // 120 minutes
-    ];
-    
-    attendancePhotoSchedule.current = schedules;
-    console.log(`📅 SETUP COMPLETE: Menjadwalkan ${schedules.length} foto absensi`);
-    console.log(`🎯 JADWAL: ${schedules.map(s => s.minutes).join(', ')} menit`);
-    
-    schedules.forEach((schedule, index) => {
-      const timeoutId = setTimeout(() => {
-        console.log(`⏰ JADWAL FOTO: Menit ${schedule.minutes} - Mengambil foto absensi ${index + 1}/25`);
+    // Check every 30 seconds for scheduled photos
+    attendanceIntervalRef.current = setInterval(() => {
+      if (!attendanceSystemActive.current || isFinished.current) {
+        return;
+      }
+      
+      const currentMinute = Math.floor((Date.now() - startTime.getTime()) / (60 * 1000));
+      
+      // Check if current minute matches any scheduled minute and photo hasn't been taken yet
+      const scheduledMinute = attendanceSchedule[photoIndex];
+      if (scheduledMinute && currentMinute >= scheduledMinute) {
+        console.log(`⏰ INTERVAL CHECK: Menit ${currentMinute} >= Jadwal ${scheduledMinute} - Foto ${photoIndex + 1}/25`);
         
-        // CRITICAL: Get current state from DOM to avoid stale closure
-        const examContainer = document.querySelector('[data-exam-container]');
+        // Get current state from DOM
+        const examContainer = document.getElementById('exam-container');
         const currentFinished = examContainer?.getAttribute('data-exam-finished') === 'true';
+        const currentViolations = parseInt(examContainer?.getAttribute('data-violations') || '0');
+        
+        console.log(`📊 INTERVAL STATUS: Violations=${currentViolations}, Finished=${currentFinished}, SystemActive=${attendanceSystemActive.current}`);
+        
+        // HANYA check ujian selesai dan system active - VIOLATIONS DIABAIKAN TOTAL!
+        if (!currentFinished && attendanceSystemActive.current) {
+          console.log(`🔥 INTERVAL EXECUTE: Foto absensi ${photoIndex + 1}/25 di menit ${currentMinute} - VIOLATIONS DIABAIKAN!`);
+          executeScheduledAttendancePhoto(`${scheduledMinute} Menit`, photoIndex + 1);
+          photoIndex++; // Move to next scheduled photo
+        } else {
+          console.log(`🛑 INTERVAL SKIP: Ujian selesai atau system tidak aktif`);
+        }
+      }
+    }, 30000); // Check every 30 seconds
         const currentViolations = parseInt(examContainer?.getAttribute('data-violations') || '0');
         const systemActive = examContainer?.getAttribute('data-attendance-active') === 'true';
         
@@ -340,12 +326,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   // Independent attendance photo execution
-  const executeIndependentAttendancePhoto = async (timeLabel: string, photoNumber: number) => {
+  const executeScheduledAttendancePhoto = async (timeLabel: string, photoNumber: number) => {
     console.log(`📸 FOTO ABSENSI INDEPENDEN: ${timeLabel} (${photoNumber}/25)`);
     
     // Get current violations from DOM for logging only - TIDAK MEMPENGARUHI EXECUTION
-    const examContainer = document.querySelector('[data-exam-container]');
-    const currentViolations = parseInt(examContainer?.getAttribute('data-violations') || '0');
+    // Independent capture - violations diabaikan total
+    console.log('🔥 INDEPENDENT CAPTURE: Mengambil foto INDEPENDEN - violations diabaikan total!');
     
     console.log(`🚨 GARANTSI: Foto ini TIDAK AKAN TERPENGARUH oleh ${currentViolations} pelanggaran!`);
     console.log(`🔥 FORCE CAPTURE: Mengambil foto PAKSA - violations diabaikan total!`);
@@ -367,14 +353,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       console.log(`✅ PHOTO SUCCESS: ${timeLabel} - INDEPENDEN TOTAL DARI VIOLATIONS!`);
       saveIndependentAttendancePhoto(photoData, timeLabel, photoNumber);
     } else {
-      console.log(`❌ PHOTO FAILED: ${timeLabel} - Mencoba lagi...`);
-      // Retry after short delay
-      setTimeout(() => {
-        if (attendanceSystemActive.current && !isFinished) {
-          console.log(`🔄 RETRY CAPTURE: ${timeLabel} - Mencoba capture lagi...`);
-          executeIndependentAttendancePhoto(timeLabel, photoNumber);
-        }
-      }, 1000);
     }
   };
 
@@ -542,8 +520,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       const context = canvas.getContext('2d');
       
       if (!context) {
-        console.log("❌ Cannot get canvas context");
-        return null;
+        console.log('❌ INDEPENDENT CAPTURE FAILED: Canvas atau video tidak tersedia');
+        console.log('❌ INDEPENDENT CAPTURE FAILED: Context tidak tersedia');
       }
       
       // Set canvas dimensions to match video
@@ -552,7 +530,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       
       // Clear canvas first
       context.clearRect(0, 0, canvas.width, canvas.height);
-      
+      console.log(`✅ PHOTO SUCCESS: ${timeLabel} - INDEPENDEN TOTAL DARI VIOLATIONS!`);
       // Draw video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
