@@ -313,16 +313,16 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     };
     
     // Column positions and widths for better spacing
-    const colPositions = [14, 20, 55, 75, 95, 115, 140, 160, 175, 190];
-    const colWidths = [4, 33, 18, 18, 18, 23, 18, 13, 13, 15];
+    const colPositions = [14, 20, 55, 75, 95, 115, 135, 150, 165, 180, 195];
+    const colWidths = [4, 33, 18, 18, 18, 18, 13, 13, 13, 13, 15];
     
     // Add table headers
-    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Akhir'];
+    const headers = ['No', 'Nama', 'NIM', 'Jurusan', 'Kelas', 'Status', 'Pelanggaran', 'PG', 'Essay', 'Pengurangan', 'Akhir'];
     let yPosition = yPos;
     
     // Draw header background
     doc.setFillColor(240, 240, 240);
-    doc.rect(14, yPosition - 6, 191, 10, 'F');
+    doc.rect(14, yPosition - 6, 206, 10, 'F');
     
     // Draw header text
     doc.setFontSize(10);
@@ -334,7 +334,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
     
     // Draw header border
     doc.setDrawColor(0, 0, 0);
-    doc.rect(14, yPosition - 6, 191, 10);
+    doc.rect(14, yPosition - 6, 206, 10);
     
     yPosition += 8;
     
@@ -377,12 +377,12 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       // Alternate row colors
       if (sessionIndex % 2 === 0) {
         doc.setFillColor(250, 250, 250);
-        doc.rect(14, yPosition - 4, 191, rowHeight, 'F');
+        doc.rect(14, yPosition - 4, 206, rowHeight, 'F');
       }
       
       // Draw row border
       doc.setDrawColor(200, 200, 200);
-      doc.rect(14, yPosition - 4, 191, rowHeight);
+      doc.rect(14, yPosition - 4, 206, rowHeight);
       
       const rowData = [
         (sessionIndex + 1).toString(),
@@ -393,6 +393,20 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         session.status || '',
         session.violations.toString(),
         session.finalScore?.toFixed(2) ?? 'N/A',
+        (() => {
+          const essayQuestions = questions.filter(q => q.type === 'essay');
+          if (essayQuestions.length === 0) return 'N/A';
+          
+          if (!session.essayScores) return 'Belum dinilai';
+          
+          const essayScoreValues = Object.values(session.essayScores);
+          if (essayScoreValues.length === 0) return 'Belum dinilai';
+          
+          const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
+          const avgEssayScore = totalEssayScore / essayScoreValues.length;
+          return avgEssayScore.toFixed(2);
+        })(),
+        (session.scoreReduction || 0).toString(),
         calculateTotalScore(session)
       ];
       
@@ -403,14 +417,14 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         
         // Redraw header on new page
         doc.setFillColor(240, 240, 240);
-        doc.rect(14, yPosition - 6, 191, 10, 'F');
+        doc.rect(14, yPosition - 6, 206, 10, 'F');
         doc.setFont(undefined, 'bold');
         doc.setFontSize(10);
         headers.forEach((header, index) => {
           doc.text(header, colPositions[index], yPosition);
         });
         doc.setDrawColor(0, 0, 0);
-        doc.rect(14, yPosition - 6, 191, 10);
+        doc.rect(14, yPosition - 6, 206, 10);
         yPosition += 8;
         doc.setFont(undefined, 'normal');
         doc.setFontSize(9);
@@ -422,10 +436,10 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         // Redraw current row background if needed
         if (sessionIndex % 2 === 0) {
           doc.setFillColor(250, 250, 250);
-          doc.rect(14, yPosition - 4, 191, newRowHeight, 'F');
+          doc.rect(14, yPosition - 4, 206, newRowHeight, 'F');
         }
         doc.setDrawColor(200, 200, 200);
-        doc.rect(14, yPosition - 4, 191, newRowHeight);
+        doc.rect(14, yPosition - 4, 206, newRowHeight);
       }
       
       // Draw cell data (except name)
@@ -485,16 +499,37 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold">Hasil Ujian: {exam.name}</h2>
-        <button 
-          onClick={downloadResultsPDF}
-          disabled={filteredSessions.length === 0}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Download PDF
-        </button>
+        <div className="flex space-x-3">
+          <button 
+            onClick={() => loadSessions(true)}
+            disabled={isLoadingMore}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-blue-400 flex items-center"
+          >
+            {isLoadingMore ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Data
+              </>
+            )}
+          </button>
+          <button 
+            onClick={downloadResultsPDF}
+            disabled={filteredSessions.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Download PDF
+          </button>
+        </div>
       </div>
       
       {/* Search and Filter Section */}
