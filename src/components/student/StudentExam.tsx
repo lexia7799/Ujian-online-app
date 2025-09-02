@@ -57,6 +57,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [violationReason, setViolationReason] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showCameraControls, setShowCameraControls] = useState(false);
+  const [isExamStarted, setIsExamStarted] = useState(false);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -105,9 +106,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Don't return - allow student to enter exam early
     }
 
-    // Initialize violations to 0 explicitly
+    // Initialize exam state
+    console.log("🎯 Initializing exam state...");
     setViolations(0);
     setIsFinished(false);
+    setIsExamStarted(false);
     
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -436,6 +439,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         const questionsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
         console.log("Loaded questions:", questionsData.length);
         setQuestions(questionsData);
+        
+        // Start exam after questions are loaded
+        setTimeout(() => {
+          console.log("🎯 Exam officially started - enabling violation detection");
+          setIsExamStarted(true);
+        }, 3000); // Wait 3 seconds after questions load
       } catch (error) {
         console.error("Gagal memuat soal:", error);
       } finally {
@@ -546,18 +555,28 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   }, [isLoading, questions.length, isFullscreenSupported, isFinished]);
 
   useEffect(() => {
-    if (isFinished || isLoading || questions.length === 0) return;
+    if (isFinished || isLoading || questions.length === 0 || !isExamStarted) {
+      console.log("🚫 Skipping violation detection setup:", {
+        isFinished,
+        isLoading,
+        questionsLength: questions.length,
+        isExamStarted
+      });
+      return;
+    }
+    
+    console.log("🎯 Setting up violation detection - exam is ready");
     
     // Enhanced security monitoring
     const handleVisibilityChange = () => {
-      if (document.hidden && !isFinished) {
+      if (document.hidden && !isFinished && isExamStarted) {
         handleViolation("Tab/Window Switch");
       }
     };
     
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
-      if (!isInFullscreen() && !isFinished) {
+      if (!isInFullscreen() && !isFinished && isExamStarted) {
         handleViolation("Exited Fullscreen");
       }
     };
@@ -567,14 +586,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     };
     
     const handleBlur = () => {
-      if (!isFinished) {
+      if (!isFinished && isExamStarted) {
         handleViolation("Focus Lost");
       }
     };
     
     // Detect multiple tabs
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'examTabCount' && !isFinished) {
+      if (e.key === 'examTabCount' && !isFinished && isExamStarted) {
         const currentCount = parseInt(localStorage.getItem('examTabCount') || '1');
         if (currentCount > 1) {
           handleViolation("Multiple Tabs Detected");
@@ -587,14 +606,16 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     localStorage.setItem('examTabCount', currentTabCount.toString());
     tabCountRef.current = currentTabCount;
     
-    if (currentTabCount > 1) {
+    if (currentTabCount > 1 && isExamStarted) {
       handleViolation("Multiple Tabs Detected");
     }
     
     // Prevent right-click and common shortcuts
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
-      handleViolation("Right Click Attempt");
+      if (isExamStarted) {
+        handleViolation("Right Click Attempt");
+      }
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -612,12 +633,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         e.altKey && e.key === 'Tab'
       ) {
         e.preventDefault();
-        if (e.key === 'PrintScreen') {
-          handleViolation("Screenshot Attempt");
-        } else if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a')) {
-          handleViolation("Copy/Paste Attempt");
-        } else {
-          handleViolation("Prohibited Shortcut");
+        if (isExamStarted) {
+          if (e.key === 'PrintScreen') {
+            handleViolation("Screenshot Attempt");
+          } else if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a')) {
+            handleViolation("Copy/Paste Attempt");
+          } else {
+            handleViolation("Prohibited Shortcut");
+          }
         }
       }
     };
@@ -625,13 +648,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Monitor screen changes
     const handleScreenChange = () => {
       // Only trigger violation if exam has actually started and questions are loaded
-      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight && questions.length > 0 && timeLeft > 0) {
+      if (screen.availWidth !== window.screen.availWidth || screen.availHeight !== window.screen.availHeight && questions.length > 0 && timeLeft > 0 && isExamStarted) {
         handleViolation("Screen Configuration Change");
       }
     };
     
     // Check for developer tools
     const checkDevTools = () => {
+      if (!isExamStarted) return;
       const threshold = 160;
       if (window.outerHeight - window.innerHeight > threshold || window.outerWidth - window.innerWidth > threshold) {
         handleViolation("Developer Tools Detected");
@@ -705,7 +729,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         localStorage.setItem('examTabCount', newCount.toString());
       }
     };
-  }, [isFinished, isLoading, questions.length, violations]);
 
   const playWarningSound = () => {
     if (!audioContextRef.current) return;
@@ -726,7 +749,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   };
 
   const handleViolation = (reason = "Unknown") => {
+    // CRITICAL: Don't process violations if exam hasn't officially started
+    if (!isExamStarted) {
+      console.log("🚫 Ignoring violation (exam not started):", reason);
+      return;
+    }
+    
+    if (isFinished) {
+      console.log("🚫 Ignoring violation (exam finished):", reason);
+      return;
+    }
+    
     const newViolations = violations + 1;
+    console.log("🚨 Processing violation:", reason, "- New count:", newViolations);
     setViolations(newViolations);
     setViolationReason(reason);
     
@@ -1223,8 +1258,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           )}
         </div>
         
-        <div className="text-xs text-gray-400 mt-1">
-          Jumlah Pelanggaran: {violations}/3
+        <div className="border-t border-gray-600 mt-2 pt-2">
+          <div className="text-xs text-gray-400">
+            Exam Started: {isExamStarted ? '✅' : '⏳'}
+          </div>
+          <div className="text-xs text-gray-400">
+            Violations: {violations}/3
+          </div>
         </div>
         {streamRef.current && (
           <div className="text-xs text-gray-400">
@@ -1244,6 +1284,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               </div>
               <div className="text-xs text-gray-400">
                 Debug: {timeLeft}s left | Status: {isFinished ? 'Finished' : 'Active'} | Violations: {violations}/3
+              </div>
+              <div className="text-xs text-gray-400">
+                Exam Started: {isExamStarted ? 'Yes' : 'No'} | Questions: {questions.length}
               </div>
               <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
             </div>
