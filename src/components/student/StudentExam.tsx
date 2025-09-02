@@ -1123,7 +1123,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         {showCameraControls && (
           <div className="bg-gray-700 px-2 py-2 border-t border-gray-600">
             <button
-              onClick={restartCamera}
+              onClick={() => window.location.reload()}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded"
             >
               🔄 Restart Camera
