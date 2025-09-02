@@ -739,12 +739,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setAttendanceSystemActive(false);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
-    
+    console.log(`📷 Taking final attendance photo: ${reason} (Total violations during exam: ${violations})`);
     // Cleanup attendance system
     if (attendanceIntervalId.current) {
       clearInterval(attendanceIntervalId.current);
       attendanceIntervalId.current = null;
-      console.log("🛑 Attendance system stopped");
     }
     
     // Exit fullscreen when exam is finished
@@ -1017,8 +1016,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           </div>
         )}
         {violations >= 3 && (
-          <div className="text-xs text-red-400 mt-1">
-            ❌ Absensi Berhenti!
+          <div className="text-xs text-red-400 mt-1 font-bold">
+            🚨 Absensi Berhenti!
           </div>
         )}
       </div>
