@@ -66,6 +66,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const attendanceIntervalId = useRef<NodeJS.Timeout | null>(null);
   const attendanceSchedule = useRef([1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120]);
   const photosTaken = useRef(new Set<number>());
+  const attendancePhotoCountRef = useRef(0);
   const attendanceSystemStarted = useRef(false);
 
   useEffect(() => {
@@ -157,84 +158,58 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       attendanceSystemStarted.current = true;
       startAttendancePhotoSystem();
     }
-    
-    return () => {
-      // Cleanup camera
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      
-      // Cleanup audio context
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
   }, []);
 
+  // Function to manually restart camera
   const restartCamera = async () => {
-    console.log("🔄 Restarting camera...");
+    console.log("🔄 Manually restarting camera...");
+    cameraInitRetryCount.current = 0;
     
     // Stop existing stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log("🛑 Stopping camera track for restart");
       });
     }
     
-    // Reset states
-    setIsCameraReady(false);
-    setCameraError(null);
-    cameraInitRetryCount.current = 0;
-    
-    // Wait a moment then reinitialize
-    setTimeout(async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            facingMode: 'user'
-          },
-          audio: false
-        });
+    // Reinitialize camera
+    try {
+      setCameraError(null);
+      setIsCameraReady(false);
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+          facingMode: 'user'
+        },
+        audio: false
+      });
+      
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
         
-        streamRef.current = stream;
+        const checkVideoReady = () => {
+          if (videoRef.current && 
+              videoRef.current.readyState >= 2 && 
+              videoRef.current.videoWidth > 0 && 
+              videoRef.current.videoHeight > 0) {
+            console.log("📷 Camera restarted successfully:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
+            setIsCameraReady(true);
+          } else {
+            setTimeout(checkVideoReady, 100);
+          }
+        };
         
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.muted = true;
-          videoRef.current.playsInline = true;
-          
-          // Wait for video to be ready
-          const checkVideoReady = () => {
-            if (videoRef.current && 
-                videoRef.current.readyState >= 2 && 
-                videoRef.current.videoWidth > 0 && 
-                videoRef.current.videoHeight > 0) {
-              console.log("✅ Camera restarted successfully");
-              setIsCameraReady(true);
-            } else {
-              setTimeout(checkVideoReady, 100);
-            }
-          };
-          
-          videoRef.current.onloadedmetadata = checkVideoReady;
-          videoRef.current.oncanplay = checkVideoReady;
-          
-          // Fallback timeout
-          setTimeout(() => {
-            if (!isCameraReady && videoRef.current) {
-              console.log("📷 Camera restart timeout, forcing ready state");
-              setIsCameraReady(true);
-            }
-          }, 3000);
-        }
-      } catch (error) {
-        console.error("Camera restart failed:", error);
-        setCameraError(`Restart failed: ${error.message}`);
+        videoRef.current.onloadedmetadata = checkVideoReady;
+        videoRef.current.oncanplay = checkVideoReady;
       }
-    }, 1000);
+    } catch (error) {
+      console.error("Manual camera restart failed:", error);
+      setCameraError(`Restart failed: ${error.message}`);
+    }
   };
 
   // Monitor camera stream health
@@ -433,7 +408,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
   // Separate function to save attendance photo
   const saveAttendancePhoto = async (photoData: string, timeLabel: string) => {
-    const currentCount = attendancePhotoCount + 1;
+    attendancePhotoCountRef.current += 1;
+    const currentCount = attendancePhotoCountRef.current;
     
     try {
       const attendanceData = {
@@ -468,7 +444,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       }, 1000);
     }
   };
-
+  
   useEffect(() => {
     // Check fullscreen support
     const checkFullscreenSupport = () => {
@@ -870,20 +846,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     setViolationReason(reason);
     
     // Capture snapshot on violation
-    const captureViolationSnapshot = async (reason: string) => {
-      const photoData = capturePhoto();
-      if (photoData) {
-        return {
-          imageData: photoData,
-          timestamp: new Date().toISOString(),
-          violationType: reason
-        };
-      }
-      return null;
-    };
-    
     captureViolationSnapshot(reason).then(snapshot => {
-      const violationData: any = {
+      const violationData = {
         violations: newViolations,
         lastViolation: { reason, timestamp: new Date() }
       };
@@ -914,6 +878,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
   };
 
+  const captureViolationSnapshot = async (reason: string) => {
+    // Implementation for capturing violation snapshot
+    return null;
+  };
+
   const handleAnswerChange = (questionId: string, answer: any) => {
     const newAnswers = { ...answers, [questionId]: answer };
     setAnswers(newAnswers);
@@ -941,28 +910,17 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
-    console.log(`🏁 MENYELESAIKAN UJIAN: ${reason}`);
-    console.log(`📊 FINAL STATUS: Foto absensi diambil ${attendancePhotoCount}/25`);
+    
     setIsFinished(true);
-    attendanceSystemActive.current = false;
-    setAttendanceScheduleActive(false);
+    setAttendanceSystemActive(false);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
     
-    // Take final attendance photo before finishing
-    console.log("📷 FOTO FINAL: Mengambil foto absensi terakhir...");
-    const finalPhotoData = capturePhoto();
-    if (finalPhotoData) {
-      const finalPhotoNumber = photosTaken.current.size + 1;
-      await saveIndependentAttendancePhoto(finalPhotoData, 'Selesai Ujian', finalPhotoNumber);
-      setAttendancePhotoCount(prev => prev + 1);
-    }
-    
-    // Cleanup attendance interval
-    console.log(`🧹 CLEANUP: Membersihkan jadwal foto absensi...`);
-    if (attendanceIntervalId.current) {
-      clearInterval(attendanceIntervalId.current);
-      attendanceIntervalId.current = null;
+    // Cleanup attendance system
+    if (attendanceInterval.current) {
+      clearInterval(attendanceInterval.current);
+      attendanceInterval.current = null;
+      console.log("🛑 Attendance system stopped");
     }
     
     // Exit fullscreen when exam is finished
@@ -1207,8 +1165,8 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         <div className="text-xs text-gray-400">
           Foto Absensi: {attendancePhotoCount}/25
         </div>
-        <div className={`text-xs ${attendanceSystemStarted.current && attendanceSystemActive.current ? 'text-cyan-400' : 'text-red-400'}`}>
-          Sistem: {attendanceSystemStarted.current && attendanceSystemActive.current ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
+        <div className={`text-xs ${attendanceSystemStarted.current && attendanceSystemActive ? 'text-cyan-400' : 'text-red-400'}`}>
+          Sistem: {attendanceSystemStarted.current && attendanceSystemActive ? 'INDEPENDEN AKTIF' : 'BERHENTI'}
         </div>
         {lastAttendanceTime && (
           <div className="text-xs text-cyan-400">
