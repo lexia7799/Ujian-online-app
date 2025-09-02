@@ -7,6 +7,7 @@ import StudentConfirmation from './StudentConfirmation';
 import TeacherResultsDashboard from './TeacherResultsDashboard';
 import TeacherProctoringDashboard from './TeacherProctoringDashboard';
 import QuestionManager from './QuestionManager';
+import TeacherAttendanceRecap from './TeacherAttendanceRecap';
 
 interface TeacherDashboardProps {
   user?: any;
@@ -17,7 +18,7 @@ interface TeacherDashboardProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
   const [view, setView] = useState('search');
-  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager' | 'attendance_recap'>('main');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,6 +86,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
         break;
       case 'question_manager':
         setCurrentView('question_manager');
+        break;
+      case 'attendance_recap':
+        setCurrentView('attendance_recap');
         break;
       default:
         navigateTo(page, data);
@@ -200,6 +204,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   if (currentView === 'question_manager') {
     return (
       <QuestionManager 
+        navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'attendance_recap') {
+    return (
+      <TeacherAttendanceRecap 
         navigateTo={navigateTo}
         navigateBack={handleBackToMain}
         appState={{ exam: currentExam }}
@@ -344,6 +358,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Kelola Soal
+                </button>
+                <button 
+                  onClick={() => handleNavigateToFeature('attendance_recap', { exam: foundExam })} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                >
+                  Rekap Absen
                 </button>
               </div>
             </div>

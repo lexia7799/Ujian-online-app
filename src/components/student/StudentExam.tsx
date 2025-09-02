@@ -43,6 +43,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [showCameraControls, setShowCameraControls] = useState(false);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
+  const attendancePhotoIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const attendancePhotoTimestamps = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120];
+  const [attendancePhotos, setAttendancePhotos] = useState<{[key: string]: string}>({});
+  const examStartTimeRef = useRef<Date | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -219,6 +223,75 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return () => clearInterval(checkCameraHealth);
     }
   }, [isCameraReady, isFinished]);
+
+  // Attendance photo capture system
+  useEffect(() => {
+    if (isFinished || isLoading || questions.length === 0) return;
+    
+    // Set exam start time
+    if (!examStartTimeRef.current) {
+      examStartTimeRef.current = new Date();
+    }
+    
+    // Start attendance photo timer
+    const startAttendancePhotoTimer = () => {
+      attendancePhotoIntervalRef.current = setInterval(() => {
+        if (isFinished || !examStartTimeRef.current) return;
+        
+        const now = new Date();
+        const elapsedMinutes = Math.floor((now.getTime() - examStartTimeRef.current.getTime()) / (1000 * 60));
+        
+        // Check if current minute matches any of our scheduled photo times
+        if (attendancePhotoTimestamps.includes(elapsedMinutes)) {
+          captureAttendancePhoto(`Menit ke-${elapsedMinutes}`);
+        }
+      }, 60000); // Check every minute
+    };
+    
+    startAttendancePhotoTimer();
+    
+    return () => {
+      if (attendancePhotoIntervalRef.current) {
+        clearInterval(attendancePhotoIntervalRef.current);
+      }
+    };
+  }, [isFinished, isLoading, questions.length]);
+
+  // Capture attendance photo function
+  const captureAttendancePhoto = async (label: string) => {
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
+      console.log("❌ Cannot capture attendance photo - camera not ready");
+      return;
+    }
+    
+    const photoData = capturePhoto();
+    if (photoData) {
+      console.log(`✅ Attendance photo captured: ${label}`);
+      
+      // Save to local state
+      setAttendancePhotos(prev => ({
+        ...prev,
+        [label]: photoData
+      }));
+      
+      // Save to Firebase
+      const attendanceData: any = {};
+      attendanceData[`attendancePhoto_${label.replace(/\s+/g, '_')}`] = {
+        imageData: photoData,
+        timestamp: new Date().toISOString(),
+        label: label
+      };
+      
+      try {
+        await updateDoc(sessionDocRef, attendanceData);
+        console.log(`✅ Attendance photo saved to Firebase: ${label}`);
+      } catch (error) {
+        console.error("Failed to save attendance photo:", error);
+      }
+    } else {
+      console.log(`❌ Failed to capture attendance photo: ${label}`);
+    }
+  };
 
   useEffect(() => {
     // Check fullscreen support
@@ -655,9 +728,18 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
+    
+    // Capture final attendance photo before finishing
+    await captureAttendancePhoto("Selesai");
+    
     setIsFinished(true);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
+    
+    // Clear attendance photo timer
+    if (attendancePhotoIntervalRef.current) {
+      clearInterval(attendancePhotoIntervalRef.current);
+    }
     
     // Exit fullscreen when exam is finished
     if (isInFullscreen()) {
