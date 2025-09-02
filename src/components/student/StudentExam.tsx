@@ -105,6 +105,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       // Don't return - allow student to enter exam early
     }
 
+    // Initialize violations to 0 explicitly
+    setViolations(0);
+    setIsFinished(false);
+    
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     
@@ -542,7 +546,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   }, [isLoading, questions.length, isFullscreenSupported, isFinished]);
 
   useEffect(() => {
-    if (isFinished || isLoading) return;
+    if (isFinished || isLoading || questions.length === 0) return;
     
     // Enhanced security monitoring
     const handleVisibilityChange = () => {
@@ -706,7 +710,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         localStorage.setItem('examTabCount', newCount.toString());
       }
     };
-  }, [isFinished, isLoading, violations]);
+  }, [isFinished, isLoading, questions.length, violations]);
 
   const playWarningSound = () => {
     if (!audioContextRef.current) return;
@@ -938,6 +942,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     }
     
     setFinalScore(score);
+    
+    console.log("💾 Saving exam results:", {
+      status,
+      finalScore: score,
+      violations,
+      reason
+    });
+    
     await updateDoc(sessionDocRef, { 
       status, 
       finishTime: new Date(), 
@@ -1009,6 +1021,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-2xl font-bold mt-4">
               Nilai Anda: <span className="text-red-500">0</span>
             </p>
+            <div className="mt-4 text-sm text-gray-400 bg-gray-800 p-4 rounded-lg">
+              <p>Debug Info:</p>
+              <p>- Violations: {violations}/3</p>
+              <p>- Final Score: {finalScore}</p>
+              <p>- Time Left: {timeLeft}s</p>
+            </div>
           </>
         ) : (
           <>
@@ -1020,6 +1038,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-lg text-gray-400 mt-2">
               Nilai esai (jika ada) akan diperiksa oleh dosen.
             </p>
+            <div className="mt-4 text-sm text-gray-400 bg-gray-800 p-4 rounded-lg">
+              <p>Debug Info:</p>
+              <p>- Violations: {violations}/3</p>
+              <p>- Final Score: {finalScore}</p>
+              <p>- Time Left: {timeLeft}s</p>
+            </div>
           </>
         )}
       </div>
@@ -1231,7 +1255,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
                 {(timeLeft % 60).toString().padStart(2, '0')}
               </div>
               <div className="text-xs text-gray-400">
-                Debug: {timeLeft}s left | Status: {isFinished ? 'Finished' : 'Active'}
+                Debug: {timeLeft}s left | Status: {isFinished ? 'Finished' : 'Active'} | Violations: {violations}/3
               </div>
               <div className="text-sm text-red-500">Pelanggaran: {violations}/3</div>
             </div>
