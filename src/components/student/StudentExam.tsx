@@ -729,7 +729,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         localStorage.setItem('examTabCount', newCount.toString());
       }
     };
-  }, [isFinished, isLoading, questions.length, isExamStarted, timeLeft, violations]);
+  }, [isFinished, isLoading, questions.length, isExamStarted, violations, timeLeft]);
 
   const playWarningSound = () => {
     if (!audioContextRef.current) return;
@@ -1259,8 +1259,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           )}
         </div>
         
-        <div className="text-xs text-gray-400 mt-1">
-          Jumlah Pelanggaran: {violations}/3
+        <div className="border-t border-gray-600 mt-2 pt-2">
+          <div className="text-xs text-gray-400">
+            Exam Started: {isExamStarted ? '✅' : '⏳'}
+          </div>
+          <div className="text-xs text-gray-400">
+            Violations: {violations}/3
+          </div>
         </div>
         {streamRef.current && (
           <div className="text-xs text-gray-400">
