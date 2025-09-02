@@ -48,6 +48,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const attendancePhotoCount = useRef(0);
   const examStartTime = useRef<Date | null>(null);
   const attendanceSystemActive = useRef(false);
+  const attendancePhotoSchedule = useRef<any[]>([]);
   
   const sessionDocRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/sessions`, sessionId);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -297,6 +298,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       { minutes: 120, time: 120 * 60 * 1000, label: '120 Menit' }, // 120 minutes
     ];
     
+    attendancePhotoSchedule.current = schedules;
     console.log(`📅 SETUP COMPLETE: Menjadwalkan ${schedules.length} foto absensi`);
     console.log(`🎯 JADWAL: ${schedules.map(s => s.minutes).join(', ')} menit`);
     
@@ -781,11 +783,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     console.log(`🚨 PELANGGARAN ${newViolations}/3: ${reason}`);
     console.log(`🔥 PENTING: Foto absensi TETAP BERJALAN! Pelanggaran tidak mempengaruhi jadwal!`);
     console.log(`📅 JADWAL ABSENSI: Tetap aktif di menit 1,5,10,15...120 meskipun ${newViolations} pelanggaran`);
-    console.log(`📊 KONFIRMASI: attendanceSystemActive=${attendanceSystemActive.current}, setupDone=${attendanceSetupDone.current}`);
-    
-    // Update DOM attribute immediately for timeout access
-    const examContainer = document.querySelector('[data-exam-container]') || document.body;
-    examContainer.setAttribute('data-violations', newViolations.toString());
+    console.log(`📊 KONFIRMASI: attendanceScheduleActive=${attendanceScheduleActive}, setupDone=${attendanceSetupDone.current}`);
     
     // Try to capture photo with retry mechanism
     let photoData = null;
@@ -844,12 +842,52 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     playWarningSound();
     
     if (newViolations >= 3) {
-      // Stop attendance system on disqualification
+      // Stop attendance system ONLY on disqualification (3 violations)
+      console.log(`🚨 DISKUALIFIKASI: Menghentikan sistem foto absensi karena 3 pelanggaran!`);
       attendanceSystemActive.current = false;
       attendanceTimeouts.current.forEach(timeoutId => {
         clearTimeout(timeoutId);
       });
       attendanceTimeouts.current = [];
+      finishExam(`Diskualifikasi: ${reason}`);
+    } else {
+      console.log(`✅ ATTENDANCE CONTINUES: Foto absensi tetap berjalan (${newViolations}/3 pelanggaran)`);
+      setShowViolationModal(true);
+      setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Auto re-enter fullscreen after violation
+      setTimeout(() => {
+        if (!isFinished && !isInFullscreen()) {
+          enterFullscreen();
+        }
+      }, 1500);
+    }
+  };
+
+  const handleViolationOld = (reason = "Unknown") => {
+    const newViolations = violations + 1;
+    setViolations(newViolations);
+    setViolationReason(reason);
+    
+    // Capture snapshot on violation
+    captureViolationSnapshot(reason).then(snapshot => {
+      const violationData = {
+        violations: newViolations,
+        lastViolation: { reason, timestamp: new Date() }
+      };
+      
+      if (snapshot) {
+        violationData[`violationSnapshot_${newViolations}`] = snapshot;
+      }
+      
+      updateDoc(sessionDocRef, violationData);
+    }).catch(error => {
+      console.error("Error in violation handling:", error);
+    });
+    
+    playWarningSound();
+    
+    if (newViolations >= 3) {
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       setShowViolationModal(true);
@@ -909,10 +947,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       clearTimeout(timeoutId);
     });
     attendanceTimeouts.current = [];
-    
-    // Update DOM attribute
-    const examContainer = document.querySelector('[data-exam-container]') || document.body;
-    examContainer.setAttribute('data-exam-finished', 'true');
     
     // Exit fullscreen when exam is finished
     if (isInFullscreen()) {
@@ -1009,7 +1043,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   }
 
   return (
-    <div>
+    <div data-exam-container>
       <Modal 
         isOpen={showConfirmModal} 
         title="Selesaikan Ujian?" 
@@ -1060,7 +1094,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
 
       {/* Hidden video element for violation snapshots */}
       {/* Live camera feed for student and violation capture */}
-      <div className="fixed top-4 right-4 z-50 bg-gray-800 rounded-lg border-2 border-gray-600 overflow-hidden shadow-lg" data-exam-container>
+      <div className="fixed top-4 right-4 z-50 bg-gray-800 rounded-lg border-2 border-gray-600 overflow-hidden shadow-lg">
         <div className="bg-gray-700 px-2 py-1 text-xs text-white text-center">
           📷 Live Camera
         </div>
@@ -1136,7 +1170,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           Pelanggaran: {violations}/3
         </div>
         <div className="text-xs text-gray-400">
-          Foto Absensi: {attendancePhotoCount.current}/25
+          Foto Absensi: {attendancePhotoCount.current}/26
         </div>
         <div className="text-xs text-green-400">
           Jadwal: {attendanceScheduleActive ? 'AKTIF' : 'TIDAK AKTIF'}
@@ -1146,11 +1180,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         </div>
         {violations > 0 && (
           <div className="text-xs text-yellow-400 mt-1">
-            {violations < 3 ? (
-              <span className="text-green-400">🔥 Absensi TETAP AKTIF!</span>
-            ) : (
-              <span className="text-red-400">🚨 Absensi BERHENTI!</span>
-            )}
+            🔥 Absensi TETAP AKTIF!
           </div>
         )}
       </div>
