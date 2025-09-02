@@ -141,14 +141,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             // Skip if already completed
             if (hasCompletedSession) return;
             
-            // Process applications efficiently
-            const applicationsQuery = query(
-              collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
-              where('studentId', '==', user.id),
-              where('status', 'in', ['approved', 'pending', 'rejected']),
-              limit(1) // Only need one application per student per exam
-            );
-            
+            // Process applications
             applicationsSnapshot.forEach(appDoc => {
               const appData = appDoc.data();
               const examWithApp = {
@@ -157,26 +150,32 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 code: examData.code,
                 applicationStatus: appData.status,
                 appliedAt: appData.appliedAt?.toDate() || new Date(),
+                startTime: examData.startTime,
+                endTime: examData.endTime,
+                status: examData.status,
                 ...examData
               };
               
               // Categorize based on status
               switch (appData.status) {
                 case 'approved':
-                const now = new Date();
-                const startTime = new Date(examData.startTime);
-                const endTime = new Date(examData.endTime);
-                
-                if (now >= startTime && now <= endTime && examData.status === 'published') {
-                  available.push(examWithApp);
-                }
-                break;
+                  const now = new Date();
+                  const startTime = new Date(examData.startTime);
+                  const endTime = new Date(examData.endTime);
+                  
+                  if (now >= startTime && now <= endTime && examData.status === 'published') {
+                    available.push(examWithApp);
+                  } else {
+                    // Approved but not yet time to start or exam ended
+                    available.push(examWithApp);
+                  }
+                  break;
                 case 'pending':
-                pending.push(examWithApp);
-                break;
+                  pending.push(examWithApp);
+                  break;
                 case 'rejected':
-                rejected.push(examWithApp);
-                break;
+                  rejected.push(examWithApp);
+                  break;
               }
             });
           } catch (examError) {
