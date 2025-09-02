@@ -297,23 +297,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
         }
       }
     }, 30000); // Check every 30 seconds
-        const currentViolations = parseInt(examContainer?.getAttribute('data-violations') || '0');
-        const systemActive = examContainer?.getAttribute('data-attendance-active') === 'true';
-        
-        console.log(`📊 STATUS CHECK: Violations=${currentViolations}, Finished=${currentFinished}, SystemActive=${systemActive}`);
-        console.log(`🔥 FORCE EXECUTE: Foto absensi ${index + 1}/25 di menit ${schedule.minutes} - VIOLATIONS DIABAIKAN!`);
-        
-        // CRITICAL: HANYA check finished dan system active - VIOLATIONS DIABAIKAN!
-        if (!currentFinished && systemActive) {
-          console.log(`📷 EXECUTING: Foto absensi ${index + 1}/25 di ${schedule.label}`);
-          console.log(`🚨 GARANTSI: Foto ini akan diambil meskipun ada ${currentViolations} pelanggaran!`);
-          executeIndependentAttendancePhoto(schedule.label, index + 1);
-        } else {
-          console.log(`❌ SKIP: Finished=${currentFinished}, SystemActive=${systemActive} di ${schedule.label}`);
-        }
-      }, schedule.time);
-      
-      attendanceTimeouts.current.push(timeoutId);
       console.log(`✅ TERJADWAL: Foto ${index + 1}/25 di menit ${schedule.minutes}`);
     });
     
