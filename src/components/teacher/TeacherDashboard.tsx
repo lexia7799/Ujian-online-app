@@ -7,6 +7,7 @@ import StudentConfirmation from './StudentConfirmation';
 import TeacherResultsDashboard from './TeacherResultsDashboard';
 import TeacherProctoringDashboard from './TeacherProctoringDashboard';
 import QuestionManager from './QuestionManager';
+import AttendanceRecap from './AttendanceRecap';
 
 interface TeacherDashboardProps {
   user?: any;
@@ -17,7 +18,7 @@ interface TeacherDashboardProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
   const [view, setView] = useState('search');
-  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager' | 'attendance_recap'>('main');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,6 +160,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     );
   }
 
+  if (currentView === 'attendance_recap') {
+    return (
+      <AttendanceRecap 
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
   // Main dashboard view
   return (
     <div>
@@ -274,6 +284,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Kelola Soal
+                </button>
+                <button 
+                  onClick={() => handleNavigateToFeature('attendance_recap', { exam: foundExam })} 
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                >
+                  Rekap Absen
                 </button>
               </div>
             </div>

@@ -23,6 +23,16 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [answers, setAnswers] = useState<{ [key: string]: any }>({});
   const [isFullscreenSupported, setIsFullscreenSupported] = useState(true);
   
+  // Attendance photo system states
+  const [attendancePhotos, setAttendancePhotos] = useState<{ [key: string]: string }>({});
+  const [attendanceNotification, setAttendanceNotification] = useState<string>('');
+  const [showAttendanceNotification, setShowAttendanceNotification] = useState(false);
+  const attendanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const examStartTimeRef = useRef<Date | null>(null);
+  
+  // Attendance schedule: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120 minutes
+  const attendanceSchedule = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120];
+  
   const calculateTimeLeft = () => {
     const endTime = new Date(exam.endTime).getTime();
     const now = new Date().getTime();
@@ -58,6 +68,10 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   useEffect(() => {
     // Initialize audio context
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Set exam start time for attendance system
+    examStartTimeRef.current = new Date();
+    console.log("🎯 Exam started at:", examStartTimeRef.current.toISOString());
     
     // Initialize camera with retry mechanism
     const initializeCamera = async (retryCount = 0) => {
@@ -98,6 +112,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               console.log("📷 Camera ready:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
               setIsCameraReady(true);
               cameraInitRetryCount.current = 0; // Reset retry count on success
+              
+              // Start attendance system when camera is ready
+              startAttendanceSystem();
             } else {
               setTimeout(checkVideoReady, 100);
             }
@@ -112,6 +129,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
               console.log("📷 Camera timeout, forcing ready state");
               setIsCameraReady(true);
               cameraInitRetryCount.current = 0;
+              
+              // Start attendance system even if camera timeout
+              startAttendanceSystem();
             }
           }, 5000);
         }
@@ -143,6 +163,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           track.stop();
           console.log("🛑 Camera track stopped");
         });
+      }
+      
+      // Cleanup attendance system
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        console.log("🛑 Attendance system stopped");
       }
     };
   }, []);
@@ -219,6 +245,117 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
       return () => clearInterval(checkCameraHealth);
     }
   }, [isCameraReady, isFinished]);
+
+  // Attendance photo system functions
+  const startAttendanceSystem = () => {
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+    }
+    
+    console.log("🎯 Starting attendance photo system...");
+    console.log("📅 Attendance schedule:", attendanceSchedule);
+    
+    // Check every 30 seconds for scheduled photos
+    attendanceIntervalRef.current = setInterval(() => {
+      if (isFinished) {
+        console.log("🛑 Exam finished, stopping attendance system");
+        return;
+      }
+      
+      if (!examStartTimeRef.current) {
+        console.log("❌ No exam start time recorded");
+        return;
+      }
+      
+      const now = new Date();
+      const elapsedMinutes = Math.floor((now.getTime() - examStartTimeRef.current.getTime()) / 60000);
+      
+      // Check if current elapsed time matches any scheduled minute
+      const scheduledMinute = attendanceSchedule.find(minute => 
+        minute === elapsedMinutes && !attendancePhotos[`minute_${minute}`]
+      );
+      
+      if (scheduledMinute) {
+        console.log(`📸 Taking attendance photo at minute ${scheduledMinute}`);
+        takeAttendancePhoto(scheduledMinute);
+      }
+    }, 30000); // Check every 30 seconds
+  };
+  
+  const takeAttendancePhoto = (minute: number) => {
+    const photoData = capturePhoto();
+    
+    if (photoData) {
+      const photoKey = `minute_${minute}`;
+      const newAttendancePhotos = { ...attendancePhotos, [photoKey]: photoData };
+      setAttendancePhotos(newAttendancePhotos);
+      
+      // Save to Firebase
+      const attendanceData = {
+        [`attendance_snapshots.${photoKey}`]: {
+          imageData: photoData,
+          timestamp: new Date().toISOString(),
+          minute: minute,
+          type: 'scheduled'
+        }
+      };
+      
+      updateDoc(sessionDocRef, attendanceData).then(() => {
+        console.log(`✅ Attendance photo saved for minute ${minute}`);
+        
+        // Show notification
+        const photoCount = Object.keys(newAttendancePhotos).length;
+        const totalScheduled = attendanceSchedule.length;
+        setAttendanceNotification(`📷 Foto absensi ${photoCount}/${totalScheduled} berhasil diambil pada ${minute} Menit`);
+        setShowAttendanceNotification(true);
+        
+        // Hide notification after 4 seconds
+        setTimeout(() => {
+          setShowAttendanceNotification(false);
+        }, 4000);
+        
+        // Show continuation message if there are violations but less than 3
+        if (violations > 0 && violations < 3) {
+          setTimeout(() => {
+            setAttendanceNotification(`🔥 Foto absensi tetap berlanjut meskipun ada ${violations} pelanggaran`);
+            setShowAttendanceNotification(true);
+            setTimeout(() => setShowAttendanceNotification(false), 3000);
+          }, 4500);
+        }
+      }).catch(error => {
+        console.error(`❌ Failed to save attendance photo for minute ${minute}:`, error);
+      });
+    } else {
+      console.log(`❌ Failed to capture attendance photo for minute ${minute}`);
+    }
+  };
+  
+  const takeFinalAttendancePhoto = () => {
+    console.log("📸 Taking final attendance photo...");
+    const photoData = capturePhoto();
+    
+    if (photoData) {
+      const photoKey = 'finished';
+      const newAttendancePhotos = { ...attendancePhotos, [photoKey]: photoData };
+      setAttendancePhotos(newAttendancePhotos);
+      
+      // Save to Firebase
+      const attendanceData = {
+        [`attendance_snapshots.${photoKey}`]: {
+          imageData: photoData,
+          timestamp: new Date().toISOString(),
+          minute: 'finished',
+          type: 'final'
+        }
+      };
+      
+      updateDoc(sessionDocRef, attendanceData).then(() => {
+        console.log("✅ Final attendance photo saved");
+      }).catch(error => {
+        console.error("❌ Failed to save final attendance photo:", error);
+      });
+    }
+  };
 
   useEffect(() => {
     // Check fullscreen support
@@ -576,10 +713,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     playWarningSound();
     
     if (newViolations >= 3) {
+      // Stop attendance system only when disqualified
+      if (attendanceIntervalRef.current) {
+        clearInterval(attendanceIntervalRef.current);
+        console.log("🛑 Attendance system stopped due to disqualification");
+      }
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Show attendance continuation message for violations 1-2
+      setTimeout(() => {
+        setAttendanceNotification(`🔥 Foto absensi tetap berlanjut meskipun ada ${newViolations} pelanggaran`);
+        setShowAttendanceNotification(true);
+        setTimeout(() => setShowAttendanceNotification(false), 3000);
+      }, 3500);
       
       // Auto re-enter fullscreen after violation
       setTimeout(() => {
@@ -655,9 +804,19 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   
   const finishExam = async (reason = "Selesai") => {
     if (isFinished) return;
+    
+    // Take final attendance photo before finishing
+    takeFinalAttendancePhoto();
+    
     setIsFinished(true);
     setShowConfirmModal(false);
     setShowUnansweredModal(false);
+    
+    // Stop attendance system
+    if (attendanceIntervalRef.current) {
+      clearInterval(attendanceIntervalRef.current);
+      console.log("🛑 Attendance system stopped - exam finished");
+    }
     
     // Exit fullscreen when exam is finished
     if (isInFullscreen()) {
@@ -796,6 +955,20 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-sm text-gray-400 mt-2">
               Foto telah diambil sebagai bukti pelanggaran
             </p>
+            {violations < 3 && (
+              <p className="text-sm text-green-400 mt-2 font-bold">
+                🔥 Foto absensi tetap berlanjut sesuai jadwal
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Attendance notification */}
+      {showAttendanceNotification && (
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+          <div className="bg-green-800 border-2 border-green-500 p-6 rounded-lg text-center shadow-2xl">
+            <p className="text-lg font-bold text-green-400">{attendanceNotification}</p>
           </div>
         </div>
       )}
@@ -896,6 +1069,31 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             )}
           </div>
         )}
+        
+        {/* Attendance system status */}
+        <div className="border-t border-gray-600 mt-2 pt-2">
+          <div className="text-xs text-cyan-400 font-bold">
+            📸 Foto Absensi: {Object.keys(attendancePhotos).length}/{attendanceSchedule.length + 1}
+          </div>
+          <div className="text-xs text-gray-400">
+            Status: {violations >= 3 ? (
+              <span className="text-red-400">🚨 BERHENTI</span>
+            ) : (
+              <span className="text-cyan-400">🔥 INDEPENDEN AKTIF</span>
+            )}
+          </div>
+          {violations > 0 && violations < 3 && (
+            <div className="text-xs text-green-400 font-bold">
+              🔥 Absensi Berlanjut!
+            </div>
+          )}
+          {violations >= 3 && (
+            <div className="text-xs text-red-400 font-bold">
+              🚨 Absensi Berhenti!
+            </div>
+          )}
+        </div>
+        
         <div className="text-xs text-gray-400 mt-1">
           Jumlah Pelanggaran: {violations}/3
         </div>
