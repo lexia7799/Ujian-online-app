@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, onSnapshot, query, limit, startAfter, orderBy, DocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, limit, startAfter, orderBy, DocumentSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 import jsPDF from 'jspdf';
 import EssayGradingView from './EssayGradingView';
@@ -59,15 +59,26 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
   useEffect(() => {
     if (!exam?.id) return;
     
-    // Load questions (limit 100 is fine for questions)
+    // Load questions with real-time updates
     const questionsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/questions`);
-    getDocs(query(questionsRef, limit(100))).then(snapshot => {
+    const unsubscribeQuestions = onSnapshot(query(questionsRef, limit(100)), (snapshot) => {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
     });
     
-    // Load first page of sessions
+    // Load first page of sessions with real-time updates
     loadSessions(true);
     
+    // Set up auto-refresh every 30 seconds for real-time monitoring
+    const refreshInterval = setInterval(() => {
+      if (!isLoadingMore) {
+        loadSessions(true);
+      }
+    }, 30000);
+    
+    return () => {
+      unsubscribeQuestions();
+      clearInterval(refreshInterval);
+    };
   }, [exam?.id]);
 
   const loadSessions = async (isFirstLoad = false) => {
@@ -582,8 +593,8 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
       
       {/* Score Reduction Modal */}
       {editingScoreSession && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Edit Pengurangan Nilai</h3>
               <button
@@ -599,48 +610,44 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             </div>
             
             <div className="space-y-4">
-              <div className="bg-gray-700 p-4 rounded-lg">
+              <div className="bg-gray-700 p-3 rounded-lg">
                 <h4 className="font-bold text-lg text-white mb-2">{editingScoreSession.studentInfo.name}</h4>
                 <p className="text-gray-300 text-sm">NIM: {editingScoreSession.studentInfo.nim}</p>
                 <p className="text-gray-300 text-sm">Kelas: {editingScoreSession.studentInfo.className}</p>
               </div>
               
-              <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-                <h5 className="text-blue-300 font-bold mb-2">📊 Informasi Nilai</h5>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-blue-200">Nilai PG:</span>
-                    <span className="text-white font-bold">{editingScoreSession.finalScore?.toFixed(2) || 'N/A'}</span>
-                  </div>
-                  {(() => {
-                    const essayQuestions = questions.filter(q => q.type === 'essay');
-                    if (essayQuestions.length > 0) {
-                      let essayScore = 'Belum dinilai';
-                      if (editingScoreSession.essayScores) {
-                        const essayScoreValues = Object.values(editingScoreSession.essayScores);
-                        if (essayScoreValues.length > 0) {
-                          const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
-                          const avgEssayScore = totalEssayScore / essayScoreValues.length;
-                          essayScore = avgEssayScore.toFixed(2);
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-blue-900 border border-blue-500 p-3 rounded-lg">
+                  <div className="text-blue-300 font-bold mb-1">Nilai PG</div>
+                  <div className="text-white font-bold text-lg">{editingScoreSession.finalScore?.toFixed(2) || 'N/A'}</div>
+                </div>
+                <div className="bg-purple-900 border border-purple-500 p-3 rounded-lg">
+                  <div className="text-purple-300 font-bold mb-1">Nilai Essay</div>
+                  <div className="text-white font-bold text-lg">
+                    {(() => {
+                      const essayQuestions = questions.filter(q => q.type === 'essay');
+                      if (essayQuestions.length > 0) {
+                        if (editingScoreSession.essayScores) {
+                          const essayScoreValues = Object.values(editingScoreSession.essayScores);
+                          if (essayScoreValues.length > 0) {
+                            const totalEssayScore = essayScoreValues.reduce((sum, s) => sum + (s || 0), 0);
+                            const avgEssayScore = totalEssayScore / essayScoreValues.length;
+                            return avgEssayScore.toFixed(2);
+                          }
                         }
+                        return 'Belum dinilai';
                       }
-                      return (
-                        <div className="flex justify-between">
-                          <span className="text-blue-200">Nilai Essay:</span>
-                          <span className="text-white font-bold">{essayScore}</span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  <div className="flex justify-between">
-                    <span className="text-blue-200">Pengurangan Saat Ini:</span>
-                    <span className="text-red-400 font-bold">-{editingScoreSession.scoreReduction || 0}</span>
+                      return 'N/A';
+                    })()}
                   </div>
-                  <div className="flex justify-between border-t border-blue-600 pt-2">
-                    <span className="text-blue-200">Nilai Akhir Saat Ini:</span>
-                    <span className="text-green-400 font-bold">{calculateTotalScore(editingScoreSession)}</span>
-                  </div>
+                </div>
+                <div className="bg-red-900 border border-red-500 p-3 rounded-lg">
+                  <div className="text-red-300 font-bold mb-1">Pengurangan</div>
+                  <div className="text-white font-bold text-lg">-{editingScoreSession.scoreReduction || 0}</div>
+                </div>
+                <div className="bg-green-900 border border-green-500 p-3 rounded-lg">
+                  <div className="text-green-300 font-bold mb-1">Nilai Akhir</div>
+                  <div className="text-white font-bold text-lg">{calculateTotalScore(editingScoreSession)}</div>
                 </div>
               </div>
               
@@ -668,25 +675,13 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
               
               {/* Preview New Score */}
               {scoreReduction > 0 && (
-                <div className="bg-yellow-900 border border-yellow-500 p-3 rounded-lg">
-                  <h5 className="text-yellow-300 font-bold mb-2">🔍 Preview Nilai Baru</h5>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-yellow-200">Nilai Sebelum Pengurangan:</span>
-                      <span className="text-white font-bold">
-                        {(parseFloat(calculateTotalScore(editingScoreSession)) + (editingScoreSession.scoreReduction || 0)).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-yellow-200">Pengurangan:</span>
-                      <span className="text-red-400 font-bold">-{scoreReduction}</span>
-                    </div>
-                    <div className="flex justify-between border-t border-yellow-600 pt-1">
-                      <span className="text-yellow-200">Nilai Akhir Baru:</span>
-                      <span className="text-green-400 font-bold">
-                        {Math.max(0, (parseFloat(calculateTotalScore(editingScoreSession)) + (editingScoreSession.scoreReduction || 0)) - scoreReduction).toFixed(2)}
-                      </span>
-                    </div>
+                <div className="bg-yellow-900 border border-yellow-500 p-3 rounded-lg text-center">
+                  <div className="text-yellow-300 font-bold mb-2">🔍 Preview Nilai Baru</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    {Math.max(0, (parseFloat(calculateTotalScore(editingScoreSession)) + (editingScoreSession.scoreReduction || 0)) - scoreReduction).toFixed(2)}
+                  </div>
+                  <div className="text-xs text-yellow-200 mt-1">
+                    {(parseFloat(calculateTotalScore(editingScoreSession)) + (editingScoreSession.scoreReduction || 0)).toFixed(2)} - {scoreReduction} = Nilai Baru
                   </div>
                 </div>
               )}
@@ -697,7 +692,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
                 </div>
               )}
               
-              <div className="flex justify-end space-x-4 pt-4">
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   onClick={() => {
                     setEditingScoreSession(null);
@@ -812,6 +807,12 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-400">
                 Menampilkan {sessions.length} siswa (Halaman {currentPage})
+                <button
+                  onClick={() => loadSessions(true)}
+                  className="ml-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded"
+                >
+                  🔄 Refresh Data
+                </button>
               </div>
               <button
                 onClick={() => loadSessions(false)}

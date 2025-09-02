@@ -42,14 +42,38 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
     // Load first page of applications
     loadApplications(true);
     
-    // Set up auto-refresh every 30 seconds
+    // Set up real-time listener for applications
+    const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`);
+    const unsubscribe = onSnapshot(
+      query(applicationsRef, orderBy('appliedAt', 'desc'), limit(APPLICATIONS_PER_PAGE)),
+      (snapshot) => {
+        const newApplications = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          appliedAt: doc.data().appliedAt?.toDate() || new Date()
+        } as Application));
+        
+        setApplications(newApplications);
+        setSelectedStudents(new Set()); // Reset selection on real-time update
+        
+        // Update pagination state
+        setHasMoreData(snapshot.docs.length === APPLICATIONS_PER_PAGE);
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+        setCurrentPage(1);
+      }
+    );
+    
+    // Fallback refresh every 30 seconds for pagination data
     const refreshInterval = setInterval(() => {
       if (!isLoadingMore) {
         loadApplications(true);
       }
-    }, 30000);
+    }, 45000); // Longer interval since we have real-time updates
     
-    return () => clearInterval(refreshInterval);
+    return () => {
+      unsubscribe();
+      clearInterval(refreshInterval);
+    };
   }, [exam?.id]);
 
   const loadApplications = async (isFirstLoad = false) => {
