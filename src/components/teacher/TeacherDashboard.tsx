@@ -28,6 +28,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showEditSchedule, setShowEditSchedule] = useState(false);
+  const [newStartTime, setNewStartTime] = useState('');
+  const [newEndTime, setNewEndTime] = useState('');
+  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
 
   const handleSearchExam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +121,49 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
       setError('Gagal memperbarui password. Silakan coba lagi.');
     } finally {
       setIsUpdatingPassword(false);
+    }
+  };
+
+  const handleEditSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStartTime.trim() || !newEndTime.trim()) {
+      setScheduleError('Waktu mulai dan selesai harus diisi');
+      return;
+    }
+    
+    if (new Date(newStartTime) >= new Date(newEndTime)) {
+      setScheduleError('Waktu selesai harus setelah waktu mulai');
+      return;
+    }
+    
+    setIsUpdatingSchedule(true);
+    setScheduleError('');
+    
+    try {
+      const examDocRef = doc(db, `artifacts/${appId}/public/data/exams`, currentExam.id);
+      await updateDoc(examDocRef, { 
+        startTime: newStartTime,
+        endTime: newEndTime
+      });
+      
+      // Update local state
+      const updatedExam = { 
+        ...currentExam, 
+        startTime: newStartTime, 
+        endTime: newEndTime 
+      };
+      setCurrentExam(updatedExam);
+      setFoundExam(updatedExam);
+      
+      setShowEditSchedule(false);
+      setNewStartTime('');
+      setNewEndTime('');
+      alert('Jadwal ujian berhasil diperbarui!');
+    } catch (error) {
+      console.error('Error updating schedule:', error);
+      setScheduleError('Gagal memperbarui jadwal. Silakan coba lagi.');
+    } finally {
+      setIsUpdatingSchedule(false);
     }
   };
 
@@ -250,6 +298,28 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                   Edit Password
                 </button>
               </div>
+              <div className="mt-2 space-y-1">
+                <p className="text-sm text-gray-400">
+                  Waktu Mulai: <span className="font-mono bg-gray-600 px-2 py-1 rounded">
+                    {new Date(foundExam.startTime).toLocaleString('id-ID')}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-400">
+                  Waktu Selesai: <span className="font-mono bg-gray-600 px-2 py-1 rounded">
+                    {new Date(foundExam.endTime).toLocaleString('id-ID')}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setNewStartTime(foundExam.startTime);
+                      setNewEndTime(foundExam.endTime);
+                      setShowEditSchedule(true);
+                    }}
+                    className="ml-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-2 rounded"
+                  >
+                    Edit Jadwal
+                  </button>
+                </p>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button 
                   onClick={() => handleNavigateToFeature('student_confirmation', { exam: foundExam })} 
@@ -339,6 +409,104 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-blue-400"
                     >
                       {isUpdatingPassword ? 'Menyimpan...' : 'Simpan Password'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
+          {/* Edit Schedule Modal */}
+          {showEditSchedule && (
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+              <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold">Edit Jadwal Ujian</h3>
+                  <button
+                    onClick={() => {
+                      setShowEditSchedule(false);
+                      setNewStartTime('');
+                      setNewEndTime('');
+                      setScheduleError('');
+                    }}
+                    className="text-gray-400 hover:text-white text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <form onSubmit={handleEditSchedule} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Ujian: {foundExam.name}
+                    </label>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Waktu Mulai Baru
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newStartTime}
+                      onChange={(e) => setNewStartTime(e.target.value)}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Waktu Selesai Baru
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newEndTime}
+                      onChange={(e) => setNewEndTime(e.target.value)}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="bg-yellow-900 border border-yellow-500 p-3 rounded-md">
+                    <p className="text-yellow-300 text-sm">
+                      ⚠️ <strong>Peringatan:</strong> Mengubah jadwal ujian akan mempengaruhi akses siswa. 
+                      Pastikan untuk memberitahu siswa tentang perubahan jadwal.
+                    </p>
+                  </div>
+                  
+                  <div className="bg-blue-900 border border-blue-500 p-3 rounded-md">
+                    <p className="text-blue-300 text-sm">
+                      💡 <strong>Tips:</strong>
+                    </p>
+                    <ul className="text-blue-200 text-xs mt-1 space-y-1">
+                      <li>• Siswa hanya bisa mengakses ujian pada waktu yang telah ditentukan</li>
+                      <li>• Jika ujian sedang berlangsung, perubahan akan berlaku segera</li>
+                      <li>• Pastikan durasi ujian cukup untuk siswa menyelesaikan soal</li>
+                    </ul>
+                  </div>
+                  
+                  {scheduleError && <p className="text-red-500 text-sm">{scheduleError}</p>}
+                  
+                  <div className="flex justify-end space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditSchedule(false);
+                        setNewStartTime('');
+                        setNewEndTime('');
+                        setScheduleError('');
+                      }}
+                      className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isUpdatingSchedule}
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-green-400"
+                    >
+                      {isUpdatingSchedule ? 'Menyimpan...' : 'Simpan Jadwal'}
                     </button>
                   </div>
                 </form>
