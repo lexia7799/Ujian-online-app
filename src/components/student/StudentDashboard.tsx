@@ -886,28 +886,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
                       ❌ DITOLAK
                     </span>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                      exam.specialStatus === 'approved_unpublished' 
-                        ? 'bg-green-600 text-white' 
-                        : 'bg-yellow-600 text-white'
-                    }`}>
-                      {exam.specialStatus === 'approved_unpublished' ? '✅ DISETUJUI' : '⏳ MENUNGGU'}
-                    <p className="text-red-200 text-sm text-center">
-                      💬 Hubungi dosen untuk informasi lebih lanjut
-                    </p>
                   </div>
+                  <div className={`border p-3 rounded-md ${
+                    exam.specialStatus === 'approved_unpublished'
+                      ? 'bg-blue-900 border-blue-600'
+                      : 'bg-red-900 border-red-600'
+                  }`}>
                     <p className={`text-sm text-center ${
                       exam.specialStatus === 'approved_unpublished'
                         ? 'text-blue-200'
-                        : 'text-yellow-200'
+                        : 'text-red-200'
                     }`}>
                       {exam.specialStatus === 'approved_unpublished'
                         ? '📝 Ujian belum dipublikasikan oleh dosen. Silakan tunggu hingga ujian siap dimulai.'
-                        : '💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.'
+                        : '💬 Hubungi dosen untuk informasi lebih lanjut'
                       }
-                      ? 'bg-blue-900 border-blue-600'
-                      : 'bg-yellow-900 border-yellow-600'
-                  }`}>
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
             
@@ -916,16 +912,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               <div className={`mt-4 border p-3 rounded-md ${
                 pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
                   ? 'bg-blue-900 border-blue-600'
-                  : 'bg-yellow-900 border-yellow-600'
+                  : 'bg-red-900 border-red-600'
               }`}>
                 <p className={`text-sm text-center ${
                   pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
                     ? 'text-blue-200'
-                    : 'text-yellow-200'
+                    : 'text-red-200'
                 }`}>
                   {pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
                     ? `📋 <strong>Status:</strong> ${pendingApplications.filter(app => app.specialStatus === 'approved_unpublished').length} ujian disetujui menunggu publikasi, ${pendingApplications.filter(app => !app.specialStatus).length} ujian menunggu konfirmasi.`
-                    : `📋 <strong>Total:</strong> ${pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen. Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.`
+                    : `📋 <strong>Total:</strong> ${rejectedApplications.length} aplikasi ujian ditolak. Hubungi dosen untuk informasi lebih lanjut.`
                   }
                 </p>
               </div>
