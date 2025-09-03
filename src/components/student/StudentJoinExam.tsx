@@ -107,12 +107,14 @@ const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, nav
 
   return (
     <div>
-      <button 
-        onClick={navigateBack} 
-        className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
-      >
-        &larr; Kembali
-      </button>
+      {canGoBack && (
+        <button 
+          onClick={navigateBack} 
+          className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+        >
+          &larr; Kembali
+        </button>
+      )}
       <h2 className="text-3xl font-bold mb-6 text-center">Ajukan Ikut Ujian</h2>
       <div className="w-full max-w-sm mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
         <form onSubmit={handleJoinExam}>

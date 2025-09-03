@@ -329,13 +329,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <button 
-          onClick={navigateBack} 
-          className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
-        >
-          &larr; Kembali
-        </button>
+      <div className="flex justify-end items-center mb-6">
         <button 
           onClick={() => navigateTo('home')} 
           className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
