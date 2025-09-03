@@ -823,7 +823,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
     return (
       <div className="text-center h-screen flex flex-col justify-center items-center -mt-16">
         <div className="bg-red-800 p-8 rounded-lg shadow-xl max-w-md">
-          <h2 className="text-2xl font-bold text-red-400 mb-4">🚫 Akses Ditolak</h2>
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Browser Tidak Didukung</h2>
           <p className="text-gray-300 mb-4">
             Browser Anda tidak mendukung mode fullscreen yang diperlukan untuk ujian ini.
           </p>
