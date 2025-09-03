@@ -173,8 +173,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               } else if (appData.status === 'approved') {
                 // Only add to available if no completed session
                 if (!hasCompletedSession) {
-                  available.push(examWithApp);
-                  console.log(`Added to available: ${examData.name}`);
+                  // Only show as available if exam is published
+                  if (examData.status === 'published') {
+                    available.push(examWithApp);
+                    console.log(`Added to available: ${examData.name}`);
+                  } else {
+                    console.log(`Skipped available (not published): ${examData.name}`);
+                  }
                 } else {
                   console.log(`Skipped available (completed): ${examData.name}`);
                 }
@@ -744,7 +749,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       const now = new Date();
                       const startTime = new Date(exam.startTime);
                       const endTime = new Date(exam.endTime);
-                      return now < startTime || now > endTime;
+                      return exam.status !== 'published' || now < startTime || now > endTime;
                     })()}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center disabled:bg-gray-500 disabled:cursor-not-allowed"
                   >
@@ -752,6 +757,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       const now = new Date();
                       const startTime = new Date(exam.startTime);
                       const endTime = new Date(exam.endTime);
+                      
+                      if (exam.status !== 'published') {
+                        return '📝 Belum Dipublikasi';
+                      }
+                      if (exam.status !== 'published') {
+                        return (
+                          <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md mb-3">
+                            <p className="text-yellow-200 text-sm text-center">
+                              📝 Ujian belum dipublikasi oleh dosen
+                            </p>
+                          </div>
+                        );
+                      }
                       
                       if (now < startTime) {
                         return '⏰ Belum Dimulai';
