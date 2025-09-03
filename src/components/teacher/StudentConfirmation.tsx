@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, updateDoc, doc, query, limit, startAfter, orderBy, DocumentSnapshot, onSnapshot } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
+import Modal from '../ui/Modal';
 
 interface Application {
   id: string;
@@ -31,6 +32,9 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const APPLICATIONS_PER_PAGE = 50;
+  const [editingApplication, setEditingApplication] = useState<Application | null>(null);
+  const [newStatus, setNewStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const handleBackNavigation = () => {
     navigateBack();
@@ -195,12 +199,79 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
     });
   };
 
+  const handleEditStatus = (application: Application) => {
+    setEditingApplication(application);
+    setNewStatus(application.status);
+  };
+
+  const handleSaveStatus = async () => {
+    if (!editingApplication) return;
+    
+    setIsUpdatingStatus(true);
+    
+    try {
+      const appRef = doc(db, `artifacts/${appId}/public/data/exams/${exam.id}/applications`, editingApplication.id);
+      await updateDoc(appRef, { status: newStatus });
+      
+      setEditingApplication(null);
+      alert(`Status siswa ${editingApplication.studentData.fullName} berhasil diubah menjadi ${
+        newStatus === 'pending' ? 'Menunggu' :
+        newStatus === 'approved' ? 'Disetujui' : 'Ditolak'
+      }!`);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Gagal mengubah status. Silakan coba lagi.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const pendingApplications = applications.filter(app => app.status === 'pending');
   const approvedCount = applications.filter(app => app.status === 'approved').length;
   const rejectedCount = applications.filter(app => app.status === 'rejected').length;
 
   return (
     <div>
+      <Modal 
+        isOpen={!!editingApplication} 
+        title="Edit Status Siswa"
+        onCancel={() => setEditingApplication(null)}
+        onConfirm={handleSaveStatus}
+        confirmText={isUpdatingStatus ? 'Menyimpan...' : 'Simpan Status'}
+        confirmColor="green"
+      >
+        {editingApplication && (
+          <div className="space-y-4">
+            <div className="bg-gray-700 p-3 rounded-lg text-center">
+              <h4 className="font-bold text-lg text-white">{editingApplication.studentData.fullName}</h4>
+              <p className="text-sm text-gray-300">{editingApplication.studentData.username}</p>
+              <p className="text-sm text-gray-300">{editingApplication.studentData.major} - {editingApplication.studentData.className}</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Pilih Status Baru:
+              </label>
+              <select
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value as 'pending' | 'approved' | 'rejected')}
+                className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="pending">⏳ Menunggu</option>
+                <option value="approved">✅ Disetujui</option>
+                <option value="rejected">❌ Ditolak</option>
+              </select>
+            </div>
+            
+            <div className="bg-blue-900 border border-blue-500 p-3 rounded-md">
+              <p className="text-blue-300 text-sm">
+                💡 <strong>Info:</strong> Mengubah status akan langsung mempengaruhi akses siswa ke ujian.
+              </p>
+            </div>
+          </div>
+        )}
+      </Modal>
+      
       <button 
         onClick={handleBackNavigation} 
         className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
@@ -356,6 +427,14 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
                               Tolak
                             </button>
                           </div>
+                        )}
+                        {app.status !== 'pending' && (
+                          <button
+                            onClick={() => handleEditStatus(app)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded"
+                          >
+                            Edit Status
+                          </button>
                         )}
                       </td>
                     </tr>
