@@ -454,32 +454,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     // Monitor fullscreen changes
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
-        // Record when user exited fullscreen
-        fullscreenExitTime.current = Date.now();
-        
-        // Attempt to re-enter fullscreen automatically
-        isAutoReenteringFullscreen.current = true;
-        
-        // Try to re-enter fullscreen with a small delay
-        setTimeout(() => {
-          if (!isFinished && !isInFullscreen()) {
-            enterFullscreen().then(() => {
-              console.log("✅ Successfully re-entered fullscreen automatically");
-              isAutoReenteringFullscreen.current = false;
-            }).catch((error) => {
-              console.warn("⚠️ Auto re-enter fullscreen failed:", error);
-              isAutoReenteringFullscreen.current = false;
-              
-              // Only count as violation if auto re-enter fails and user has been out for more than 3 seconds
-              const timeOutOfFullscreen = Date.now() - (fullscreenExitTime.current || 0);
-              if (timeOutOfFullscreen > 3000) {
-                handleViolation("Exited Fullscreen");
-              }
-            });
-          } else {
-            isAutoReenteringFullscreen.current = false;
-          }
-        }, 100); // Small delay to ensure the exit event is processed
+        handleViolation("Exited Fullscreen");
       }
     };
     
