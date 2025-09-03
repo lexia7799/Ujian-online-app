@@ -288,17 +288,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         setRetakeExams(retakes);
         setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        
-      } catch (error) {
-        console.error('Error fetching exam results:', error);
-        setExamResults([]);
-        setAvailableExams([]);
-        setRetakeExams([]);
-        setPendingApplications([]);
-        setRejectedApplications([]);
-      } finally {
-        setIsLoading(false);
-      }
+    } catch (error) {
+      console.error('Error fetching exam results:', error);
+      setExamResults([]);
+      setAvailableExams([]);
+      setPendingApplications([]);
+      setApprovedApplications([]);
+      setRejectedApplications([]);
+      setCompletedRetakeSessions(new Set());
+    } finally {
+      setIsLoading(false);
+    }
     };
 
     fetchData();
