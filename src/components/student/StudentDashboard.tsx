@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, updateDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -15,12 +15,123 @@ interface StudentDashboardProps {
   navigateBack: () => void;
 }
 
+const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, navigateBack }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [studentProfile, setStudentProfile] = useState<any>(null);
+  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    fullName: '',
+    nim: '',
+    major: '',
+    className: '',
     university: '',
+    whatsapp: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [editError, setEditError] = useState('');
+  const [editValidationErrors, setEditValidationErrors] = useState<any>({});
+  const [isUpdating, setIsUpdating] = useState(false);
   const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
-      if (!examsSnapshot.empty) {
-        const examDoc = examsSnapshot.docs[0];
-    setIsLoading(false);
-  }, []);
+
+  useEffect(() => {
+    const fetchStudentData = async () => {
+      try {
+        // Fetch student profile
+        const studentsQuery = query(
+          collection(db, `artifacts/${appId}/public/data/students`),
+          where('id', '==', user.id),
+          limit(1)
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        if (!studentsSnapshot.empty) {
+          const studentDoc = studentsSnapshot.docs[0];
+          const studentData = { id: studentDoc.id, ...studentDoc.data() };
+          setStudentProfile(studentData);
+          
+          // Initialize edit form with current data
+          setEditFormData({
+            fullName: studentData.fullName || '',
+            nim: studentData.nim || '',
+            major: studentData.major || '',
+            className: studentData.className || '',
+            university: studentData.university || '',
+            whatsapp: studentData.whatsapp || '',
+            password: '',
+            confirmPassword: ''
+          });
+        }
+
+        // Fetch pending exam applications
+        const examsQuery = query(
+          collection(db, `artifacts/${appId}/public/data/exams`),
+          where('applicants', 'array-contains', user.id)
+        );
+        const examsSnapshot = await getDocs(examsQuery);
+        
+        const pending: any[] = [];
+        examsSnapshot.forEach(doc => {
+          const examData = doc.data();
+          const applicantData = examData.applicantDetails?.[user.id];
+          
+          if (applicantData && applicantData.status === 'pending') {
+            pending.push({
+              id: doc.id,
+              ...examData,
+              appliedAt: applicantData.appliedAt?.toDate() || new Date(),
+              hasCompletedSession: examData.completedSessions?.includes(user.id) || false
+            });
+          }
+        });
+        
+        setPendingApplications(pending);
+      } catch (error) {
+        console.error('Error fetching student data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudentData();
+  }, [user.id]);
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const validateUniqueNIM = async () => {
+    const errors: any = {};
+    
+    try {
+      // Check if NIM is unique (excluding current user)
+      const nimQuery = query(
+        collection(db, `artifacts/${appId}/public/data/students`),
+        where('nim', '==', editFormData.nim)
+      );
+      const nimSnapshot = await getDocs(nimQuery);
+      
+      if (!nimSnapshot.empty) {
+        const existingDoc = nimSnapshot.docs[0];
+        if (existingDoc.id !== user.id) {
+          errors.nim = 'NIM/NIS sudah digunakan oleh siswa lain';
+        }
+      }
+    } catch (error) {
+      console.error('Error validating unique fields:', error);
+    }
+    
+    return errors;
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
     setEditError('');
     setEditValidationErrors({});
     setIsUpdating(true);
@@ -408,6 +519,28 @@ interface StudentDashboardProps {
               <div className="flex justify-end space-x-4 pt-6">
                 <button 
                   type="button"
+                  onClick={() => {
+                    setShowEditProfile(false);
+                    setEditError('');
+                    setEditValidationErrors({});
+                  }}
+                  className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isUpdating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50"
+                >
+                  {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <h2 className="text-3xl font-bold mb-6">Dashboard Siswa</h2>
       <p className="text-lg text-gray-400 mb-8">
         Selamat datang, <span className="text-indigo-400 font-semibold">{user?.fullName || 'Siswa'}</span>
