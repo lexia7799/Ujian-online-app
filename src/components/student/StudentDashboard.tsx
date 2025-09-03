@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit, addDoc, collectionGroup, orderBy } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -47,6 +47,60 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Add state for retake exams
+  const [retakeExams, setRetakeExams] = useState<any[]>([]);
+  const [completedRetakeSessions, setCompletedRetakeSessions] = useState<any[]>([]);
+  const handleRetakeRequest = async (examCode: string, examName: string) => {
+    try {
+      // Find the exam by code
+      const examsSnapshot = await getDocs(query(
+        collection(db, `artifacts/${appId}/public/data/exams`),
+        where('code', '==', examCode),
+        limit(1)
+      ));
+      
+      if (!examsSnapshot.empty) {
+        const examDoc = examsSnapshot.docs[0];
+        const examId = examDoc.id;
+        
+        // Check if retake request already exists
+        const retakeRequestsSnapshot = await getDocs(query(
+          collection(db, `artifacts/${appId}/public/data/exams/${examId}/retakeRequests`),
+          where('studentId', '==', user.id),
+          limit(1)
+        ));
+        
+        if (!retakeRequestsSnapshot.empty) {
+          alert('Anda sudah mengajukan ujian ulang untuk ujian ini. Tunggu konfirmasi dari dosen.');
+          return;
+        }
+        
+        // Create retake request
+        await addDoc(collection(db, `artifacts/${appId}/public/data/exams/${examId}/retakeRequests`), {
+          studentId: user.id,
+          studentData: {
+            fullName: studentProfile?.fullName || user.fullName || '',
+            username: user.username,
+            major: studentProfile?.major || '',
+            className: studentProfile?.className || '',
+            university: studentProfile?.university || ''
+          },
+          examId: examId,
+          examName: examName,
+          examCode: examCode,
+          status: 'pending',
+          requestedAt: new Date(),
+          originalDisqualificationDate: new Date()
+        });
+        
+        alert(`Permintaan ujian ulang untuk "${examName}" berhasil diajukan. Tunggu konfirmasi dari dosen.`);
+      }
+    } catch (error) {
+      console.error('Error submitting retake request:', error);
+      alert('Gagal mengajukan ujian ulang. Silakan coba lagi.');
+    }
+  };
+
   useEffect(() => {
     // Early return if no user
     if (!user || !user.id) {
@@ -88,6 +142,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         const available: any[] = [];
         const pending: any[] = [];
         const rejected: any[] = [];
+        const retakes: any[] = [];
         
         // Process each exam
         for (const examDoc of examsSnapshot.docs) {
@@ -171,8 +226,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 pending.push(examWithApp);
                 console.log(`Added to pending: ${examData.name}`);
               } else if (appData.status === 'approved') {
-                // Only add to available if no completed session
-                if (!hasCompletedSession) {
+                // Check if this is a retake application
+                if (appData.isRetake) {
+                  retakes.push(examWithApp);
+                  console.log(`Added to retakes: ${examData.name}`);
+                } else if (!hasCompletedSession) {
+                  // Only add to available if no completed session and not a retake
                   available.push(examWithApp);
                   console.log(`Added to available: ${examData.name}`);
                 } else {
@@ -185,30 +244,63 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             });
             
           } catch (examError) {
-            console.warn(`Error processing exam ${examId}:`, examError);
+            console.error(`Error processing exam ${examId}:`, examError);
           }
         }
         
-        console.log(`Final counts - Pending: ${pending.length}, Available: ${available.length}, Rejected: ${rejected.length}, Results: ${results.length}`);
+        // Load exam history - try with index first, fallback to simple query
+        let sessions = [];
+        try {
+          const sessionsQuery = query(
+            collectionGroup(db, 'sessions'),
+            where('studentId', '==', user.id),
+            orderBy('startTime', 'desc'),
+            limit(50)
+          );
+          
+          const sessionsSnapshot = await getDocs(sessionsQuery);
+          sessions = sessionsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            examPath: doc.ref.parent.parent?.path || ''
+          }));
+        } catch (indexError) {
+          console.warn('Index not available, using fallback query:', indexError);
+          
+          // Fallback: Query without orderBy to avoid index requirement
+          const fallbackQuery = query(
+            collectionGroup(db, 'sessions'),
+            where('studentId', '==', user.id),
+            limit(50)
+          );
+          
+          const fallbackSnapshot = await getDocs(fallbackQuery);
+          sessions = fallbackSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            examPath: doc.ref.parent.parent?.path || ''
+          }));
+          
+          // Sort manually by startTime (descending)
+          sessions.sort((a, b) => {
+            const timeA = a.startTime?.seconds || 0;
+            const timeB = b.startTime?.seconds || 0;
+            return timeB - timeA;
+          });
+        }
         
-        // Set all results
-        setExamResults(results.sort((a, b) => {
-          if (!a.finishTime && !b.finishTime) return 0;
-          if (!a.finishTime) return -1;
-          if (!b.finishTime) return 1;
-          return b.finishTime.getTime() - a.finishTime.getTime();
-        }));
-        
+        setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
         setAvailableExams(available);
+        setRetakeExams(retakes);
         setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        
       } catch (error) {
         console.error('Error fetching exam results:', error);
         setExamResults([]);
         setAvailableExams([]);
         setPendingApplications([]);
         setRejectedApplications([]);
+        setCompletedRetakeSessions([]);
       } finally {
         setIsLoading(false);
       }
@@ -784,6 +876,112 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           </div>
         )}
 
+        {/* Ujian Ulang yang Disetujui (Retake Exams) */}
+        {retakeExams.length > 0 && (
+          <div className="mb-6 bg-purple-800 border border-purple-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">🔄</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-purple-400">
+                  {retakeExams.length === 1 ? 'Ujian Ulang Siap Dimulai' : `${retakeExams.length} Ujian Ulang Siap Dimulai`}
+                </h4>
+                <p className="text-purple-200 text-sm">
+                  {retakeExams.length === 1 
+                    ? 'Ujian ulang yang sudah disetujui dosen dan bisa dimulai sekarang'
+                    : 'Beberapa ujian ulang sudah disetujui dosen dan bisa dimulai sekarang'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className={`grid gap-4 ${
+              retakeExams.length === 1 
+                ? 'grid-cols-1' 
+                : retakeExams.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
+              {retakeExams.map(exam => {
+                const hasCompletedRetake = completedRetakeSessions.some(retakeSession => 
+                  retakeSession.examId === exam.id
+                );
+                
+                // Determine which schedule to use
+                return (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-purple-400 hover:bg-gray-600 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Mulai: {exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime).toLocaleString('id-ID') : new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime).toLocaleString('id-ID') : new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round(((exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime).getTime() : new Date(exam.endTime).getTime()) - (exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime).getTime() : new Date(exam.startTime).getTime())) / (1000 * 60))} menit</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-purple-600 text-white">
+                      🔄 UJIAN ULANG
+                    </span>
+                  </div>
+                  
+                  <div className="bg-purple-900 border border-purple-600 p-3 rounded-md">
+                    <p className="text-purple-200 text-sm text-center">
+                      🔄 Ujian ulang yang sudah disetujui dosen
+                    </p>
+                  </div>
+                  
+                  {/* Exam Status Check and Start Button */}
+                  {(() => {
+                    const now = new Date();
+                    const examStartTime = exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime) : new Date(exam.startTime);
+                    const examEndTime = exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime) : new Date(exam.endTime);
+                    
+                    if (now < examStartTime) {
+                      return (
+                        <div className="mt-3 bg-blue-900 border border-blue-600 p-3 rounded-md">
+                          <p className="text-blue-200 text-sm text-center">
+                            ⏰ Ujian akan dimulai pada:<br/>
+                            <span className="font-bold">{examStartTime.toLocaleString('id-ID')}</span>
+                          </p>
+                        </div>
+                      );
+                    } else if (now > examEndTime) {
+                      return (
+                        <div className="mt-3 bg-gray-900 border border-gray-600 p-3 rounded-md">
+                          <p className="text-gray-400 text-sm text-center">
+                            ⏰ Waktu ujian ulang telah berakhir
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <button
+                          onClick={() => navigateTo('student_precheck', { exam: { ...exam, startTime: examStartTime.toISOString(), endTime: examEndTime.toISOString() }, currentUser: user, isRetake: true })}
+                          className="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
+                        >
+                          🚀 Mulai Ujian Ulang Sekarang
+                        </button>
+                      );
+                    }
+                  })()}
+                </div>
+                );
+              })}
+            </div>
+            
+            {/* Summary Info */}
+            {retakeExams.length > 1 && (
+              <div className="mt-4 bg-purple-900 border border-purple-600 p-3 rounded-md">
+                <p className="text-purple-200 text-sm text-center">
+                  🔄 <strong>Catatan:</strong> Anda memiliki {retakeExams.length} ujian ulang yang disetujui. 
+                  Pastikan untuk mengerjakan semua ujian ulang sesuai jadwal yang ditentukan dosen.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Aplikasi Menunggu Konfirmasi (Pending) */}
         {pendingApplications.length > 0 && (
           <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
@@ -888,7 +1086,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         )}
 
         {/* Empty State */}
-        {availableExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
+        {availableExams.length === 0 && retakeExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
           <div className="bg-gray-800 border border-gray-600 p-8 rounded-lg text-center">
             <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">📝</span>
@@ -932,6 +1130,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 <th className="p-4">Nilai Akhir</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Waktu Selesai</th>
+                <th className="p-4">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -985,6 +1184,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                   </td>
                   <td className="p-4 text-gray-400">
                     {result.finishTime ? result.finishTime.toLocaleString('id-ID') : 'Belum selesai'}
+                  </td>
+                  <td className="p-4">
+                    {result.status === 'disqualified' && (
+                      <button
+                        onClick={() => handleRetakeRequest(result.examCode, result.examName)}
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-1 px-3 rounded"
+                      >
+                        Ajukan Ujian Ulang
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
