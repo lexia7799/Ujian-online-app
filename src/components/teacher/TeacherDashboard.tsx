@@ -25,9 +25,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
   const [error, setError] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [inputPassword, setInputPassword] = useState('');
+  const [showInputPassword, setShowInputPassword] = useState(false);
   const [currentExam, setCurrentExam] = useState<any>(null);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [newStartTime, setNewStartTime] = useState('');
@@ -275,14 +277,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
             <form onSubmit={handleVerifyPassword} className="mt-6">
               <h4 className="font-bold text-lg">Verifikasi Akses untuk: {foundExam.name}</h4>
               <div className="flex space-x-2 mt-2">
-                <input 
-                  type="password" 
-                  value={inputPassword} 
-                  onChange={(e) => setInputPassword(e.target.value)} 
-                  placeholder="Masukkan Password Ujian" 
-                  className="flex-grow p-3 bg-gray-700 rounded-md border border-gray-600" 
-                  required
-                />
+                <div className="relative flex-grow">
+                  <input 
+                    type={showInputPassword ? "text" : "password"}
+                    value={inputPassword} 
+                    onChange={(e) => setInputPassword(e.target.value)} 
+                    placeholder="Masukkan Password Ujian" 
+                    className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 pr-12" 
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowInputPassword(!showInputPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                  >
+                    {showInputPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
                 <button 
                   type="submit" 
                   className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg"
@@ -392,14 +412,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Password Baru untuk: {foundExam.name}
                     </label>
-                    <input
-                      type="text"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Masukkan password baru"
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Masukkan password baru"
+                        className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                      >
+                        {showNewPassword ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="bg-yellow-900 border border-yellow-500 p-3 rounded-md">
