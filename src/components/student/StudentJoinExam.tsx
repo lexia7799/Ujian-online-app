@@ -7,9 +7,10 @@ interface StudentJoinExamProps {
   user: User;
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
+  canGoBack?: boolean;
 }
 
-const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, navigateBack }) => {
+const StudentJoinExam: React.FC<StudentJoinExamProps> = ({ user, navigateTo, navigateBack, canGoBack = true }) => {
   const [examCode, setExamCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
