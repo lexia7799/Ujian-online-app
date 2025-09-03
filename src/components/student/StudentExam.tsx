@@ -859,7 +859,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
               Nilai esai (jika ada) akan diperiksa oleh dosen.
             </p>
             <button 
-              onClick={() => navigateTo('student_dashboard', { currentUser: user })}
+              onClick={() => navigateTo('student_dashboard', { currentUser: user, clearHistory: true })}
               className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
             >
               🏠 Kembali ke Dashboard

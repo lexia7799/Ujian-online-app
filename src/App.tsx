@@ -62,6 +62,13 @@ function App() {
   const [navigationHistory, setNavigationHistory] = useState<string[]>(['home']);
 
   const navigateTo = (pageName: string, data = {}) => {
+    // Clear navigation history when going to dashboard after exam completion
+    if (pageName === 'student_dashboard' && data.currentUser && data.clearHistory) {
+      setNavigationHistory(['home', 'student_dashboard']);
+    } else {
+      setNavigationHistory(prev => [...prev, pageName]);
+    }
+    
     setPage(pageName);
     setAppState(currentState => {
       const newState = { ...currentState, ...data };
@@ -70,7 +77,6 @@ function App() {
       }
       return newState;
     });
-    setNavigationHistory(prev => [...prev, pageName]);
   };
 
   const navigateBack = () => {
