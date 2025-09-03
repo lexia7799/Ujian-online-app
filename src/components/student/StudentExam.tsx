@@ -676,42 +676,15 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     } else {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
-    }
-  };
-
-  // Handle keyboard events for violation modal
-  useEffect(() => {
-    if (!showViolationModal) return;
-
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        setShowViolationModal(false);
-        
-        // Auto re-enter fullscreen after first violation is dismissed
-        if (violations === 1 && !isFinished && !isInFullscreen()) {
-          setTimeout(() => {
-            enterFullscreen();
-          }, 500);
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyPress);
-    return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [showViolationModal, violations, isFinished]);
-
-  // Auto fullscreen for second violation and beyond
-  useEffect(() => {
-    if (violations >= 2 && showViolationModal && !isFinished) {
-      // Auto re-enter fullscreen for second violation and beyond
+      
+      // Auto re-enter fullscreen after violation for first two violations
       setTimeout(() => {
-        if (!isInFullscreen()) {
+        if (!isFinished && !isInFullscreen() && newViolations <= 2) {
           enterFullscreen();
         }
       }, 1500);
     }
-  }, [violations, showViolationModal, isFinished]);
+  };
 
   const handleViolationOld = (reason = "Unknown") => {
     const newViolations = violations + 1;
