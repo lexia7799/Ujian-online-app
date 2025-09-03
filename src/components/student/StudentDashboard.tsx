@@ -47,6 +47,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Add state for retake exams
+  const [retakeExams, setRetakeExams] = useState<any[]>([]);
   const handleRetakeRequest = async (examCode: string, examName: string) => {
     try {
       // Find the exam by code
@@ -139,6 +141,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         const available: any[] = [];
         const pending: any[] = [];
         const rejected: any[] = [];
+        const retakes: any[] = [];
         
         // Process each exam
         for (const examDoc of examsSnapshot.docs) {
@@ -222,8 +225,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 pending.push(examWithApp);
                 console.log(`Added to pending: ${examData.name}`);
               } else if (appData.status === 'approved') {
-                // Only add to available if no completed session
-                if (!hasCompletedSession) {
+                // Check if this is a retake application
+                if (appData.isRetake) {
+                  retakes.push(examWithApp);
+                  console.log(`Added to retakes: ${examData.name}`);
+                } else if (!hasCompletedSession) {
+                  // Only add to available if no completed session and not a retake
                   available.push(examWithApp);
                   console.log(`Added to available: ${examData.name}`);
                 } else {
@@ -251,6 +258,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         }));
         
         setAvailableExams(available);
+        setRetakeExams(retakes);
         setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         
@@ -258,6 +266,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         console.error('Error fetching exam results:', error);
         setExamResults([]);
         setAvailableExams([]);
+        setRetakeExams([]);
         setPendingApplications([]);
         setRejectedApplications([]);
       } finally {
