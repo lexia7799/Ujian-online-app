@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit, addDoc, collectionGroup, orderBy } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -49,6 +49,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
   // Add state for retake exams
   const [retakeExams, setRetakeExams] = useState<any[]>([]);
+  const [completedRetakeSessions, setCompletedRetakeSessions] = useState<any[]>([]);
   const handleRetakeRequest = async (examCode: string, examName: string) => {
     try {
       // Find the exam by code
@@ -243,6 +244,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             });
             
           } catch (examError) {
+            console.error(`Error processing exam ${examId}:`, examError);
+          }
+        }
+        
         // Load exam history - try with index first, fallback to simple query
         let sessions = [];
         try {
@@ -284,21 +289,21 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           });
         }
         
+        setExamResults(results.sort((a, b) => b.finishTime.getTime() - a.finishTime.getTime()));
         setAvailableExams(available);
         setRetakeExams(retakes);
         setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
         setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-    } catch (error) {
-      console.error('Error fetching exam results:', error);
-      setExamResults([]);
-      setAvailableExams([]);
-      setPendingApplications([]);
-      setApprovedApplications([]);
-      setRejectedApplications([]);
-      setCompletedRetakeSessions(new Set());
-    } finally {
-      setIsLoading(false);
-    }
+      } catch (error) {
+        console.error('Error fetching exam results:', error);
+        setExamResults([]);
+        setAvailableExams([]);
+        setPendingApplications([]);
+        setRejectedApplications([]);
+        setCompletedRetakeSessions([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchData();
