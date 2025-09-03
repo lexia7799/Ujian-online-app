@@ -870,13 +870,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 ? 'grid-cols-1 md:grid-cols-2' 
                 : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
             }`}>
-              {retakeExams.map(exam => {
-                const hasCompletedRetake = completedRetakeSessions.some(retakeSession => 
-                  retakeSession.examId === exam.id
-                );
-                
-                // Determine which schedule to use
-                return (
+              {retakeExams.map(exam => (
                 <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-purple-400 hover:bg-gray-600 transition-colors">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-grow">
@@ -934,8 +928,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     }
                   })()}
                 </div>
-                );
-              })}
+              ))}
             </div>
             
             {/* Summary Info */}
