@@ -421,7 +421,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           }
         }, 2000);
       } else {
-        handleViolation("Fullscreen Required - Unable to Enter");
+        console.warn("Unable to enter fullscreen after maximum retries");
       }
     }
   };
@@ -453,12 +453,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
         handleViolation("Exited Fullscreen");
-        // Auto re-enter fullscreen after violation
-        setTimeout(() => {
-          if (!isFinished) {
-            enterFullscreen();
-          }
-        }, 1000);
       }
     };
     
@@ -676,13 +670,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     } else {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
-      
-      // Auto re-enter fullscreen after violation
-      setTimeout(() => {
-        if (!isFinished && !isInFullscreen()) {
-          enterFullscreen();
-        }
-      }, 1500);
     }
   };
 
