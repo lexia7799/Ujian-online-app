@@ -948,7 +948,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         )}
 
         {/* Empty State */}
-        {availableExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
+        {availableExams.length === 0 && retakeExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
           <div className="bg-gray-800 border border-gray-600 p-8 rounded-lg text-center">
             <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">📝</span>
