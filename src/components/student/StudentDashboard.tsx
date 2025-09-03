@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, updateDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -15,22 +15,12 @@ interface StudentDashboardProps {
   navigateBack: () => void;
 }
 
-interface ExamResult {
-  id: string;
-  examName: string;
-  finalScore: number;
-  finishTime: Date;
-  status: string;
-}
-
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, navigateBack }) => {
-  const [examResults, setExamResults] = useState<ExamResult[]>([]);
-  const [studentProfile, setStudentProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [availableExams, setAvailableExams] = useState<any[]>([]);
+  const [studentProfile, setStudentProfile] = useState<any>(null);
   const [pendingApplications, setPendingApplications] = useState<any[]>([]);
-  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const [editFormData, setEditFormData] = useState({
     fullName: '',
     nim: '',
@@ -41,211 +31,100 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     password: '',
     confirmPassword: ''
   });
-  const [showEditPassword, setShowEditPassword] = useState(false);
-  const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
   const [editError, setEditError] = useState('');
-  const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
+  const [editValidationErrors, setEditValidationErrors] = useState<any>({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
 
   useEffect(() => {
-    // Early return if no user
-    if (!user || !user.id) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Fetch all exam data and applications
-    const fetchData = async () => {
+    const fetchStudentData = async () => {
       try {
-        // Fetch student profile first
-        const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
+        // Fetch student profile
+        const studentsQuery = query(
+          collection(db, `artifacts/${appId}/public/data/students`),
+          where('id', '==', user.id),
+          limit(1)
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
         
-        if (studentDoc.exists()) {
-          const profileData = studentDoc.data();
-          setStudentProfile(profileData);
+        if (!studentsSnapshot.empty) {
+          const studentDoc = studentsSnapshot.docs[0];
+          const studentData = { id: studentDoc.id, ...studentDoc.data() };
+          setStudentProfile(studentData);
+          
+          // Initialize edit form with current data
           setEditFormData({
-            fullName: profileData.fullName || '',
-            nim: profileData.nim || '',
-            major: profileData.major || '',
-            className: profileData.className || '',
-            university: profileData.university || '',
-            whatsapp: profileData.whatsapp || '',
+            fullName: studentData.fullName || '',
+            nim: studentData.nim || '',
+            major: studentData.major || '',
+            className: studentData.className || '',
+            university: studentData.university || '',
+            whatsapp: studentData.whatsapp || '',
             password: '',
             confirmPassword: ''
           });
         }
 
-        // Fetch all exams
-        const examsSnapshot = await getDocs(query(
-          collection(db, `artifacts/${appId}/public/data/exams`), 
-          limit(100)
-        ));
+        // Fetch pending exam applications
+        const examsQuery = query(
+          collection(db, `artifacts/${appId}/public/data/exams`),
+          where('applicants', 'array-contains', user.id)
+        );
+        const examsSnapshot = await getDocs(examsQuery);
         
-        console.log(`Found ${examsSnapshot.docs.length} total exams`);
-        
-        // Initialize arrays
-        const results: ExamResult[] = [];
-        const available: any[] = [];
         const pending: any[] = [];
-        const rejected: any[] = [];
-        
-        // Process each exam
-        for (const examDoc of examsSnapshot.docs) {
-          const examData = examDoc.data();
-          const examId = examDoc.id;
+        examsSnapshot.forEach(doc => {
+          const examData = doc.data();
+          const applicantData = examData.applicantDetails?.[user.id];
           
-          console.log(`Processing exam: ${examData.name} (${examId})`);
-          
-          try {
-            // Check for completed sessions first
-            const sessionsSnapshot = await getDocs(query(
-              collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
-              where('studentId', '==', user.id),
-              limit(5)
-            ));
-            
-            let hasCompletedSession = false;
-            
-            // Process sessions for results
-            sessionsSnapshot.forEach(sessionDoc => {
-              const sessionData = sessionDoc.data();
-              
-              if (['finished', 'disqualified'].includes(sessionData.status)) {
-                hasCompletedSession = true;
-                
-                // Calculate scores
-                let essayScore = undefined;
-                let totalScore = undefined;
-                
-                if (sessionData.essayScores) {
-                  const essayScores = Object.values(sessionData.essayScores);
-                  if (essayScores.length > 0) {
-                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                    const mcScore = sessionData.finalScore || 0;
-                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
-                  }
-                }
-                
-                results.push({
-                  id: sessionDoc.id,
-                  examName: examData.name || 'Unknown Exam',
-                  examCode: examData.code,
-                  finalScore: sessionData.finalScore || 0,
-                  essayScore,
-                  totalScore,
-                  finishTime: sessionData.finishTime?.toDate() || new Date(),
-                  status: sessionData.status
-                });
-              }
+          if (applicantData && applicantData.status === 'pending') {
+            pending.push({
+              id: doc.id,
+              ...examData,
+              appliedAt: applicantData.appliedAt?.toDate() || new Date(),
+              hasCompletedSession: examData.completedSessions?.includes(user.id) || false
             });
-            
-            // Check for applications regardless of completed sessions
-            const applicationsSnapshot = await getDocs(query(
-              collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
-              where('studentId', '==', user.id),
-              limit(5)
-            ));
-            
-            console.log(`Found ${applicationsSnapshot.docs.length} applications for exam ${examId}`);
-            
-            // Process applications
-            applicationsSnapshot.forEach(appDoc => {
-              const appData = appDoc.data();
-              console.log(`Application status: ${appData.status} for exam ${examData.name}`);
-              
-              const examWithApp = {
-                id: examId,
-                name: examData.name,
-                code: examData.code,
-                applicationStatus: appData.status,
-                appliedAt: appData.appliedAt?.toDate() || new Date(),
-                startTime: examData.startTime,
-                endTime: examData.endTime,
-                status: examData.status,
-                hasCompletedSession,
-                ...examData
-              };
-              
-              // Categorize based on application status
-              if (appData.status === 'pending') {
-                pending.push(examWithApp);
-                console.log(`Added to pending: ${examData.name}`);
-              } else if (appData.status === 'approved') {
-                // Only add to available if no completed session
-                if (!hasCompletedSession) {
-                  available.push(examWithApp);
-                  console.log(`Added to available: ${examData.name}`);
-                } else {
-                  console.log(`Skipped available (completed): ${examData.name}`);
-                }
-              } else if (appData.status === 'rejected') {
-                rejected.push(examWithApp);
-                console.log(`Added to rejected: ${examData.name}`);
-              }
-            });
-            
-          } catch (examError) {
-            console.warn(`Error processing exam ${examId}:`, examError);
           }
-        }
+        });
         
-        console.log(`Final counts - Pending: ${pending.length}, Available: ${available.length}, Rejected: ${rejected.length}, Results: ${results.length}`);
-        
-        // Set all results
-        setExamResults(results.sort((a, b) => {
-          if (!a.finishTime && !b.finishTime) return 0;
-          if (!a.finishTime) return -1;
-          if (!b.finishTime) return 1;
-          return b.finishTime.getTime() - a.finishTime.getTime();
-        }));
-        
-        setAvailableExams(available);
-        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        
+        setPendingApplications(pending);
       } catch (error) {
-        console.error('Error fetching exam results:', error);
-        setExamResults([]);
-        setAvailableExams([]);
-        setPendingApplications([]);
-        setRejectedApplications([]);
+        console.error('Error fetching student data:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, [user?.id]);
+    fetchStudentData();
+  }, [user.id]);
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
-    // Clear validation error when user starts typing
-    if (editValidationErrors[e.target.name]) {
-      setEditValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[e.target.name];
-        return newErrors;
-      });
-    }
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const validateUniqueNIM = async () => {
-    // Only validate if NIM has changed
-    if (editFormData.nim === studentProfile?.nim) {
-      return {};
-    }
-
-    const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
-    const errors: {[key: string]: string} = {};
+    const errors: any = {};
     
-    // Check for duplicate NIM (excluding current user)
-    const nimQuery = query(studentsRef, where("nim", "==", editFormData.nim));
-    const nimSnapshot = await getDocs(nimQuery);
-    
-    // Check if any document found is not the current user
-    const duplicateNIM = nimSnapshot.docs.find(doc => doc.id !== user.id);
-    if (duplicateNIM) {
-      errors.nim = "NIM/NIS sudah terdaftar oleh siswa lain. Gunakan NIM/NIS yang berbeda.";
+    try {
+      // Check if NIM is unique (excluding current user)
+      const nimQuery = query(
+        collection(db, `artifacts/${appId}/public/data/students`),
+        where('nim', '==', editFormData.nim)
+      );
+      const nimSnapshot = await getDocs(nimQuery);
+      
+      if (!nimSnapshot.empty) {
+        const existingDoc = nimSnapshot.docs[0];
+        if (existingDoc.id !== user.id) {
+          errors.nim = 'NIM/NIS sudah digunakan oleh siswa lain';
+        }
+      }
+    } catch (error) {
+      console.error('Error validating unique fields:', error);
     }
     
     return errors;
@@ -645,14 +524,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     setEditError('');
                     setEditValidationErrors({});
                   }}
-                  className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg"
+                  className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg"
                 >
                   Batal
                 </button>
                 <button 
-                  type="submit" 
+                  type="submit"
                   disabled={isUpdating}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:bg-indigo-400"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50"
                 >
                   {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </button>
@@ -662,335 +541,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         </div>
       )}
 
-      {/* Status Aplikasi Ujian Section */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold">Status Aplikasi Ujian</h3>
-          <button 
-            onClick={() => navigateTo('student_join_exam', { currentUser: user })}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
-          >
-            + Ajukan Ujian Baru
-          </button>
-        </div>
-
-        {/* Ujian Siap Dimulai (Approved & Active) */}
-        {availableExams.length > 0 && (
-          <div className="mb-6 bg-green-800 border border-green-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">{availableExams.length > 1 ? '📚' : '🎯'}</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-green-400">
-                  {availableExams.length > 1 ? `${availableExams.length} Ujian Siap Dimulai` : 'Ujian Siap Dimulai'}
-                </h4>
-                <p className="text-green-200 text-sm">
-                  {availableExams.length > 1 
-                    ? 'Beberapa ujian sudah disetujui dan bisa dimulai sekarang' 
-                    : 'Ujian yang sudah disetujui dan bisa dimulai sekarang'
-                  }
-                </p>
-              </div>
-            </div>
-            <div className={`grid gap-4 ${
-              availableExams.length === 1 
-                ? 'grid-cols-1' 
-                : availableExams.length === 2 
-                ? 'grid-cols-1 md:grid-cols-2' 
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {availableExams.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-green-400 hover:bg-gray-600 transition-colors">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
-                      ✅ DISETUJUI
-                    </span>
-                  </div>
-                  
-                  {/* Exam Status Check */}
-                  {(() => {
-                    const now = new Date();
-                    const startTime = new Date(exam.startTime);
-                    const endTime = new Date(exam.endTime);
-                    
-                    if (now < startTime) {
-                      return (
-                        <div className="bg-blue-900 border border-blue-600 p-3 rounded-md mb-3">
-                          <p className="text-blue-200 text-sm text-center">
-                            ⏰ Ujian akan dimulai pada:<br/>
-                            <span className="font-bold">{startTime.toLocaleString('id-ID')}</span>
-                          </p>
-                        </div>
-                      );
-                    } else if (now > endTime) {
-                      return (
-                        <div className="bg-gray-900 border border-gray-600 p-3 rounded-md mb-3">
-                          <p className="text-gray-400 text-sm text-center">
-                            ⏰ Ujian telah berakhir
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  
-                  <button
-                    onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
-                    disabled={(() => {
-                      const now = new Date();
-                      const startTime = new Date(exam.startTime);
-                      const endTime = new Date(exam.endTime);
-                      return now < startTime || now > endTime;
-                    })()}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center disabled:bg-gray-500 disabled:cursor-not-allowed"
-                  >
-                    {(() => {
-                      const now = new Date();
-                      const startTime = new Date(exam.startTime);
-                      const endTime = new Date(exam.endTime);
-                      
-                      if (now < startTime) {
-                        return '⏰ Belum Dimulai';
-                      } else if (now > endTime) {
-                        return '⏰ Sudah Berakhir';
-                      } else {
-                        return '🚀 Mulai Ujian Sekarang';
-                      }
-                    })()}
-                  </button>
-                </div>
-              ))}
-            </div>
-            
-            {/* Summary Info */}
-            {availableExams.length > 1 && (
-              <div className="mt-4 bg-green-900 border border-green-600 p-3 rounded-md">
-                <p className="text-green-200 text-sm text-center">
-                  💡 <strong>Tips:</strong> Anda memiliki {availableExams.length} ujian yang disetujui. 
-                  Pastikan untuk mengerjakan semua ujian sesuai jadwal yang ditentukan.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Aplikasi Menunggu Konfirmasi (Pending) */}
-        {pendingApplications.length > 0 && (
-          <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">⏳</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi</h4>
-                <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pendingApplications.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                      ⏳ MENUNGGU
-                    </span>
-                  </div>
-                  <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
-                    <p className="text-yellow-200 text-sm text-center">
-                      💡 Menunggu persetujuan dari dosen
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Aplikasi Ditolak (Rejected) */}
-        {rejectedApplications.length > 0 && (
-          <div className="mb-6 bg-red-800 border border-red-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">❌</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-red-400">
-                  {rejectedApplications.length === 1 ? 'Aplikasi Ditolak' : `${rejectedApplications.length} Aplikasi Ditolak`}
-                </h4>
-                <p className="text-red-200 text-sm">
-                  {rejectedApplications.length === 1 
-                    ? 'Aplikasi ujian yang tidak disetujui oleh dosen'
-                    : 'Beberapa aplikasi ujian tidak disetujui oleh dosen'
-                  }
-                </p>
-              </div>
-            </div>
-            <div className={`grid gap-4 ${
-              rejectedApplications.length === 1 
-                ? 'grid-cols-1' 
-                : rejectedApplications.length === 2 
-                ? 'grid-cols-1 md:grid-cols-2' 
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {rejectedApplications.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-red-400">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                      ❌ DITOLAK
-                    </span>
-                  </div>
-                  <div className="bg-red-900 border border-red-600 p-3 rounded-md">
-                    <p className="text-red-200 text-sm text-center">
-                      💬 Hubungi dosen untuk informasi lebih lanjut
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Summary for multiple rejected */}
-            {rejectedApplications.length > 1 && (
-              <div className="mt-4 bg-red-900 border border-red-600 p-3 rounded-md">
-                <p className="text-red-200 text-sm text-center">
-                  📞 <strong>Tindak Lanjut:</strong> {rejectedApplications.length} aplikasi ujian ditolak.
-                  Silakan hubungi dosen yang bersangkutan untuk mengetahui alasan penolakan.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {availableExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
-          <div className="bg-gray-800 border border-gray-600 p-8 rounded-lg text-center">
-            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">📝</span>
-            </div>
-            <h4 className="text-xl font-bold text-gray-400 mb-2">Belum Ada Aplikasi Ujian</h4>
-            <p className="text-gray-500 mb-4">
-              Anda belum mengajukan ujian apapun. Mulai dengan mengajukan ujian pertama Anda.
-            </p>
-            <button 
-              onClick={() => navigateTo('student_join_exam', { currentUser: user })}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg"
-            >
-              🚀 Ajukan Ujian Pertama
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Riwayat Ujian Section */}
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
-      </div>
+      <h2 className="text-3xl font-bold mb-6">Dashboard Siswa</h2>
+      <p className="text-lg text-gray-400 mb-8">
+        Selamat datang, <span className="text-indigo-400 font-semibold">{user?.fullName || 'Siswa'}</span>
+      </p>
       
-      <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
-        {examResults.length === 0 ? (
-          <div className="text-center p-8 text-gray-400">
-            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">📊</span>
-            </div>
-            <p className="text-lg mb-2">Belum ada riwayat ujian yang selesai</p>
-            <p className="text-sm text-gray-500">Riwayat ujian akan muncul setelah Anda menyelesaikan ujian</p>
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="p-4">Nama Ujian</th>
-                <th className="p-4">Kode Ujian</th>
-                <th className="p-4">Nilai PG</th>
-                <th className="p-4">Nilai Essay</th>
-                <th className="p-4">Nilai Akhir</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Waktu Selesai</th>
-              </tr>
-            </thead>
-            <tbody>
-              {examResults.map(result => (
-                <tr key={result.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4 font-semibold">{result.examName}</td>
-                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
-                  <td className="p-4">
-                    <span className={`font-bold ${
-                      result.status === 'disqualified' 
-                        ? 'text-red-400' 
-                        : result.finalScore >= 70 
-                        ? 'text-green-400' 
-                        : result.finalScore >= 60 
-                        ? 'text-yellow-400' 
-                        : 'text-red-400'
-                    }`}>
-                      {result.finalScore.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-gray-300">
-                      {result.essayScore !== undefined ? result.essayScore.toFixed(2) : 'N/A'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`font-bold ${
-                      result.status === 'disqualified' 
-                        ? 'text-red-400' 
-                        : (result.totalScore || result.finalScore) >= 70 
-                        ? 'text-green-400' 
-                        : (result.totalScore || result.finalScore) >= 60 
-                        ? 'text-yellow-400' 
-                        : 'text-red-400'
-                    }`}>
-                      {result.totalScore ? result.totalScore.toFixed(2) : result.finalScore.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                      result.status === 'finished' 
-                        ? 'bg-green-600 text-white' 
-                        : result.status === 'disqualified'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-yellow-600 text-white'
-                    }`}>
-                      {result.status === 'finished' ? 'Selesai' : 
-                       result.status === 'disqualified' ? 'Diskualifikasi' : 
-                       result.status === 'started' ? 'Sedang Berlangsung' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-400">
-                    {result.finishTime ? result.finishTime.toLocaleString('id-ID') : 'Belum selesai'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <button 
+          onClick={() => navigateTo('student_join', { currentUser: user })} 
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-6 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105"
+        >
+          📝 Gabung Ujian
+        </button>
+        <button 
+          onClick={() => alert('Fitur riwayat ujian akan segera hadir!')} 
+          className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-6 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105"
+        >
+          📊 Riwayat Ujian
+        </button>
       </div>
     </div>
   );
