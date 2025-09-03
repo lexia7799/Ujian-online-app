@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 interface CustomUser {
@@ -46,6 +46,57 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [editError, setEditError] = useState('');
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleRetakeRequest = async (examCode: string, examName: string) => {
+    try {
+      // Find the exam by code
+      const examsSnapshot = await getDocs(query(
+        collection(db, `artifacts/${appId}/public/data/exams`),
+        where('code', '==', examCode),
+        limit(1)
+      ));
+      
+      if (!examsSnapshot.empty) {
+        const examDoc = examsSnapshot.docs[0];
+        const examId = examDoc.id;
+        
+        // Check if retake request already exists
+        const retakeRequestsSnapshot = await getDocs(query(
+          collection(db, `artifacts/${appId}/public/data/exams/${examId}/retakeRequests`),
+          where('studentId', '==', user.id),
+          limit(1)
+        ));
+        
+        if (!retakeRequestsSnapshot.empty) {
+          alert('Anda sudah mengajukan ujian ulang untuk ujian ini. Tunggu konfirmasi dari dosen.');
+          return;
+        }
+        
+        // Create retake request
+        await addDoc(collection(db, `artifacts/${appId}/public/data/exams/${examId}/retakeRequests`), {
+          studentId: user.id,
+          studentData: {
+            fullName: studentProfile?.fullName || user.fullName || '',
+            username: user.username,
+            major: studentProfile?.major || '',
+            className: studentProfile?.className || '',
+            university: studentProfile?.university || ''
+          },
+          examId: examId,
+          examName: examName,
+          examCode: examCode,
+          status: 'pending',
+          requestedAt: new Date(),
+          originalDisqualificationDate: new Date()
+        });
+        
+        alert(`Permintaan ujian ulang untuk "${examName}" berhasil diajukan. Tunggu konfirmasi dari dosen.`);
+      }
+    } catch (error) {
+      console.error('Error submitting retake request:', error);
+      alert('Gagal mengajukan ujian ulang. Silakan coba lagi.');
+    }
+  };
 
   useEffect(() => {
     // Early return if no user
@@ -932,6 +983,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 <th className="p-4">Nilai Akhir</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Waktu Selesai</th>
+                <th className="p-4">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -985,6 +1037,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                   </td>
                   <td className="p-4 text-gray-400">
                     {result.finishTime ? result.finishTime.toLocaleString('id-ID') : 'Belum selesai'}
+                  </td>
+                  <td className="p-4">
+                    {result.status === 'disqualified' && (
+                      <button
+                        onClick={() => handleRetakeRequest(result.examCode, result.examName)}
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-1 px-3 rounded"
+                      >
+                        Ajukan Ujian Ulang
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -223,6 +223,26 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     );
   }
 
+  if (currentView === 'retake_confirmation') {
+    return (
+      <RetakeConfirmation 
+        navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'retake_schedule') {
+    return (
+      <RetakeSchedule 
+        navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
   // Main dashboard view
   return (
     <div>
