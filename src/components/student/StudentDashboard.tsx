@@ -560,6 +560,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           📊 Riwayat Ujian
         </button>
       </div>
+      
+      <button 
+        onClick={() => navigateTo('student_dashboard', { currentUser: user })}
+        className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+      >
+        🏠 Kembali ke Dashboard
+      </button>
     </div>
   );
 };
