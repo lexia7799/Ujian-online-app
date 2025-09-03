@@ -784,7 +784,20 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
                   <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.className}</td>
                   <td className="p-4">
-                    {session.isRetake && session.status === 'finished' ? 'Selesai Mengulang' : session.status}
+                    <span className={`px-2 py-1 text-xs font-bold rounded ${
+                      session.isRetake && session.status === 'finished' 
+                        ? 'bg-purple-600 text-white' 
+                        : session.status === 'finished'
+                        ? 'bg-green-600 text-white'
+                        : session.status === 'disqualified'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-blue-600 text-white'
+                    }`}>
+                      {session.isRetake && session.status === 'finished' ? 'Mengulang' : 
+                       session.status === 'finished' ? 'Selesai' :
+                       session.status === 'disqualified' ? 'Diskualifikasi' :
+                       session.status === 'started' ? 'Sedang Ujian' : session.status}
+                    </span>
                   </td>
                   <td className="p-4">{session.violations}</td>
                   <td className="p-4">{session.finalScore?.toFixed(2) ?? 'N/A'}</td>
