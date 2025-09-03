@@ -178,10 +178,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     console.log(`Added to available: ${examData.name}`);
                   } else {
                     // Add to pending with special status for approved but unpublished
-                    pending.push({
+                    const approvedUnpublishedExam = {
                       ...examWithApp,
-                      specialStatus: 'approved_unpublished'
-                    });
+                      specialStatus: 'approved_unpublished',
+                      displayStatus: 'approved_unpublished'
+                    };
+                    pending.push(approvedUnpublishedExam);
                     console.log(`Added to pending (approved but unpublished): ${examData.name}`);
                   }
                 } else {
