@@ -171,14 +171,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 pending.push(examWithApp);
                 console.log(`Added to pending: ${examData.name}`);
               } else if (appData.status === 'approved') {
-                // Only add to available if no completed session
+                // Only add to available if no completed session and published
                 if (!hasCompletedSession) {
-                  // Only show as available if exam is published
                   if (examData.status === 'published') {
                     available.push(examWithApp);
                     console.log(`Added to available: ${examData.name}`);
                   } else {
-                    console.log(`Skipped available (not published): ${examData.name}`);
+                    // Add to pending with special status for approved but unpublished
+                    pending.push({
+                      ...examWithApp,
+                      specialStatus: 'approved_unpublished'
+                    });
+                    console.log(`Added to pending (approved but unpublished): ${examData.name}`);
                   }
                 } else {
                   console.log(`Skipped available (completed): ${examData.name}`);
@@ -801,7 +805,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
             <div className="flex items-center mb-4">
               <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">⏳</span>
+                <span className="text-2xl">{pendingApplications.some(app => app.specialStatus === 'approved_unpublished') ? '✅' : '⏳'}</span>
               </div>
               <div>
                 <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi</h4>
@@ -844,12 +848,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
               </div>
               <div>
                 <h4 className="text-xl font-bold text-red-400">
-                  {rejectedApplications.length === 1 ? 'Aplikasi Ditolak' : `${rejectedApplications.length} Aplikasi Ditolak`}
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished') 
+                    ? (pendingApplications.length === 1 ? 'Aplikasi Disetujui' : 'Status Aplikasi Ujian')
+                    : (pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`)
+                  }
                 </h4>
                 <p className="text-red-200 text-sm">
-                  {rejectedApplications.length === 1 
-                    ? 'Aplikasi ujian yang tidak disetujui oleh dosen'
-                    : 'Beberapa aplikasi ujian tidak disetujui oleh dosen'
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'Aplikasi disetujui, menunggu publikasi ujian'
+                    : (pendingApplications.length === 1 
+                      ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
+                      : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen')
                   }
                 </p>
               </div>
@@ -877,22 +886,47 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
                       ❌ DITOLAK
                     </span>
-                  </div>
-                  <div className="bg-red-900 border border-red-600 p-3 rounded-md">
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                      exam.specialStatus === 'approved_unpublished' 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-yellow-600 text-white'
+                    }`}>
+                      {exam.specialStatus === 'approved_unpublished' ? '✅ DISETUJUI' : '⏳ MENUNGGU'}
                     <p className="text-red-200 text-sm text-center">
                       💬 Hubungi dosen untuk informasi lebih lanjut
                     </p>
                   </div>
-                </div>
+                    <p className={`text-sm text-center ${
+                      exam.specialStatus === 'approved_unpublished'
+                        ? 'text-blue-200'
+                        : 'text-yellow-200'
+                    }`}>
+                      {exam.specialStatus === 'approved_unpublished'
+                        ? '📝 Ujian belum dipublikasikan oleh dosen. Silakan tunggu hingga ujian siap dimulai.'
+                        : '💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.'
+                      }
+                      ? 'bg-blue-900 border-blue-600'
+                      : 'bg-yellow-900 border-yellow-600'
+                  }`}>
               ))}
             </div>
             
             {/* Summary for multiple rejected */}
             {rejectedApplications.length > 1 && (
-              <div className="mt-4 bg-red-900 border border-red-600 p-3 rounded-md">
-                <p className="text-red-200 text-sm text-center">
-                  📞 <strong>Tindak Lanjut:</strong> {rejectedApplications.length} aplikasi ujian ditolak.
-                  Silakan hubungi dosen yang bersangkutan untuk mengetahui alasan penolakan.
+              <div className={`mt-4 border p-3 rounded-md ${
+                pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                  ? 'bg-blue-900 border-blue-600'
+                  : 'bg-yellow-900 border-yellow-600'
+              }`}>
+                <p className={`text-sm text-center ${
+                  pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'text-blue-200'
+                    : 'text-yellow-200'
+                }`}>
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? `📋 <strong>Status:</strong> ${pendingApplications.filter(app => app.specialStatus === 'approved_unpublished').length} ujian disetujui menunggu publikasi, ${pendingApplications.filter(app => !app.specialStatus).length} ujian menunggu konfirmasi.`
+                    : `📋 <strong>Total:</strong> ${pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen. Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.`
+                  }
                 </p>
               </div>
             )}
