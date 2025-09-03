@@ -378,73 +378,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         )}
       </div>
 
-      {/* Aplikasi Menunggu Konfirmasi (Pending) */}
-      {pendingApplications.length > 0 && (
-        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
-              <span className="text-2xl">⏳</span>
-            </div>
-            <div>
-              <h4 className="text-xl font-bold text-yellow-400">
-                {pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`}
-              </h4>
-              <p className="text-yellow-200 text-sm">
-                {pendingApplications.length === 1 
-                  ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
-                  : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen'
-                }
-              </p>
-            </div>
-          </div>
-          <div className={`grid gap-4 ${
-            pendingApplications.length === 1 
-              ? 'grid-cols-1' 
-              : pendingApplications.length === 2 
-              ? 'grid-cols-1 md:grid-cols-2' 
-              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-          }`}>
-            {pendingApplications.map(exam => (
-              <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-grow">
-                    <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                    <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                    <div className="mt-2 text-xs text-gray-400">
-                      <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
-                      <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                      <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                      <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      {exam.hasCompletedSession && (
-                        <p className="text-green-400 text-xs mt-1">✅ Sudah pernah mengikuti ujian ini</p>
-                      )}
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                    ⏳ MENUNGGU
-                  </span>
-                </div>
-                <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
-                  <p className="text-yellow-200 text-sm text-center">
-                    💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Summary for multiple pending */}
-          {pendingApplications.length > 1 && (
-            <div className="mt-4 bg-yellow-900 border border-yellow-600 p-3 rounded-md">
-              <p className="text-yellow-200 text-sm text-center">
-                📋 <strong>Total:</strong> {pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen.
-                Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Edit Profile Modal */}
       {showEditProfile && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
@@ -804,19 +737,59 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
 
         {/* Aplikasi Menunggu Konfirmasi (Pending) */}
         {pendingApplications.length > 0 && (
-          <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
+          <div className={`mb-6 p-6 rounded-lg shadow-lg border ${
+            pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+              ? 'bg-green-800 border-green-500'
+              : 'bg-yellow-800 border-yellow-500'
+          }`}>
             <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">{pendingApplications.some(app => app.specialStatus === 'approved_unpublished') ? '✅' : '⏳'}</span>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${
+                pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                  ? 'bg-green-600'
+                  : 'bg-yellow-600'
+              }`}>
+                <span className="text-2xl">
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished') ? '✅' : '⏳'}
+                </span>
               </div>
               <div>
-                <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi</h4>
-                <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
+                <h4 className={`text-xl font-bold ${
+                  pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'text-green-400'
+                    : 'text-yellow-400'
+                }`}>
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'Aplikasi Disetujui'
+                    : (pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`)
+                  }
+                </h4>
+                <p className={`text-sm ${
+                  pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'text-green-200'
+                    : 'text-yellow-200'
+                }`}>
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'Aplikasi disetujui, menunggu publikasi ujian'
+                    : (pendingApplications.length === 1 
+                      ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
+                      : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen')
+                  }
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${
+              pendingApplications.length === 1 
+                ? 'grid-cols-1' 
+                : pendingApplications.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
               {pendingApplications.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
+                <div key={exam.id} className={`bg-gray-700 p-4 rounded-lg border ${
+                  exam.specialStatus === 'approved_unpublished' 
+                    ? 'border-green-400' 
+                    : 'border-yellow-400'
+                }`}>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-grow">
                       <h5 className="font-bold text-lg text-white">{exam.name}</h5>
@@ -824,20 +797,60 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       <div className="mt-2 text-xs text-gray-400">
                         <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
                         <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
+                        {exam.hasCompletedSession && (
+                          <p className="text-green-400 text-xs mt-1">✅ Sudah pernah mengikuti ujian ini</p>
+                        )}
                       </div>
                     </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                      ⏳ MENUNGGU
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full text-white ${
+                      exam.specialStatus === 'approved_unpublished'
+                        ? 'bg-green-600'
+                        : 'bg-yellow-600'
+                    }`}>
+                      {exam.specialStatus === 'approved_unpublished' ? '✅ DISETUJUI' : '⏳ MENUNGGU'}
                     </span>
                   </div>
-                  <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
-                    <p className="text-yellow-200 text-sm text-center">
-                      💡 Menunggu persetujuan dari dosen
+                  <div className={`border p-3 rounded-md ${
+                    exam.specialStatus === 'approved_unpublished'
+                      ? 'bg-blue-900 border-blue-600'
+                      : 'bg-yellow-900 border-yellow-600'
+                  }`}>
+                    <p className={`text-sm text-center ${
+                      exam.specialStatus === 'approved_unpublished'
+                        ? 'text-blue-200'
+                        : 'text-yellow-200'
+                    }`}>
+                      {exam.specialStatus === 'approved_unpublished'
+                        ? `📝 Aplikasi Anda untuk ujian "${exam.name}" telah disetujui!\n\nUjian belum dipublikasikan oleh dosen. Silakan tunggu hingga ujian siap dimulai.`
+                        : '💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.'
+                      }
                     </p>
                   </div>
                 </div>
               ))}
             </div>
+            
+            {/* Summary for multiple pending */}
+            {pendingApplications.length > 1 && (
+              <div className={`mt-4 border p-3 rounded-md ${
+                pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                  ? 'bg-blue-900 border-blue-600'
+                  : 'bg-yellow-900 border-yellow-600'
+              }`}>
+                <p className={`text-sm text-center ${
+                  pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? 'text-blue-200'
+                    : 'text-yellow-200'
+                }`}>
+                  {pendingApplications.some(app => app.specialStatus === 'approved_unpublished')
+                    ? `📋 <strong>Status:</strong> ${pendingApplications.filter(app => app.specialStatus === 'approved_unpublished').length} ujian disetujui menunggu publikasi, ${pendingApplications.filter(app => !app.specialStatus).length} ujian menunggu konfirmasi.`
+                    : `📋 <strong>Total:</strong> ${pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen. Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.`
+                  }
+                </p>
+              </div>
+            )}
           </div>
         )}
 
