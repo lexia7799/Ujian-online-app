@@ -908,6 +908,11 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-sm text-gray-400 mt-2">
               Foto telah diambil sebagai bukti pelanggaran
             </p>
+            <div className="mt-4 bg-blue-900 border border-blue-500 p-3 rounded-md">
+              <p className="text-blue-300 text-sm font-bold">
+                💡 Tekan Enter atau Spasi untuk melanjutkan ujian
+              </p>
+            </div>
           </div>
         </div>
       )}
