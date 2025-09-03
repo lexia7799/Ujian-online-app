@@ -856,6 +856,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
             <p className="text-lg text-gray-400 mt-2">
               Nilai esai (jika ada) akan diperiksa oleh dosen.
             </p>
+            <button 
+              onClick={() => navigateTo('student_dashboard', { currentUser: user })}
+              className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+            >
+              🏠 Kembali ke Dashboard
+            </button>
           </>
         )}
       </div>
