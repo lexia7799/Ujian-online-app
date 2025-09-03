@@ -185,6 +185,11 @@ Create these composite indexes in Firestore:
    - Note: This index is required for collection group queries on studentId field
    - Direct link: Use the Firebase Console error link to create this index automatically
 
+6. **Collection Group**: `sessions` (Composite Index for Student Dashboard)
+   - Fields: `studentId` (Ascending), `startTime` (Descending), `__name__` (Ascending)
+   - Note: This index is required for StudentDashboard exam history queries
+   - Direct link: https://console.firebase.google.com/v1/r/project/ujian-online-15771/firestore/indexes?create_composite=ClNwcm9qZWN0cy91amlhbi1vbmxpbmUtMTU3NzEvZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL3Nlc3Npb25zL2luZGV4ZXMvXxACGg0KCXN0dWRlbnRJZBABGg0KCXN0YXJ0VGltZRACGgwKCF9fbmFtZV9fEAI
+
 ## 6. Storage Rules (for violation photos)
 
 ```javascript

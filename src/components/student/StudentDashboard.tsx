@@ -1,569 +1,1201 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, collectionGroup, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
-interface StudentDashboardProps {
-  user: any;
-  navigateTo: (page: string, data?: any) => void;
-  navigateBack: () => void;
-  canGoBack: boolean;
+interface CustomUser {
+  id: string;
+  username: string;
+  role: string;
+  [key: string]: any;
 }
 
-const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
-  const [view, setView] = useState('dashboard');
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileData, setProfileData] = useState({
+interface StudentDashboardProps {
+  user: CustomUser;
+  navigateTo: (page: string, data?: any) => void;
+  navigateBack: () => void;
+}
+
+interface ExamResult {
+  id: string;
+  examName: string;
+  finalScore: number;
+  finishTime: Date;
+  status: string;
+}
+
+const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, navigateBack }) => {
+  const [examResults, setExamResults] = useState<ExamResult[]>([]);
+  const [studentProfile, setStudentProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [availableExams, setAvailableExams] = useState<any[]>([]);
+  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
+  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editFormData, setEditFormData] = useState({
     fullName: '',
     nim: '',
     major: '',
     className: '',
     university: '',
     whatsapp: '',
-    username: '',
-    password: ''
+    password: '',
+    confirmPassword: ''
   });
-  const [examHistory, setExamHistory] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [completedRetakeSessions, setCompletedRetakeSessions] = useState<Set<string>>(new Set());
-  const [approvedRetakeExams, setApprovedRetakeExams] = useState<any[]>([]);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Add state for retake exams
+  const [retakeExams, setRetakeExams] = useState<any[]>([]);
+  const handleRetakeRequest = async (examCode: string, examName: string) => {
+    try {
+      // Find the exam by code
+      const examsSnapshot = await getDocs(query(
+        collection(db, `artifacts/${appId}/public/data/exams`),
+        where('code', '==', examCode),
+        limit(1)
+      ));
+      
+      if (!examsSnapshot.empty) {
+        const examDoc = examsSnapshot.docs[0];
+        const examId = examDoc.id;
+        
+        // Check if retake request already exists
+        const retakeRequestsSnapshot = await getDocs(query(
+          collection(db, `artifacts/${appId}/public/data/exams/${examId}/retakeRequests`),
+          where('studentId', '==', user.id),
+          limit(1)
+        ));
+        
+        if (!retakeRequestsSnapshot.empty) {
+          alert('Anda sudah mengajukan ujian ulang untuk ujian ini. Tunggu konfirmasi dari dosen.');
+          return;
+        }
+        
+        // Create retake request
+        await addDoc(collection(db, `artifacts/${appId}/public/data/exams/${examId}/retakeRequests`), {
+          studentId: user.id,
+          studentData: {
+            fullName: studentProfile?.fullName || user.fullName || '',
+            username: user.username,
+            major: studentProfile?.major || '',
+            className: studentProfile?.className || '',
+            university: studentProfile?.university || ''
+          },
+          examId: examId,
+          examName: examName,
+          examCode: examCode,
+          status: 'pending',
+          requestedAt: new Date(),
+          originalDisqualificationDate: new Date()
+        });
+        
+        alert(`Permintaan ujian ulang untuk "${examName}" berhasil diajukan. Tunggu konfirmasi dari dosen.`);
+      }
+    } catch (error) {
+      console.error('Error submitting retake request:', error);
+      alert('Gagal mengajukan ujian ulang. Silakan coba lagi.');
+    }
+  };
 
   useEffect(() => {
-    if (!user?.id) {
-      setError('User data not found');
+    // Early return if no user
+    if (!user || !user.id) {
       setIsLoading(false);
       return;
     }
 
-    const loadStudentData = async () => {
+    // Fetch all exam data and applications
+    const fetchData = async () => {
       try {
-        setIsLoading(true);
-        setError('');
-
-        // Load student profile
-        const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
-        const studentQuery = query(studentsRef, where("__name__", "==", user.id), limit(1));
-        const studentSnapshot = await getDocs(studentQuery);
+        // Fetch student profile first
+        const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
         
-        if (!studentSnapshot.empty) {
-          const studentData = studentSnapshot.docs[0].data();
-          setProfileData({
-            fullName: studentData.fullName || '',
-            nim: studentData.nim || '',
-            major: studentData.major || '',
-            className: studentData.className || '',
-            university: studentData.university || '',
-            whatsapp: studentData.whatsapp || '',
-            username: studentData.username || '',
-            password: studentData.password || ''
+        if (studentDoc.exists()) {
+          const profileData = studentDoc.data();
+          setStudentProfile(profileData);
+          setEditFormData({
+            fullName: profileData.fullName || '',
+            nim: profileData.nim || '',
+            major: profileData.major || '',
+            className: profileData.className || '',
+            university: profileData.university || '',
+            whatsapp: profileData.whatsapp || '',
+            password: '',
+            confirmPassword: ''
           });
         }
 
-        // Load exam history using collection group query
-        const sessionsQuery = query(
-          collectionGroup(db, 'sessions'),
-          where('studentId', '==', user.id),
-          orderBy('startTime', 'desc'),
-          limit(50)
-        );
+        // Fetch all exams
+        const examsSnapshot = await getDocs(query(
+          collection(db, `artifacts/${appId}/public/data/exams`), 
+          limit(100)
+        ));
         
-        const sessionsSnapshot = await getDocs(sessionsQuery);
-        const sessions = sessionsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          examPath: doc.ref.parent.parent?.path || ''
-        }));
-
-        // Get exam details for each session
-        const examHistoryWithDetails = await Promise.all(
-          sessions.map(async (session) => {
-            try {
-              const examId = session.examPath.split('/').pop();
-              if (!examId) return null;
-
-              const examRef = collection(db, `artifacts/${appId}/public/data/exams`);
-              const examQuery = query(examRef, where("__name__", "==", examId), limit(1));
-              const examSnapshot = await getDocs(examQuery);
-              
-              if (!examSnapshot.empty) {
-                const examData = examSnapshot.docs[0].data();
-                return {
-                  ...session,
-                  examId: examId,
-                  examName: examData.name || 'Unknown Exam',
-                  examCode: examData.code || 'N/A',
-                  examData: examData
-                };
-              }
-              return null;
-            } catch (error) {
-              console.error('Error loading exam details:', error);
-              return null;
-            }
-          })
-        );
-
-        const validHistory = examHistoryWithDetails.filter(item => item !== null);
-        setExamHistory(validHistory);
-
-        // Track completed retake sessions
-        const retakeSessions = validHistory.filter(session => 
-          session.isRetake && (session.status === 'finished' || session.status === 'disqualified')
-        );
-        const completedRetakeExamIds = new Set(retakeSessions.map(session => session.examId));
-        setCompletedRetakeSessions(completedRetakeExamIds);
-
-        // Load approved retake exams
-        const loadApprovedRetakes = async () => {
+        console.log(`Found ${examsSnapshot.docs.length} total exams`);
+        
+        // Initialize arrays
+        const results: ExamResult[] = [];
+        const available: any[] = [];
+        const pending: any[] = [];
+        const rejected: any[] = [];
+        const retakes: any[] = [];
+        
+        // Process each exam
+        for (const examDoc of examsSnapshot.docs) {
+          const examData = examDoc.data();
+          const examId = examDoc.id;
+          
+          console.log(`Processing exam: ${examData.name} (${examId})`);
+          
           try {
-            const examsRef = collection(db, `artifacts/${appId}/public/data/exams`);
-            const examsSnapshot = await getDocs(examsRef);
+            // Check for completed sessions first
+            const sessionsSnapshot = await getDocs(query(
+              collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
+              where('studentId', '==', user.id),
+              limit(5)
+            ));
             
-            const approvedRetakes = [];
+            let hasCompletedSession = false;
             
-            for (const examDoc of examsSnapshot.docs) {
-              const examData = examDoc.data();
-              const examId = examDoc.id;
+            // Process sessions for results
+            sessionsSnapshot.forEach(sessionDoc => {
+              const sessionData = sessionDoc.data();
               
-              // Check if student has approved retake application
-              const applicationsRef = collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`);
-              const applicationQuery = query(
-                applicationsRef,
-                where('studentId', '==', user.id),
-                where('isRetake', '==', true),
-                where('status', '==', 'approved'),
-                limit(1)
-              );
-              
-              const applicationSnapshot = await getDocs(applicationQuery);
-              
-              if (!applicationSnapshot.empty) {
-                const applicationData = applicationSnapshot.docs[0].data();
-                approvedRetakes.push({
-                  examId: examId,
-                  examData: examData,
-                  applicationData: applicationData,
-                  customSchedule: applicationData.customSchedule || null
+              if (['finished', 'disqualified'].includes(sessionData.status)) {
+                hasCompletedSession = true;
+                
+                // Calculate scores
+                let essayScore = undefined;
+                let totalScore = undefined;
+                
+                if (sessionData.essayScores) {
+                  const essayScores = Object.values(sessionData.essayScores);
+                  if (essayScores.length > 0) {
+                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
+                    const mcScore = sessionData.finalScore || 0;
+                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
+                  }
+                }
+                
+                results.push({
+                  id: sessionDoc.id,
+                  examName: examData.name || 'Unknown Exam',
+                  examCode: examData.code,
+                  finalScore: sessionData.finalScore || 0,
+                  essayScore,
+                  totalScore,
+                  finishTime: sessionData.finishTime?.toDate() || new Date(),
+                  status: sessionData.status
                 });
               }
-            }
+            });
             
-            setApprovedRetakeExams(approvedRetakes);
-          } catch (error) {
-            console.error('Error loading approved retakes:', error);
-          }
-        };
-
-        await loadApprovedRetakes();
-
+            // Check for applications regardless of completed sessions
+            const applicationsSnapshot = await getDocs(query(
+              collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
+              where('studentId', '==', user.id),
+              limit(5)
+            ));
+            
+            console.log(`Found ${applicationsSnapshot.docs.length} applications for exam ${examId}`);
+            
+            // Process applications
+            applicationsSnapshot.forEach(appDoc => {
+              const appData = appDoc.data();
+              console.log(`Application status: ${appData.status} for exam ${examData.name}`);
+              
+              const examWithApp = {
+                id: examId,
+                name: examData.name,
+                code: examData.code,
+                applicationStatus: appData.status,
+                appliedAt: appData.appliedAt?.toDate() || new Date(),
+                startTime: examData.startTime,
+                endTime: examData.endTime,
+                status: examData.status,
+                hasCompletedSession,
+                ...examData
+              };
+              
+              // Categorize based on application status
+              if (appData.status === 'pending') {
+                pending.push(examWithApp);
+                console.log(`Added to pending: ${examData.name}`);
+              } else if (appData.status === 'approved') {
+                // Check if this is a retake application
+                if (appData.isRetake) {
+                  retakes.push(examWithApp);
+                  console.log(`Added to retakes: ${examData.name}`);
+                } else if (!hasCompletedSession) {
+                  // Only add to available if no completed session and not a retake
+                  available.push(examWithApp);
+                  console.log(`Added to available: ${examData.name}`);
+                } else {
+                  console.log(`Skipped available (completed): ${examData.name}`);
+                }
+              } else if (appData.status === 'rejected') {
+                rejected.push(examWithApp);
+                console.log(`Added to rejected: ${examData.name}`);
+              }
+            });
+            
+          } catch (examError) {
+        // Load exam history - try with index first, fallback to simple query
+        let sessions = [];
+        try {
+          const sessionsQuery = query(
+            collectionGroup(db, 'sessions'),
+            where('studentId', '==', user.id),
+            orderBy('startTime', 'desc'),
+            limit(50)
+          );
+          
+          const sessionsSnapshot = await getDocs(sessionsQuery);
+          sessions = sessionsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            examPath: doc.ref.parent.parent?.path || ''
+          }));
+        } catch (indexError) {
+          console.warn('Index not available, using fallback query:', indexError);
+          
+          // Fallback: Query without orderBy to avoid index requirement
+          const fallbackQuery = query(
+            collectionGroup(db, 'sessions'),
+            where('studentId', '==', user.id),
+            limit(50)
+          );
+          
+          const fallbackSnapshot = await getDocs(fallbackQuery);
+          sessions = fallbackSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            examPath: doc.ref.parent.parent?.path || ''
+          }));
+          
+          // Sort manually by startTime (descending)
+          sessions.sort((a, b) => {
+            const timeA = a.startTime?.seconds || 0;
+            const timeB = b.startTime?.seconds || 0;
+            return timeB - timeA;
+          });
+        }
+        
+        setAvailableExams(available);
+        setRetakeExams(retakes);
+        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
+        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
+        
       } catch (error) {
-        console.error('Error loading student data:', error);
-        setError('Failed to load student data. Please try refreshing the page.');
+        console.error('Error fetching exam results:', error);
+        setExamResults([]);
+        setAvailableExams([]);
+        setRetakeExams([]);
+        setPendingApplications([]);
+        setRejectedApplications([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadStudentData();
+    fetchData();
   }, [user?.id]);
 
-  const handleEditProfile = () => {
-    setEditingProfile(true);
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
+    // Clear validation error when user starts typing
+    if (editValidationErrors[e.target.name]) {
+      setEditValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[e.target.name];
+        return newErrors;
+      });
+    }
   };
 
-  const handleSaveProfile = async () => {
-    // Profile saving logic would go here
-    setEditingProfile(false);
-    alert('Profile updated successfully!');
-  };
+  const validateUniqueNIM = async () => {
+    // Only validate if NIM has changed
+    if (editFormData.nim === studentProfile?.nim) {
+      return {};
+    }
 
-  const handleCancelEdit = () => {
-    setEditingProfile(false);
-  };
-
-  const getStatusBadge = (session: any) => {
-    if (session.isRetake && (session.status === 'finished' || session.status === 'disqualified')) {
-      return (
-        <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
-          Sudah Mengulang
-        </span>
-      );
+    const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
+    const errors: {[key: string]: string} = {};
+    
+    // Check for duplicate NIM (excluding current user)
+    const nimQuery = query(studentsRef, where("nim", "==", editFormData.nim));
+    const nimSnapshot = await getDocs(nimQuery);
+    
+    // Check if any document found is not the current user
+    const duplicateNIM = nimSnapshot.docs.find(doc => doc.id !== user.id);
+    if (duplicateNIM) {
+      errors.nim = "NIM/NIS sudah terdaftar oleh siswa lain. Gunakan NIM/NIS yang berbeda.";
     }
     
-    switch (session.status) {
-      case 'finished':
-        return (
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
-            Selesai
-          </span>
-        );
-      case 'disqualified':
-        return (
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-            Diskualifikasi
-          </span>
-        );
-      case 'started':
-        return (
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-600 text-white">
-            Sedang Ujian
-          </span>
-        );
-      default:
-        return (
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-gray-600 text-white">
-            {session.status}
-          </span>
-        );
-    }
+    return errors;
   };
 
-  const getRetakeButtonForExam = (examId: string) => {
-    // Check if student has already completed a retake for this exam
-    if (completedRetakeSessions.has(examId)) {
-      return (
-        <button
-          disabled
-          className="bg-gray-600 text-gray-300 font-bold py-2 px-4 rounded-lg cursor-not-allowed"
-        >
-          ✅ Sudah Mengerjakan Ujian Ulang
-        </button>
-      );
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError('');
+    setEditValidationErrors({});
+    setIsUpdating(true);
+
+    // Validate password if provided
+    if (editFormData.password && editFormData.password !== editFormData.confirmPassword) {
+      setEditError('Password tidak cocok');
+      setIsUpdating(false);
+      return;
     }
 
-    // Check if student has pending retake application
-    const hasPendingRetake = approvedRetakeExams.some(retake => retake.examId === examId);
-    if (hasPendingRetake) {
-      return (
-        <button
-          disabled
-          className="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg cursor-not-allowed"
-        >
-          ⏳ Permintaan Diajukan
-        </button>
-      );
+    if (editFormData.password && editFormData.password.length < 6) {
+      setEditError('Password minimal 6 karakter');
+      setIsUpdating(false);
+      return;
     }
 
-    return (
-      <button
-        onClick={() => navigateTo('student_join_exam', { examId })}
-        className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg"
-      >
-        🔄 Ajukan Ujian Ulang
-      </button>
-    );
+    try {
+      // Validate unique NIM
+      const uniqueFieldErrors = await validateUniqueNIM();
+      if (Object.keys(uniqueFieldErrors).length > 0) {
+        setEditValidationErrors(uniqueFieldErrors);
+        setIsUpdating(false);
+        return;
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        fullName: editFormData.fullName,
+        nim: editFormData.nim,
+        major: editFormData.major,
+        className: editFormData.className,
+        university: editFormData.university,
+        whatsapp: editFormData.whatsapp,
+        updatedAt: new Date()
+      };
+
+      // Only update password if provided
+      if (editFormData.password) {
+        updateData.password = editFormData.password;
+      }
+
+      // Update in Firestore
+      await updateDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id), updateData);
+
+      // Update local state
+      const updatedProfile = { ...studentProfile, ...updateData };
+      setStudentProfile(updatedProfile);
+      
+      // Reset form
+      setEditFormData({
+        ...editFormData,
+        whatsapp: updatedProfile.whatsapp || '',
+        password: '',
+        confirmPassword: ''
+      });
+      
+      setShowEditProfile(false);
+      alert('Profil berhasil diperbarui!');
+    } catch (error: any) {
+      setEditError('Gagal memperbarui profil. Silakan coba lagi.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-        <span className="ml-3 text-lg">Loading dashboard...</span>
-      </div>
-    );
+    return <div className="text-center p-8">Memuat dashboard...</div>;
   }
 
-  if (error) {
-    return (
-      <div className="text-center p-8">
-        <div className="bg-red-800 border border-red-500 p-4 rounded-lg">
-          <h3 className="text-red-400 font-bold mb-2">Error Loading Dashboard</h3>
-          <p className="text-gray-300">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
+  if (!user || !user.id) {
+    return <div className="text-center p-8 text-red-400">Error: User data tidak valid</div>;
   }
 
   return (
     <div>
-      {canGoBack && (
+      <div className="flex justify-between items-center mb-6">
         <button 
           onClick={navigateBack} 
-          className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+          className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
         >
           &larr; Kembali
         </button>
-      )}
-      
-      <h2 className="text-3xl font-bold mb-6">Dashboard Siswa</h2>
-      
-      <div className="flex space-x-4 mb-6 border-b border-gray-700">
         <button 
-          onClick={() => setView('dashboard')} 
-          className={`py-2 px-4 ${view === 'dashboard' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400'}`}
+          onClick={() => navigateTo('home')} 
+          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
         >
-          Dashboard
-        </button>
-        <button 
-          onClick={() => setView('profile')} 
-          className={`py-2 px-4 ${view === 'profile' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400'}`}
-        >
-          Edit Profil
-        </button>
-        <button 
-          onClick={() => setView('join')} 
-          className={`py-2 px-4 ${view === 'join' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400'}`}
-        >
-          Gabung Ujian
+          Logout
         </button>
       </div>
-
-      {view === 'dashboard' && (
-        <div className="space-y-6">
-          {/* Welcome Section */}
+      
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold mb-4">Dashboard Siswa</h2>
+        {studentProfile && (
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
-            <h3 className="text-2xl font-bold mb-2">Selamat Datang, {profileData.fullName || user.username}!</h3>
-            <p className="text-gray-400">NIM: {profileData.nim}</p>
-            <p className="text-gray-400">Program Studi: {profileData.major}</p>
-            <p className="text-gray-400">Kelas: {profileData.className}</p>
-          </div>
-
-          {/* Approved Retake Exams Section */}
-          {approvedRetakeExams.length > 0 && (
-            <div className="bg-purple-900 border border-purple-500 p-6 rounded-lg shadow-xl">
-              <h3 className="text-xl font-bold mb-4 text-purple-300">🔄 Ujian Ulang Disetujui</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {approvedRetakeExams.map((retake) => {
-                  const hasCompletedRetake = completedRetakeSessions.has(retake.examId);
-                  const effectiveStartTime = retake.customSchedule?.startTime || retake.examData.startTime;
-                  const effectiveEndTime = retake.customSchedule?.endTime || retake.examData.endTime;
-                  const now = new Date();
-                  const startTime = new Date(effectiveStartTime);
-                  const endTime = new Date(effectiveEndTime);
-                  
-                  return (
-                    <div key={retake.examId} className="bg-purple-800 border border-purple-400 p-4 rounded-lg">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-bold text-lg text-white">{retake.examData.name}</h4>
-                          <p className="text-purple-200 text-sm">Kode: {retake.examData.code}</p>
-                        </div>
-                        <div className="flex flex-col space-y-1">
-                          <span className="px-2 py-1 text-xs font-bold rounded-full bg-purple-600 text-white">
-                            UJIAN ULANG
-                          </span>
-                          {retake.customSchedule && (
-                            <span className="px-2 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                              JADWAL KHUSUS
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="text-sm text-purple-200 mb-3">
-                        <p><strong>Mulai:</strong> {startTime.toLocaleString('id-ID')}</p>
-                        <p><strong>Selesai:</strong> {endTime.toLocaleString('id-ID')}</p>
-                      </div>
-                      
-                      <div className="mt-3">
-                        {hasCompletedRetake ? (
-                          <button
-                            disabled
-                            className="w-full bg-gray-600 text-gray-300 font-bold py-2 px-4 rounded-lg cursor-not-allowed"
-                          >
-                            ✅ Sudah Mengerjakan Ujian Ulang
-                          </button>
-                        ) : now < startTime ? (
-                          <div className="w-full bg-blue-800 border border-blue-500 text-blue-200 font-bold py-2 px-4 rounded-lg text-center">
-                            ⏰ Ujian Belum Dimulai
-                          </div>
-                        ) : now > endTime ? (
-                          <div className="w-full bg-gray-700 border border-gray-500 text-gray-300 font-bold py-2 px-4 rounded-lg text-center">
-                            ⏰ Ujian Sudah Berakhir
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => navigateTo('student_precheck', { 
-                              exam: {
-                                ...retake.examData,
-                                id: retake.examId,
-                                startTime: effectiveStartTime,
-                                endTime: effectiveEndTime
-                              },
-                              isRetake: true
-                            })}
-                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg"
-                          >
-                            🔄 Mulai Ujian Ulang Sekarang
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Exam History */}
-          <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
-            <h3 className="text-xl font-bold mb-4">Riwayat Ujian</h3>
-            {examHistory.length === 0 ? (
-              <p className="text-gray-400">Belum ada riwayat ujian.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="p-3">Nama Ujian</th>
-                      <th className="p-3">Kode</th>
-                      <th className="p-3">Tanggal</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Nilai</th>
-                      <th className="p-3">Pelanggaran</th>
-                      <th className="p-3">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {examHistory.map((session) => (
-                      <tr key={session.id} className="border-b border-gray-700">
-                        <td className="p-3 font-semibold">{session.examName}</td>
-                        <td className="p-3 text-gray-400">{session.examCode}</td>
-                        <td className="p-3 text-gray-400">
-                          {session.startTime ? new Date(session.startTime.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}
-                        </td>
-                        <td className="p-3">{getStatusBadge(session)}</td>
-                        <td className="p-3">
-                          {session.finalScore !== null && session.finalScore !== undefined 
-                            ? session.finalScore.toFixed(2) 
-                            : 'N/A'}
-                        </td>
-                        <td className="p-3">{session.violations || 0}</td>
-                        <td className="p-3">
-                          {session.status === 'disqualified' && !session.isRetake && (
-                            getRetakeButtonForExam(session.examId)
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {view === 'profile' && (
-        <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
-          <h3 className="text-xl font-bold mb-4">Edit Profil</h3>
-          {editingProfile ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  value={profileData.fullName}
-                  onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
-                  placeholder="Nama Lengkap"
-                  className="p-3 bg-gray-700 rounded-md border border-gray-600"
-                />
-                <input
-                  type="text"
-                  value={profileData.nim}
-                  onChange={(e) => setProfileData({...profileData, nim: e.target.value})}
-                  placeholder="NIM"
-                  className="p-3 bg-gray-700 rounded-md border border-gray-600"
-                />
-                <input
-                  type="text"
-                  value={profileData.major}
-                  onChange={(e) => setProfileData({...profileData, major: e.target.value})}
-                  placeholder="Program Studi"
-                  className="p-3 bg-gray-700 rounded-md border border-gray-600"
-                />
-                <input
-                  type="text"
-                  value={profileData.className}
-                  onChange={(e) => setProfileData({...profileData, className: e.target.value})}
-                  placeholder="Kelas"
-                  className="p-3 bg-gray-700 rounded-md border border-gray-600"
-                />
-                <input
-                  type="text"
-                  value={profileData.university}
-                  onChange={(e) => setProfileData({...profileData, university: e.target.value})}
-                  placeholder="Universitas"
-                  className="p-3 bg-gray-700 rounded-md border border-gray-600"
-                />
-                <input
-                  type="text"
-                  value={profileData.whatsapp}
-                  onChange={(e) => setProfileData({...profileData, whatsapp: e.target.value})}
-                  placeholder="WhatsApp"
-                  className="p-3 bg-gray-700 rounded-md border border-gray-600"
-                />
-              </div>
-              <div className="flex space-x-4">
-                <button
-                  onClick={handleSaveProfile}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"
-                >
-                  Simpan
-                </button>
-                <button
-                  onClick={handleCancelEdit}
-                  className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg"
-                >
-                  Batal
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Nama Lengkap</label>
-                  <p className="p-3 bg-gray-700 rounded-md">{profileData.fullName || 'Belum diisi'}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
+                  <span className="text-2xl font-bold text-white">
+                    {studentProfile.fullName.charAt(0).toUpperCase()}
+                  </span>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">NIM</label>
-                  <p className="p-3 bg-gray-700 rounded-md">{profileData.nim || 'Belum diisi'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Program Studi</label>
-                  <p className="p-3 bg-gray-700 rounded-md">{profileData.major || 'Belum diisi'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Kelas</label>
-                  <p className="p-3 bg-gray-700 rounded-md">{profileData.className || 'Belum diisi'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Universitas</label>
-                  <p className="p-3 bg-gray-700 rounded-md">{profileData.university || 'Belum diisi'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">WhatsApp</label>
-                  <p className="p-3 bg-gray-700 rounded-md">{profileData.whatsapp || 'Belum diisi'}</p>
+                  <h3 className="text-xl font-bold">{studentProfile.fullName}</h3>
+                  <p className="text-gray-400">{studentProfile.major} - {studentProfile.className}</p>
+                  <p className="text-gray-400">NIM/NIS: {studentProfile.nim || 'N/A'}</p>
+                  <p className="text-gray-400">{studentProfile.university}</p>
                 </div>
               </div>
               <button
-                onClick={handleEditProfile}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+                onClick={() => setShowEditProfile(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
               >
                 Edit Profil
               </button>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Aplikasi Menunggu Konfirmasi (Pending) */}
+      {pendingApplications.length > 0 && (
+        <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
+              <span className="text-2xl">⏳</span>
+            </div>
+            <div>
+              <h4 className="text-xl font-bold text-yellow-400">
+                {pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`}
+              </h4>
+              <p className="text-yellow-200 text-sm">
+                {pendingApplications.length === 1 
+                  ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
+                  : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen'
+                }
+              </p>
+            </div>
+          </div>
+          <div className={`grid gap-4 ${
+            pendingApplications.length === 1 
+              ? 'grid-cols-1' 
+              : pendingApplications.length === 2 
+              ? 'grid-cols-1 md:grid-cols-2' 
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+          }`}>
+            {pendingApplications.map(exam => (
+              <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-grow">
+                    <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                    <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                    <div className="mt-2 text-xs text-gray-400">
+                      <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
+                      <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                      <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                      <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
+                      {exam.hasCompletedSession && (
+                        <p className="text-green-400 text-xs mt-1">✅ Sudah pernah mengikuti ujian ini</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
+                    ⏳ MENUNGGU
+                  </span>
+                </div>
+                <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+                  <p className="text-yellow-200 text-sm text-center">
+                    💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Summary for multiple pending */}
+          {pendingApplications.length > 1 && (
+            <div className="mt-4 bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+              <p className="text-yellow-200 text-sm text-center">
+                📋 <strong>Total:</strong> {pendingApplications.length} aplikasi ujian sedang menunggu konfirmasi dosen.
+                Anda akan mendapat notifikasi setelah dosen memproses aplikasi Anda.
+              </p>
+            </div>
           )}
         </div>
       )}
 
-      {view === 'join' && (
-        <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
-          <h3 className="text-xl font-bold mb-4">Gabung Ujian</h3>
-          <button
-            onClick={() => navigateTo('student_join', { currentUser: user })}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg"
-          >
-            Masukkan Kode Ujian
-          </button>
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold">Edit Profil</h3>
+              <button
+                onClick={() => {
+                  setShowEditProfile(false);
+                  setEditError('');
+                  setEditValidationErrors({});
+                }}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Important Notes */}
+            <div className="mb-6 bg-yellow-900 border border-yellow-500 p-4 rounded-lg">
+              <h4 className="text-yellow-300 font-bold mb-2">⚠️ Catatan Penting:</h4>
+              <ul className="text-yellow-200 text-sm space-y-1">
+                <li>• NIM/NIS harus unik dan tidak boleh sama dengan siswa lain</li>
+                <li>• Username tidak dapat diubah setelah registrasi</li>
+                <li>• Password baru minimal 6 karakter (kosongkan jika tidak ingin mengubah)</li>
+                <li>• Pastikan semua data yang dimasukkan benar dan valid</li>
+              </ul>
+            </div>
+
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column - Personal Data */}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-semibold text-gray-300 border-b border-gray-600 pb-2">Data Pribadi</h4>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Nama Lengkap</label>
+                    <input 
+                      name="fullName" 
+                      type="text"
+                      value={editFormData.fullName}
+                      onChange={handleEditChange} 
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Program Studi/Jurusan</label>
+                    <input 
+                      name="major" 
+                      type="text"
+                      value={editFormData.major}
+                      onChange={handleEditChange} 
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Kelas</label>
+                    <input 
+                      name="className" 
+                      type="text"
+                      value={editFormData.className}
+                      onChange={handleEditChange} 
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Universitas/Sekolah</label>
+                    <input 
+                      name="university" 
+                      type="text"
+                      value={editFormData.university}
+                      onChange={handleEditChange} 
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Nomor WhatsApp</label>
+                    <input 
+                      name="whatsapp" 
+                      type="tel"
+                      value={editFormData.whatsapp}
+                      onChange={handleEditChange} 
+                      placeholder="08123456789"
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      required 
+                    />
+                  </div>
+                </div>
+                
+                {/* Right Column - Account Data */}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-semibold text-gray-300 border-b border-gray-600 pb-2">Data Akun</h4>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">NIM/NIS (Nomor Induk)</label>
+                    <input 
+                      name="nim" 
+                      type="text"
+                      value={editFormData.nim}
+                      onChange={handleEditChange} 
+                      className={`w-full p-3 bg-gray-700 rounded-md border ${
+                        editValidationErrors.nim ? 'border-red-500' : 'border-gray-600'
+                      } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                      required 
+                    />
+                    {editValidationErrors.nim && (
+                      <p className="text-red-400 text-xs mt-1">{editValidationErrors.nim}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                    <input 
+                      type="text"
+                      value={user.username}
+                      disabled
+                      className="w-full p-3 bg-gray-600 rounded-md border border-gray-500 text-gray-400 cursor-not-allowed" 
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Username tidak dapat diubah</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Password Baru (Opsional)</label>
+                    <div className="relative">
+                      <input 
+                        name="password" 
+                        type={showEditPassword ? "text" : "password"}
+                        value={editFormData.password}
+                        onChange={handleEditChange} 
+                        placeholder="Kosongkan jika tidak ingin mengubah"
+                        className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-12" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                      >
+                        {showEditPassword ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Konfirmasi Password Baru</label>
+                    <div className="relative">
+                      <input 
+                        name="confirmPassword" 
+                        type={showEditConfirmPassword ? "text" : "password"}
+                        value={editFormData.confirmPassword}
+                        onChange={handleEditChange} 
+                        placeholder="Ulangi password baru"
+                        className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-12" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditConfirmPassword(!showEditConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                      >
+                        {showEditConfirmPassword ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {editError && (
+                <div className="bg-red-900 border border-red-500 p-3 rounded-md">
+                  <p className="text-red-200 text-sm">{editError}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-4 pt-6">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowEditProfile(false);
+                    setEditError('');
+                    setEditValidationErrors({});
+                  }}
+                  className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isUpdating}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:bg-indigo-400"
+                >
+                  {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
+
+      {/* Status Aplikasi Ujian Section */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold">Status Aplikasi Ujian</h3>
+          <button 
+            onClick={() => navigateTo('student_join_exam', { currentUser: user })}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            + Ajukan Ujian Baru
+          </button>
+        </div>
+
+        {/* Ujian Siap Dimulai (Approved & Active) */}
+        {availableExams.length > 0 && (
+          <div className="mb-6 bg-green-800 border border-green-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">{availableExams.length > 1 ? '📚' : '🎯'}</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-green-400">
+                  {availableExams.length > 1 ? `${availableExams.length} Ujian Siap Dimulai` : 'Ujian Siap Dimulai'}
+                </h4>
+                <p className="text-green-200 text-sm">
+                  {availableExams.length > 1 
+                    ? 'Beberapa ujian sudah disetujui dan bisa dimulai sekarang' 
+                    : 'Ujian yang sudah disetujui dan bisa dimulai sekarang'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className={`grid gap-4 ${
+              availableExams.length === 1 
+                ? 'grid-cols-1' 
+                : availableExams.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
+              {availableExams.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-green-400 hover:bg-gray-600 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
+                      ✅ DISETUJUI
+                    </span>
+                  </div>
+                  
+                  {/* Exam Status Check */}
+                  {(() => {
+                    const now = new Date();
+                    const startTime = new Date(exam.startTime);
+                    const endTime = new Date(exam.endTime);
+                    
+                    if (now < startTime) {
+                      return (
+                        <div className="bg-blue-900 border border-blue-600 p-3 rounded-md mb-3">
+                          <p className="text-blue-200 text-sm text-center">
+                            ⏰ Ujian akan dimulai pada:<br/>
+                            <span className="font-bold">{startTime.toLocaleString('id-ID')}</span>
+                          </p>
+                        </div>
+                      );
+                    } else if (now > endTime) {
+                      return (
+                        <div className="bg-gray-900 border border-gray-600 p-3 rounded-md mb-3">
+                          <p className="text-gray-400 text-sm text-center">
+                            ⏰ Ujian telah berakhir
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
+                  <button
+                    onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
+                    disabled={(() => {
+                      const now = new Date();
+                      const startTime = new Date(exam.startTime);
+                      const endTime = new Date(exam.endTime);
+                      return now < startTime || now > endTime;
+                    })()}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center disabled:bg-gray-500 disabled:cursor-not-allowed"
+                  >
+                    {(() => {
+                      const now = new Date();
+                      const startTime = new Date(exam.startTime);
+                      const endTime = new Date(exam.endTime);
+                      
+                      if (now < startTime) {
+                        return '⏰ Belum Dimulai';
+                      } else if (now > endTime) {
+                        return '⏰ Sudah Berakhir';
+                      } else {
+                        return '🚀 Mulai Ujian Sekarang';
+                      }
+                    })()}
+                  </button>
+                </div>
+              ))}
+            </div>
+            
+            {/* Summary Info */}
+            {availableExams.length > 1 && (
+              <div className="mt-4 bg-green-900 border border-green-600 p-3 rounded-md">
+                <p className="text-green-200 text-sm text-center">
+                  💡 <strong>Tips:</strong> Anda memiliki {availableExams.length} ujian yang disetujui. 
+                  Pastikan untuk mengerjakan semua ujian sesuai jadwal yang ditentukan.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Ujian Ulang yang Disetujui (Retake Exams) */}
+        {retakeExams.length > 0 && (
+          <div className="mb-6 bg-purple-800 border border-purple-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">🔄</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-purple-400">
+                  {retakeExams.length === 1 ? 'Ujian Ulang Siap Dimulai' : `${retakeExams.length} Ujian Ulang Siap Dimulai`}
+                </h4>
+                <p className="text-purple-200 text-sm">
+                  {retakeExams.length === 1 
+                    ? 'Ujian ulang yang sudah disetujui dosen dan bisa dimulai sekarang'
+                    : 'Beberapa ujian ulang sudah disetujui dosen dan bisa dimulai sekarang'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className={`grid gap-4 ${
+              retakeExams.length === 1 
+                ? 'grid-cols-1' 
+                : retakeExams.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
+              {retakeExams.map(exam => {
+                const hasCompletedRetake = completedRetakeSessions.some(retakeSession => 
+                  retakeSession.examId === exam.id
+                );
+                
+                // Determine which schedule to use
+                return (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-purple-400 hover:bg-gray-600 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Mulai: {exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime).toLocaleString('id-ID') : new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime).toLocaleString('id-ID') : new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round(((exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime).getTime() : new Date(exam.endTime).getTime()) - (exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime).getTime() : new Date(exam.startTime).getTime())) / (1000 * 60))} menit</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-purple-600 text-white">
+                      🔄 UJIAN ULANG
+                    </span>
+                  </div>
+                  
+                  <div className="bg-purple-900 border border-purple-600 p-3 rounded-md">
+                    <p className="text-purple-200 text-sm text-center">
+                      🔄 Ujian ulang yang sudah disetujui dosen
+                    </p>
+                  </div>
+                  
+                  {/* Exam Status Check and Start Button */}
+                  {(() => {
+                    const now = new Date();
+                    const examStartTime = exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime) : new Date(exam.startTime);
+                    const examEndTime = exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime) : new Date(exam.endTime);
+                    
+                    if (now < examStartTime) {
+                      return (
+                        <div className="mt-3 bg-blue-900 border border-blue-600 p-3 rounded-md">
+                          <p className="text-blue-200 text-sm text-center">
+                            ⏰ Ujian akan dimulai pada:<br/>
+                            <span className="font-bold">{examStartTime.toLocaleString('id-ID')}</span>
+                          </p>
+                        </div>
+                      );
+                    } else if (now > examEndTime) {
+                      return (
+                        <div className="mt-3 bg-gray-900 border border-gray-600 p-3 rounded-md">
+                          <p className="text-gray-400 text-sm text-center">
+                            ⏰ Waktu ujian ulang telah berakhir
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <button
+                          onClick={() => navigateTo('student_precheck', { exam: { ...exam, startTime: examStartTime.toISOString(), endTime: examEndTime.toISOString() }, currentUser: user, isRetake: true })}
+                          className="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
+                        >
+                          🚀 Mulai Ujian Ulang Sekarang
+                        </button>
+                      );
+                    }
+                  })()}
+                </div>
+                );
+              })}
+            </div>
+            
+            {/* Summary Info */}
+            {retakeExams.length > 1 && (
+              <div className="mt-4 bg-purple-900 border border-purple-600 p-3 rounded-md">
+                <p className="text-purple-200 text-sm text-center">
+                  🔄 <strong>Catatan:</strong> Anda memiliki {retakeExams.length} ujian ulang yang disetujui. 
+                  Pastikan untuk mengerjakan semua ujian ulang sesuai jadwal yang ditentukan dosen.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Aplikasi Menunggu Konfirmasi (Pending) */}
+        {pendingApplications.length > 0 && (
+          <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">⏳</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-yellow-400">Menunggu Konfirmasi</h4>
+                <p className="text-yellow-200 text-sm">Aplikasi ujian yang sedang menunggu persetujuan dosen</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingApplications.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
+                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
+                      ⏳ MENUNGGU
+                    </span>
+                  </div>
+                  <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
+                    <p className="text-yellow-200 text-sm text-center">
+                      💡 Menunggu persetujuan dari dosen
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Aplikasi Ditolak (Rejected) */}
+        {rejectedApplications.length > 0 && (
+          <div className="mb-6 bg-red-800 border border-red-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">❌</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-red-400">
+                  {rejectedApplications.length === 1 ? 'Aplikasi Ditolak' : `${rejectedApplications.length} Aplikasi Ditolak`}
+                </h4>
+                <p className="text-red-200 text-sm">
+                  {rejectedApplications.length === 1 
+                    ? 'Aplikasi ujian yang tidak disetujui oleh dosen'
+                    : 'Beberapa aplikasi ujian tidak disetujui oleh dosen'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className={`grid gap-4 ${
+              rejectedApplications.length === 1 
+                ? 'grid-cols-1' 
+                : rejectedApplications.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
+              {rejectedApplications.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-red-400">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
+                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
+                      ❌ DITOLAK
+                    </span>
+                  </div>
+                  <div className="bg-red-900 border border-red-600 p-3 rounded-md">
+                    <p className="text-red-200 text-sm text-center">
+                      💬 Hubungi dosen untuk informasi lebih lanjut
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Summary for multiple rejected */}
+            {rejectedApplications.length > 1 && (
+              <div className="mt-4 bg-red-900 border border-red-600 p-3 rounded-md">
+                <p className="text-red-200 text-sm text-center">
+                  📞 <strong>Tindak Lanjut:</strong> {rejectedApplications.length} aplikasi ujian ditolak.
+                  Silakan hubungi dosen yang bersangkutan untuk mengetahui alasan penolakan.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {availableExams.length === 0 && retakeExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.length === 0 && (
+          <div className="bg-gray-800 border border-gray-600 p-8 rounded-lg text-center">
+            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📝</span>
+            </div>
+            <h4 className="text-xl font-bold text-gray-400 mb-2">Belum Ada Aplikasi Ujian</h4>
+            <p className="text-gray-500 mb-4">
+              Anda belum mengajukan ujian apapun. Mulai dengan mengajukan ujian pertama Anda.
+            </p>
+            <button 
+              onClick={() => navigateTo('student_join_exam', { currentUser: user })}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg"
+            >
+              🚀 Ajukan Ujian Pertama
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Riwayat Ujian Section */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
+      </div>
+      
+      <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        {examResults.length === 0 ? (
+          <div className="text-center p-8 text-gray-400">
+            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📊</span>
+            </div>
+            <p className="text-lg mb-2">Belum ada riwayat ujian yang selesai</p>
+            <p className="text-sm text-gray-500">Riwayat ujian akan muncul setelah Anda menyelesaikan ujian</p>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-gray-700">
+              <tr>
+                <th className="p-4">Nama Ujian</th>
+                <th className="p-4">Kode Ujian</th>
+                <th className="p-4">Nilai PG</th>
+                <th className="p-4">Nilai Essay</th>
+                <th className="p-4">Nilai Akhir</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Waktu Selesai</th>
+                <th className="p-4">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {examResults.map(result => (
+                <tr key={result.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                  <td className="p-4 font-semibold">{result.examName}</td>
+                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
+                  <td className="p-4">
+                    <span className={`font-bold ${
+                      result.status === 'disqualified' 
+                        ? 'text-red-400' 
+                        : result.finalScore >= 70 
+                        ? 'text-green-400' 
+                        : result.finalScore >= 60 
+                        ? 'text-yellow-400' 
+                        : 'text-red-400'
+                    }`}>
+                      {result.finalScore.toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-gray-300">
+                      {result.essayScore !== undefined ? result.essayScore.toFixed(2) : 'N/A'}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`font-bold ${
+                      result.status === 'disqualified' 
+                        ? 'text-red-400' 
+                        : (result.totalScore || result.finalScore) >= 70 
+                        ? 'text-green-400' 
+                        : (result.totalScore || result.finalScore) >= 60 
+                        ? 'text-yellow-400' 
+                        : 'text-red-400'
+                    }`}>
+                      {result.totalScore ? result.totalScore.toFixed(2) : result.finalScore.toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                      result.status === 'finished' 
+                        ? 'bg-green-600 text-white' 
+                        : result.status === 'disqualified'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-yellow-600 text-white'
+                    }`}>
+                      {result.status === 'finished' ? 'Selesai' : 
+                       result.status === 'disqualified' ? 'Diskualifikasi' : 
+                       result.status === 'started' ? 'Sedang Berlangsung' : 'Pending'}
+                    </span>
+                  </td>
+                  <td className="p-4 text-gray-400">
+                    {result.finishTime ? result.finishTime.toLocaleString('id-ID') : 'Belum selesai'}
+                  </td>
+                  <td className="p-4">
+                    {result.status === 'disqualified' && (
+                      <button
+                        onClick={() => handleRetakeRequest(result.examCode, result.examName)}
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-1 px-3 rounded"
+                      >
+                        Ajukan Ujian Ulang
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 };
