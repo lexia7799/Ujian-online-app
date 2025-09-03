@@ -783,7 +783,9 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
                   <td className="p-4 text-gray-300">{session.studentInfo.nim}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.className}</td>
-                  <td className="p-4">{session.status}</td>
+                  <td className="p-4">
+                    {session.isRetake && session.status === 'finished' ? 'Selesai Mengulang' : session.status}
+                  </td>
                   <td className="p-4">{session.violations}</td>
                   <td className="p-4">{session.finalScore?.toFixed(2) ?? 'N/A'}</td>
                   <td className="p-4">

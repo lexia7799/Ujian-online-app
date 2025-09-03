@@ -130,7 +130,8 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         status: 'started',
         violations: 0,
         answers: {},
-        finalScore: null
+        finalScore: null,
+        isRetake: appState.isRetake || false
       });
       
       console.log("Session created with ID:", docRef.id);

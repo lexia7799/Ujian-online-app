@@ -919,7 +919,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                     } else {
                       return (
                         <button
-                          onClick={() => navigateTo('student_precheck', { exam: { ...exam, startTime: examStartTime.toISOString(), endTime: examEndTime.toISOString() }, currentUser: user })}
+                          onClick={() => navigateTo('student_precheck', { exam: { ...exam, startTime: examStartTime.toISOString(), endTime: examEndTime.toISOString() }, currentUser: user, isRetake: true })}
                           className="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
                         >
                           🚀 Mulai Ujian Ulang Sekarang
