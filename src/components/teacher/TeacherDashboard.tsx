@@ -8,6 +8,8 @@ import TeacherResultsDashboard from './TeacherResultsDashboard';
 import TeacherProctoringDashboard from './TeacherProctoringDashboard';
 import QuestionManager from './QuestionManager';
 import TeacherAttendanceRecap from './TeacherAttendanceRecap';
+import RetakeConfirmation from './RetakeConfirmation';
+import RetakeSchedule from './RetakeSchedule';
 
 interface TeacherDashboardProps {
   user?: any;
@@ -18,7 +20,7 @@ interface TeacherDashboardProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
   const [view, setView] = useState('search');
-  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager' | 'attendance_recap'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'student_confirmation' | 'teacher_results' | 'teacher_proctoring' | 'question_manager' | 'attendance_recap' | 'retake_confirmation' | 'retake_schedule'>('main');
   const [searchCode, setSearchCode] = useState('');
   const [foundExam, setFoundExam] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -91,6 +93,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
         break;
       case 'attendance_recap':
         setCurrentView('attendance_recap');
+        break;
+      case 'retake_confirmation':
+        setCurrentView('retake_confirmation');
+        break;
+      case 'retake_schedule':
+        setCurrentView('retake_schedule');
         break;
       default:
         navigateTo(page, data);
@@ -217,6 +225,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
     return (
       <TeacherAttendanceRecap 
         navigateTo={navigateTo}
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'retake_confirmation') {
+    return (
+      <RetakeConfirmation 
+        navigateBack={handleBackToMain}
+        appState={{ exam: currentExam }}
+      />
+    );
+  }
+
+  if (currentView === 'retake_schedule') {
+    return (
+      <RetakeSchedule 
         navigateBack={handleBackToMain}
         appState={{ exam: currentExam }}
       />
@@ -404,6 +430,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, navigateTo, n
                   className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
                 >
                   Rekap Absen
+                </button>
+                <button 
+                  onClick={() => handleNavigateToFeature('retake_confirmation', { exam: foundExam })} 
+                  className="bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                >
+                  Konfirmasi Ujian Ulang
+                </button>
+                <button 
+                  onClick={() => handleNavigateToFeature('retake_schedule', { exam: foundExam })} 
+                  className="bg-pink-600 hover:bg-pink-700 text-white text-sm font-bold py-2 px-3 rounded-lg"
+                >
+                  Atur Jadwal Ujian Ulang
                 </button>
               </div>
             </div>
