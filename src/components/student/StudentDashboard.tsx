@@ -844,6 +844,105 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           </div>
         )}
 
+        {/* Ujian Ulang yang Disetujui (Retake Exams) */}
+        {retakeExams.length > 0 && (
+          <div className="mb-6 bg-purple-800 border border-purple-500 p-6 rounded-lg shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-2xl">🔄</span>
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-purple-400">
+                  {retakeExams.length === 1 ? 'Ujian Ulang Siap Dimulai' : `${retakeExams.length} Ujian Ulang Siap Dimulai`}
+                </h4>
+                <p className="text-purple-200 text-sm">
+                  {retakeExams.length === 1 
+                    ? 'Ujian ulang yang sudah disetujui dosen dan bisa dimulai sekarang'
+                    : 'Beberapa ujian ulang sudah disetujui dosen dan bisa dimulai sekarang'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className={`grid gap-4 ${
+              retakeExams.length === 1 
+                ? 'grid-cols-1' 
+                : retakeExams.length === 2 
+                ? 'grid-cols-1 md:grid-cols-2' 
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}>
+              {retakeExams.map(exam => (
+                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-purple-400 hover:bg-gray-600 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
+                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>📅 Mulai: {exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime).toLocaleString('id-ID') : new Date(exam.startTime).toLocaleString('id-ID')}</p>
+                        <p>⏰ Selesai: {exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime).toLocaleString('id-ID') : new Date(exam.endTime).toLocaleString('id-ID')}</p>
+                        <p>⏱️ Durasi: {Math.round(((exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime).getTime() : new Date(exam.endTime).getTime()) - (exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime).getTime() : new Date(exam.startTime).getTime())) / (1000 * 60))} menit</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-purple-600 text-white">
+                      🔄 UJIAN ULANG
+                    </span>
+                  </div>
+                  
+                  <div className="bg-purple-900 border border-purple-600 p-3 rounded-md">
+                    <p className="text-purple-200 text-sm text-center">
+                      🔄 Ujian ulang yang sudah disetujui dosen
+                    </p>
+                  </div>
+                  
+                  {/* Exam Status Check and Start Button */}
+                  {(() => {
+                    const now = new Date();
+                    const examStartTime = exam.customSchedule?.startTime ? new Date(exam.customSchedule.startTime) : new Date(exam.startTime);
+                    const examEndTime = exam.customSchedule?.endTime ? new Date(exam.customSchedule.endTime) : new Date(exam.endTime);
+                    
+                    if (now < examStartTime) {
+                      return (
+                        <div className="mt-3 bg-blue-900 border border-blue-600 p-3 rounded-md">
+                          <p className="text-blue-200 text-sm text-center">
+                            ⏰ Ujian akan dimulai pada:<br/>
+                            <span className="font-bold">{examStartTime.toLocaleString('id-ID')}</span>
+                          </p>
+                        </div>
+                      );
+                    } else if (now > examEndTime) {
+                      return (
+                        <div className="mt-3 bg-gray-900 border border-gray-600 p-3 rounded-md">
+                          <p className="text-gray-400 text-sm text-center">
+                            ⏰ Waktu ujian ulang telah berakhir
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <button
+                          onClick={() => navigateTo('student_precheck', { exam: { ...exam, startTime: examStartTime.toISOString(), endTime: examEndTime.toISOString() }, currentUser: user })}
+                          className="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
+                        >
+                          🚀 Mulai Ujian Ulang Sekarang
+                        </button>
+                      );
+                    }
+                  })()}
+                </div>
+              ))}
+            </div>
+            
+            {/* Summary Info */}
+            {retakeExams.length > 1 && (
+              <div className="mt-4 bg-purple-900 border border-purple-600 p-3 rounded-md">
+                <p className="text-purple-200 text-sm text-center">
+                  🔄 <strong>Catatan:</strong> Anda memiliki {retakeExams.length} ujian ulang yang disetujui. 
+                  Pastikan untuk mengerjakan semua ujian ulang sesuai jadwal yang ditentukan dosen.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Aplikasi Menunggu Konfirmasi (Pending) */}
         {pendingApplications.length > 0 && (
           <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
