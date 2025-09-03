@@ -65,8 +65,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const cameraInitRetryCount = useRef(0);
   const maxCameraRetries = 5;
-  const isAutoReenteringFullscreen = useRef(false);
-  const fullscreenExitTime = useRef<number | null>(null);
 
   useEffect(() => {
     // Initialize audio context
@@ -423,7 +421,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
           }
         }, 2000);
       } else {
-        console.warn("Unable to enter fullscreen after maximum retries");
+        handleViolation("Fullscreen Required - Unable to Enter");
       }
     }
   };
@@ -455,6 +453,12 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     const handleFullscreenChange = () => {
       if (!isInFullscreen() && !isFinished) {
         handleViolation("Exited Fullscreen");
+        // Auto re-enter fullscreen after violation
+        setTimeout(() => {
+          if (!isFinished) {
+            enterFullscreen();
+          }
+        }, 1000);
       }
     };
     
@@ -672,6 +676,13 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
     } else {
       setShowViolationModal(true);
       setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Auto re-enter fullscreen after violation
+      setTimeout(() => {
+        if (!isFinished && !isInFullscreen()) {
+          enterFullscreen();
+        }
+      }, 1500);
     }
   };
 
