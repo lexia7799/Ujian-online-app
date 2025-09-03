@@ -322,32 +322,34 @@ const StudentConfirmation: React.FC<StudentConfirmationProps> = ({ navigateBack,
               </span>
             </div>
             
-            {selectedStudents.size > 0 && (
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleApproveSelected}
-                  disabled={isLoading}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-green-400"
-                >
-                  Setujui Terpilih
-                </button>
-                <button
-                  onClick={handleRejectSelected}
-                  disabled={isLoading}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-red-400"
-                >
-                  Tolak Terpilih
-                </button>
-              </div>
-            )}
-            
-            <button
-              onClick={() => loadApplications(true)}
-              disabled={isLoadingMore}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-blue-400"
-            >
-              {isLoadingMore ? '🔄' : '🔄'} Refresh
-            </button>
+            <div className="flex items-center space-x-2">
+              {selectedStudents.size > 0 && (
+                <>
+                  <button
+                    onClick={handleApproveSelected}
+                    disabled={isLoading}
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-green-400"
+                  >
+                    Setujui Terpilih
+                  </button>
+                  <button
+                    onClick={handleRejectSelected}
+                    disabled={isLoading}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-red-400"
+                  >
+                    Tolak Terpilih
+                  </button>
+                </>
+              )}
+              
+              <button
+                onClick={() => loadApplications(true)}
+                disabled={isLoadingMore}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-blue-400"
+              >
+                {isLoadingMore ? '🔄' : '🔄'} Refresh
+              </button>
+            </div>
           </div>
         </div>
       )}
