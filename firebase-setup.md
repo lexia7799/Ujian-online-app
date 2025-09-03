@@ -167,28 +167,6 @@ Create these collections in Firestore:
 
 Create these composite indexes in Firestore:
 
-**CRITICAL: Collection Group Indexes Required**
-
-The following indexes are REQUIRED for the StudentDashboard to work properly:
-
-1. **Collection Group Index for Sessions**
-   - **Collection ID**: `sessions` (Collection Group)
-   - **Fields**: 
-     - `studentId` (Ascending)
-     - `startTime` (Descending) 
-     - `__name__` (Ascending)
-   - **Direct Link**: Use the error link in browser console to create automatically
-   - **Manual Creation**: Firebase Console → Firestore → Indexes → Create Index → Collection Group
-
-2. **Collection Group Index for Applications**
-   - **Collection ID**: `applications` (Collection Group)
-   - **Fields**:
-     - `studentId` (Ascending)
-     - `__name__` (Ascending)
-   - **Manual Creation**: Firebase Console → Firestore → Indexes → Create Index → Collection Group
-
-**Other Composite Indexes:**
-
 1. **Collection**: `artifacts/ujian-online-app/public/data/exams`
    - Fields: `code` (Ascending), `__name__` (Ascending)
 
@@ -198,25 +176,14 @@ The following indexes are REQUIRED for the StudentDashboard to work properly:
 3. **Collection**: `artifacts/ujian-online-app/public/data/exams/{examId}/sessions`
    - Fields: `studentInfo.name` (Ascending), `status` (Ascending)
 
-**How to Create Collection Group Indexes:**
+4. **Collection Group**: `sessions`
+   - Fields: `status` (Ascending), `studentId` (Ascending), `__name__` (Ascending)
+   - Note: This index is required for StudentDashboard queries across all sessions
 
-1. **Automatic Creation (Recommended)**:
-   - Run the app and trigger the error
-   - Click the direct link in the browser console error message
-   - Firebase will automatically create the required index
-
-2. **Manual Creation**:
-   - Go to Firebase Console → Firestore Database → Indexes
-   - Click "Create Index"
-   - Select "Collection Group" 
-   - Enter collection ID: `sessions` or `applications`
-   - Add the required fields as listed above
-   - Click "Create"
-
-3. **Index Building Time**:
-   - Small databases: 1-5 minutes
-   - Large databases: Can take hours
-   - App will use fallback queries until indexes are ready
+5. **Collection Group**: `sessions` (Single Field Index)
+   - Fields: `studentId` (Ascending)
+   - Note: This index is required for collection group queries on studentId field
+   - Direct link: Use the Firebase Console error link to create this index automatically
 
 ## 6. Storage Rules (for violation photos)
 

@@ -14,11 +14,9 @@ interface Question {
 
 interface StudentExamProps {
   appState: any;
-  navigateTo: (page: string, data?: any) => void;
-  user: any;
 }
 
-const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user }) => {
+const StudentExam: React.FC<StudentExamProps> = ({ appState }) => {
   const { exam, studentInfo, sessionId } = appState;
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
