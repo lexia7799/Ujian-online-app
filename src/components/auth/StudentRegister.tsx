@@ -204,7 +204,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
           // Set timeout for image upload (10 seconds)
           const uploadPromise = uploadProfileImage(studentId);
           const timeoutPromise = new Promise<string | null>((_, reject) => 
-            setTimeout(() => reject(new Error('Upload timeout')), 60000)
+            setTimeout(() => reject(new Error('Upload timeout')), 120000)
           );
           
           profilePhotoURL = await Promise.race([uploadPromise, timeoutPromise]) || '';
