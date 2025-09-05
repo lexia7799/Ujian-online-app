@@ -108,7 +108,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
       
       img.onload = () => {
         // Calculate new dimensions (max 400x400)
-        const maxSize = 400;
+        const maxSize = 200;
         let { width, height } = img;
         
         if (width > height) {
@@ -130,7 +130,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         
         canvas.toBlob((blob) => {
           resolve(blob || file);
-        }, 'image/jpeg', 0.8);
+        }, 'image/jpeg', 0.6);
       };
       
       img.src = URL.createObjectURL(file);
