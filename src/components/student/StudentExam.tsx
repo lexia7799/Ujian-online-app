@@ -677,14 +677,22 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       setShowViolationModal(true);
-      setTimeout(() => setShowViolationModal(false), 3000);
       
-      // Auto re-enter fullscreen after violation for first two violations
-      setTimeout(() => {
-        if (!isFinished && !isInFullscreen() && newViolations <= 2) {
-          enterFullscreen();
-        }
-      }, 1500);
+      // For first two violations, auto re-enter fullscreen after showing warning
+      if (newViolations <= 2) {
+        setTimeout(() => {
+          setShowViolationModal(false);
+          // Auto re-enter fullscreen immediately after closing modal
+          setTimeout(() => {
+            if (!isFinished && !isInFullscreen()) {
+              enterFullscreen();
+            }
+          }, 100);
+        }, 3000);
+      } else {
+        // For third violation, modal stays open (exam will be finished)
+        setTimeout(() => setShowViolationModal(false), 3000);
+      }
     }
   };
 
