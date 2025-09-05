@@ -39,13 +39,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     university: '',
     whatsapp: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    profilePhoto: ''
   });
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
   const [editError, setEditError] = useState('');
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [newProfileImage, setNewProfileImage] = useState<File | null>(null);
+  const [newProfileImagePreview, setNewProfileImagePreview] = useState<string>('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     // Early return if no user
@@ -71,7 +75,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             university: profileData.university || '',
             whatsapp: profileData.whatsapp || '',
             password: '',
-            confirmPassword: ''
+            confirmPassword: '',
+            profilePhoto: profileData.profilePhoto || ''
           });
         }
 
@@ -262,6 +267,53 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
     return errors;
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setEditError('File harus berupa gambar (JPG, PNG, GIF, dll.)');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setEditError('Ukuran file maksimal 5MB');
+        return;
+      }
+      
+      setNewProfileImage(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNewProfileImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      setEditError('');
+    }
+  };
+
+  const uploadProfileImage = async (): Promise<string | null> => {
+    if (!newProfileImage) return null;
+    
+    try {
+      setIsUploadingImage(true);
+      const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+      const storage = getStorage();
+      const imageRef = ref(storage, `profile-images/${user.id}/${Date.now()}_${newProfileImage.name}`);
+      
+      const snapshot = await uploadBytes(imageRef, newProfileImage);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Gagal mengupload gambar profil');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError('');
@@ -306,6 +358,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         updateData.password = editFormData.password;
       }
 
+      // Upload new profile image if provided
+      if (newProfileImage) {
+        const newImageURL = await uploadProfileImage();
+        if (newImageURL) {
+          updateData.profilePhoto = newImageURL;
+        }
+      }
+
       // Update in Firestore
       await updateDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id), updateData);
 
@@ -316,10 +376,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       // Reset form
       setEditFormData({
         ...editFormData,
-        whatsapp: updatedProfile.whatsapp || '',
+        profilePhoto: updatedProfile.profilePhoto || '',
         password: '',
         confirmPassword: ''
       });
+      
+      // Reset image states
+      setNewProfileImage(null);
+      setNewProfileImagePreview('');
       
       setShowEditProfile(false);
       alert('Profil berhasil diperbarui!');
@@ -355,11 +419,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
-                  <span className="text-2xl font-bold text-white">
-                    {studentProfile.fullName.charAt(0).toUpperCase()}
-                  </span>
-                </div>
+                {studentProfile.profilePhoto ? (
+                  <img
+                    src={studentProfile.profilePhoto}
+                    alt="Profile"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-indigo-500"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
+                    <span className="text-2xl font-bold text-white">
+                      {studentProfile.fullName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
                 <div>
                   <h3 className="text-xl font-bold">{studentProfile.fullName}</h3>
                   <p className="text-gray-400">{studentProfile.major} - {studentProfile.className}</p>
@@ -472,6 +544,46 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                       className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
                       required 
                     />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Foto Profil
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        {newProfileImagePreview ? (
+                          <img
+                            src={newProfileImagePreview}
+                            alt="Preview Baru"
+                            className="w-20 h-20 rounded-full object-cover border-2 border-indigo-500"
+                          />
+                        ) : studentProfile.profilePhoto ? (
+                          <img
+                            src={studentProfile.profilePhoto}
+                            alt="Foto Saat Ini"
+                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-600"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center border-2 border-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-grow">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                          Format: JPG, PNG, GIF. Maksimal 5MB. Kosongkan jika tidak ingin mengubah.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
@@ -589,10 +701,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isUpdating}
+                  disabled={isUpdating || isUploadingImage}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:bg-indigo-400"
                 >
-                  {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+                  {isUpdating ? (isUploadingImage ? 'Mengupload gambar...' : 'Menyimpan...') : 'Simpan Perubahan'}
                 </button>
               </div>
             </form>
