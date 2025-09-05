@@ -45,6 +45,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
   const [editError, setEditError] = useState('');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [newProfileImage, setNewProfileImage] = useState<File | null>(null);
