@@ -295,13 +295,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
   };
 
   const uploadProfileImage = async (): Promise<string | null> => {
-    if (!newProfileImage) return null;
+    if (!profileImage) return null;
     
     try {
       setIsUploadingImage(true);
       
       // Compress image before upload
-      const compressedImage = await compressImage(file);
+      const compressedImage = await compressImage(profileImage);
       
       const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
       const storage = getStorage();
