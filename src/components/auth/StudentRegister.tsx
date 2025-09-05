@@ -79,20 +79,63 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     
     try {
       setIsUploadingImage(true);
-      const storage = getStorage();
-      const imageRef = ref(storage, `profile-images/${studentId}/${Date.now()}_${profileImage.name}`);
       
-      const snapshot = await uploadBytes(imageRef, profileImage);
+      // Compress image before upload
+      const compressedImage = await compressImage(profileImage);
+      
+      const storage = getStorage();
+      const imageRef = ref(storage, `profile-images/${studentId}/${Date.now()}_profile.jpg`);
+      
+      const snapshot = await uploadBytes(imageRef, compressedImage);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
       return downloadURL;
     } catch (error) {
       console.error('Error uploading image:', error);
-      throw new Error('Gagal mengupload gambar profil');
+      // Don't throw error, just return null to continue registration
+      setError('Gagal mengupload gambar profil, tapi akun tetap dibuat');
+      return null;
     } finally {
       setIsUploadingImage(false);
     }
   };
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions (max 400x400)
+        const maxSize = 400;
+        let { width, height } = img;
+        
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          resolve(blob || file);
+        }, 'image/jpeg', 0.8);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };</parameter>
 
   const validateUniqueFields = async () => {
     const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
@@ -149,14 +192,27 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
       setIsLoading(false);
       return;
     }
+
     try {
       // Generate unique ID for student
       const studentId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Upload profile image if exists
+      // Upload profile image if exists (with timeout)
       let profilePhotoURL = '';
       if (profileImage) {
-        profilePhotoURL = await uploadProfileImage(studentId) || '';
+        try {
+          // Set timeout for image upload (10 seconds)
+          const uploadPromise = uploadProfileImage(studentId);
+          const timeoutPromise = new Promise<string | null>((_, reject) => 
+            setTimeout(() => reject(new Error('Upload timeout')), 10000)
+          );
+          
+          profilePhotoURL = await Promise.race([uploadPromise, timeoutPromise]) || '';
+        } catch (uploadError) {
+          console.error('Image upload failed or timed out:', uploadError);
+          setError('Upload gambar gagal, tapi akun tetap akan dibuat');
+          profilePhotoURL = '';
+        }
       }
       
       await setDoc(doc(db, `artifacts/${appId}/public/data/students`, studentId), {
@@ -173,7 +229,10 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         role: 'student'
       });
 
-      alert('Akun siswa berhasil dibuat! Silakan login.');
+      const message = profilePhotoURL 
+        ? 'Akun siswa berhasil dibuat dengan foto profil! Silakan login.'
+        : 'Akun siswa berhasil dibuat! Foto profil dapat diupload nanti di edit profil.';
+      alert(message);
       navigateTo('student_login');
     } catch (error: any) {
       setError('Gagal membuat akun. Silakan coba lagi.');
