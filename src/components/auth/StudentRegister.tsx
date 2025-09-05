@@ -135,7 +135,7 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
       
       img.src = URL.createObjectURL(file);
     });
-  };</parameter>
+  };
 
   const validateUniqueFields = async () => {
     const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
