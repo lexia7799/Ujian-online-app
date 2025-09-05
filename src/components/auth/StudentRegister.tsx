@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, appId } from '../../config/firebase';
-import { getStorage } from 'firebase/storage';
 
 interface StudentRegisterProps {
   navigateTo: (page: string, data?: any) => void;
@@ -22,14 +20,11 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
     whatsapp: ''
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [conflictInfo, setConflictInfo] = useState<{[key: string]: string}>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [profileImage, setProfileImage] = useState<File | null>(null);
-  const [profileImagePreview, setProfileImagePreview] = useState<string>('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -46,95 +41,6 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         return newConflicts;
       });
     }
-  };
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('File harus berupa gambar (JPG, PNG, GIF, dll.)');
-        return;
-      }
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Ukuran file maksimal 5MB');
-        return;
-      }
-      
-      setProfileImage(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfileImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-      setError('');
-    }
-  };
-
-  const uploadProfileImage = async (studentId: string): Promise<string | null> => {
-    if (!profileImage) return null;
-    
-    try {
-      setIsUploadingImage(true);
-      
-      // Compress image before upload
-      const compressedImage = await compressImage(profileImage);
-      
-      const storage = getStorage();
-      const imageRef = ref(storage, `profile-images/${studentId}/${Date.now()}_profile.jpg`);
-      
-      const snapshot = await uploadBytes(imageRef, compressedImage);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      return downloadURL;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      // Don't throw error, just return null to continue registration
-      setError('Gagal mengupload gambar profil, tapi akun tetap dibuat');
-      return null;
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
-  const compressImage = (file: File): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      
-      img.onload = () => {
-        // Calculate new dimensions (max 400x400)
-        const maxSize = 200;
-        let { width, height } = img;
-        
-        if (width > height) {
-          if (width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          resolve(blob || file);
-        }, 'image/jpeg', 0.6);
-      };
-      
-      img.src = URL.createObjectURL(file);
-    });
   };
 
   const validateUniqueFields = async () => {
@@ -192,28 +98,9 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
       setIsLoading(false);
       return;
     }
-
     try {
       // Generate unique ID for student
       const studentId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Upload profile image if exists (with timeout)
-      let profilePhotoURL = '';
-      if (profileImage) {
-        try {
-          // Set timeout for image upload (10 seconds)
-          const uploadPromise = uploadProfileImage(studentId);
-          const timeoutPromise = new Promise<string | null>((_, reject) => 
-            setTimeout(() => reject(new Error('Upload timeout')), 120000)
-          );
-          
-          profilePhotoURL = await Promise.race([uploadPromise, timeoutPromise]) || '';
-        } catch (uploadError) {
-          console.error('Image upload failed or timed out:', uploadError);
-          setError('Upload gambar gagal, tapi akun tetap akan dibuat');
-          profilePhotoURL = '';
-        }
-      }
       
       await setDoc(doc(db, `artifacts/${appId}/public/data/students`, studentId), {
         fullName: formData.fullName,
@@ -224,15 +111,11 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
         className: formData.className,
         university: formData.university,
         whatsapp: formData.whatsapp,
-        profilePhoto: profilePhotoURL,
         createdAt: new Date(),
         role: 'student'
       });
 
-      const message = profilePhotoURL 
-        ? 'Akun siswa berhasil dibuat dengan foto profil! Silakan login.'
-        : 'Akun siswa berhasil dibuat! Foto profil dapat diupload nanti di edit profil.';
-      alert(message);
+      alert('Akun siswa berhasil dibuat! Silakan login.');
       navigateTo('student_login');
     } catch (error: any) {
       setError('Gagal membuat akun. Silakan coba lagi.');
@@ -329,40 +212,6 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
                   className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
                   required 
                 />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Foto Profil (Opsional)
-                </label>
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    {profileImagePreview ? (
-                      <img
-                        src={profileImagePreview}
-                        alt="Preview"
-                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-600"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center border-2 border-gray-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-grow">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Format: JPG, PNG, GIF. Maksimal 5MB.
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
             
@@ -477,17 +326,10 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button 
             type="submit" 
-            disabled={isLoading || isUploadingImage}
+            disabled={isLoading}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg disabled:bg-indigo-400"
           >
-            {isLoading ? (
-              isUploadingImage ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Mengupload gambar...
-                </div>
-              ) : 'Mendaftar...'
-            ) : 'Daftar'}
+            {isLoading ? 'Mendaftar...' : 'Daftar'}
           </button>
         </form>
         <div className="mt-4 text-center">

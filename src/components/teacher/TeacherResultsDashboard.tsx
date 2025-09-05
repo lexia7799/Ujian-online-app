@@ -753,7 +753,6 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
         <table className="w-full text-left">
           <thead className="bg-gray-700">
             <tr>
-              <th className="p-4">Foto</th>
               <th className="p-4">Nama Lengkap</th>
               <th className="p-4">NIM</th>
               <th className="p-4">Program Studi</th>
@@ -770,7 +769,7 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
           <tbody>
             {filteredSessions.length === 0 ? (
               <tr>
-                <td colSpan={12} className="text-center p-8 text-gray-400">
+                <td colSpan={11} className="text-center p-8 text-gray-400">
                   {sessions.length === 0 
                     ? "Belum ada siswa yang menyelesaikan ujian."
                     : "Tidak ada siswa yang sesuai dengan filter."
@@ -780,21 +779,6 @@ const TeacherResultsDashboard: React.FC<TeacherResultsDashboardProps> = ({ navig
             ) : (
               filteredSessions.map(session => (
                 <tr key={session.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4">
-                    {session.studentInfo.profilePhoto ? (
-                      <img
-                        src={session.studentInfo.profilePhoto}
-                        alt="Profile"
-                        className="w-10 h-10 rounded-full object-cover border border-gray-600"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-bold text-white">
-                          {(session.studentInfo.name || session.studentInfo.fullName || 'N').charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                  </td>
                   <td className="p-4 font-semibold">{session.studentInfo.name || session.studentInfo.fullName || 'N/A'}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.nim}</td>
                   <td className="p-4 text-gray-300">{session.studentInfo.major}</td>
