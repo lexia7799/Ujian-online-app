@@ -1,271 +1,163 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, collectionGroup, orderBy, limit } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, getStorage } from 'firebase/storage';
 import { db, appId } from '../../config/firebase';
 
-interface CustomUser {
-  id: string;
-  username: string;
-  role: string;
-  [key: string]: any;
-}
-
 interface StudentDashboardProps {
-  user: CustomUser;
+  user: any;
   navigateTo: (page: string, data?: any) => void;
   navigateBack: () => void;
+  canGoBack: boolean;
 }
 
-interface ExamResult {
+interface ExamHistory {
   id: string;
   examName: string;
-  finalScore: number;
-  finishTime: Date;
+  examCode: string;
   status: string;
+  finalScore?: number;
+  violations: number;
+  startTime: Date;
+  finishTime?: Date;
 }
 
-const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, navigateBack }) => {
-  const [examResults, setExamResults] = useState<ExamResult[]>([]);
-  const [studentProfile, setStudentProfile] = useState<any>(null);
+interface Application {
+  id: string;
+  examName: string;
+  examCode: string;
+  status: 'pending' | 'approved' | 'rejected';
+  appliedAt: Date;
+}
+
+const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, navigateBack, canGoBack }) => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [examHistory, setExamHistory] = useState<ExamHistory[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [availableExams, setAvailableExams] = useState<any[]>([]);
-  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
-  const [rejectedApplications, setRejectedApplications] = useState<any[]>([]);
-  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [studentData, setStudentData] = useState<any>(null);
+  
+  // Edit profile states
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [editFormData, setEditFormData] = useState({
     fullName: '',
-    nim: '',
     major: '',
     className: '',
     university: '',
     whatsapp: '',
     password: '',
-    confirmPassword: '',
-    profilePhoto: ''
+    confirmPassword: ''
   });
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showEditConfirmPassword, setShowEditConfirmPassword] = useState(false);
-  const [editError, setEditError] = useState('');
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [newProfileImage, setNewProfileImage] = useState<File | null>(null);
-  const [newProfileImagePreview, setNewProfileImagePreview] = useState<string>('');
+  
+  // Profile photo states
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string>('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
-    // Early return if no user
-    if (!user || !user.id) {
-      setIsLoading(false);
-      return;
+    if (user?.id) {
+      loadStudentData();
+      loadExamHistory();
+      loadApplications();
     }
-
-    // Fetch all exam data and applications
-    const fetchData = async () => {
-      try {
-        // Fetch student profile first
-        const studentDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id));
-        
-        if (studentDoc.exists()) {
-          const profileData = studentDoc.data();
-          setStudentProfile(profileData);
-          setEditFormData({
-            fullName: profileData.fullName || '',
-            nim: profileData.nim || '',
-            major: profileData.major || '',
-            className: profileData.className || '',
-            university: profileData.university || '',
-            whatsapp: profileData.whatsapp || '',
-            password: '',
-            confirmPassword: '',
-            profilePhoto: profileData.profilePhoto || ''
-          });
-        }
-
-        // Fetch all exams
-        const examsSnapshot = await getDocs(query(
-          collection(db, `artifacts/${appId}/public/data/exams`), 
-          limit(100)
-        ));
-        
-        console.log(`Found ${examsSnapshot.docs.length} total exams`);
-        
-        // Initialize arrays
-        const results: ExamResult[] = [];
-        const available: any[] = [];
-        const pending: any[] = [];
-        const rejected: any[] = [];
-        
-        // Process each exam
-        for (const examDoc of examsSnapshot.docs) {
-          const examData = examDoc.data();
-          const examId = examDoc.id;
-          
-          console.log(`Processing exam: ${examData.name} (${examId})`);
-          
-          try {
-            // Check for completed sessions first
-            const sessionsSnapshot = await getDocs(query(
-              collection(db, `artifacts/${appId}/public/data/exams/${examId}/sessions`),
-              where('studentId', '==', user.id),
-              limit(5)
-            ));
-            
-            let hasCompletedSession = false;
-            
-            // Process sessions for results
-            sessionsSnapshot.forEach(sessionDoc => {
-              const sessionData = sessionDoc.data();
-              
-              if (['finished', 'disqualified'].includes(sessionData.status)) {
-                hasCompletedSession = true;
-                
-                // Calculate scores
-                let essayScore = undefined;
-                let totalScore = undefined;
-                
-                if (sessionData.essayScores) {
-                  const essayScores = Object.values(sessionData.essayScores);
-                  if (essayScores.length > 0) {
-                    essayScore = essayScores.reduce((sum: number, score: number) => sum + score, 0) / essayScores.length;
-                    const mcScore = sessionData.finalScore || 0;
-                    totalScore = (mcScore * 0.5) + (essayScore * 0.5);
-                  }
-                }
-                
-                results.push({
-                  id: sessionDoc.id,
-                  examName: examData.name || 'Unknown Exam',
-                  examCode: examData.code,
-                  finalScore: sessionData.finalScore || 0,
-                  essayScore,
-                  totalScore,
-                  finishTime: sessionData.finishTime?.toDate() || new Date(),
-                  status: sessionData.status
-                });
-              }
-            });
-            
-            // Check for applications regardless of completed sessions
-            const applicationsSnapshot = await getDocs(query(
-              collection(db, `artifacts/${appId}/public/data/exams/${examId}/applications`),
-              where('studentId', '==', user.id),
-              limit(5)
-            ));
-            
-            console.log(`Found ${applicationsSnapshot.docs.length} applications for exam ${examId}`);
-            
-            // Process applications
-            applicationsSnapshot.forEach(appDoc => {
-              const appData = appDoc.data();
-              console.log(`Application status: ${appData.status} for exam ${examData.name}`);
-              
-              const examWithApp = {
-                id: examId,
-                name: examData.name,
-                code: examData.code,
-                applicationStatus: appData.status,
-                appliedAt: appData.appliedAt?.toDate() || new Date(),
-                startTime: examData.startTime,
-                endTime: examData.endTime,
-                status: examData.status,
-                hasCompletedSession,
-                ...examData
-              };
-              
-              // Categorize based on application status
-              if (appData.status === 'pending') {
-                pending.push(examWithApp);
-                console.log(`Added to pending: ${examData.name}`);
-              } else if (appData.status === 'approved') {
-                // Only add to available if no completed session and published
-                if (!hasCompletedSession) {
-                  if (examData.status === 'published') {
-                    available.push(examWithApp);
-                    console.log(`Added to available: ${examData.name}`);
-                  } else {
-                    // Add to rejected array with special status for approved but unpublished
-                    const approvedUnpublishedExam = {
-                      ...examWithApp,
-                      specialStatus: 'approved_unpublished',
-                      displayStatus: 'approved_unpublished'
-                    };
-                    rejected.push(approvedUnpublishedExam);
-                    console.log(`Added to approved_unpublished: ${examData.name}`);
-                  }
-                } else {
-                  console.log(`Skipped available (completed): ${examData.name}`);
-                }
-              } else if (appData.status === 'rejected') {
-                rejected.push(examWithApp);
-                console.log(`Added to rejected: ${examData.name}`);
-              }
-            });
-            
-          } catch (examError) {
-            console.warn(`Error processing exam ${examId}:`, examError);
-          }
-        }
-        
-        console.log(`Final counts - Pending: ${pending.length}, Available: ${available.length}, Rejected: ${rejected.length}, Results: ${results.length}`);
-        
-        // Set all results
-        setExamResults(results.sort((a, b) => {
-          if (!a.finishTime && !b.finishTime) return 0;
-          if (!a.finishTime) return -1;
-          if (!b.finishTime) return 1;
-          return b.finishTime.getTime() - a.finishTime.getTime();
-        }));
-        
-        setAvailableExams(available);
-        setPendingApplications(pending.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        setRejectedApplications(rejected.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime()));
-        
-      } catch (error) {
-        console.error('Error fetching exam results:', error);
-        setExamResults([]);
-        setAvailableExams([]);
-        setPendingApplications([]);
-        setRejectedApplications([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
   }, [user?.id]);
 
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
-    // Clear validation error when user starts typing
-    if (editValidationErrors[e.target.name]) {
-      setEditValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[e.target.name];
-        return newErrors;
-      });
+  const loadStudentData = async () => {
+    try {
+      const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
+      const q = query(studentsRef, where("username", "==", user.username), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const studentDoc = querySnapshot.docs[0];
+        const data = { id: studentDoc.id, ...studentDoc.data() };
+        setStudentData(data);
+        
+        // Initialize edit form with current data
+        setEditFormData({
+          fullName: data.fullName || '',
+          major: data.major || '',
+          className: data.className || '',
+          university: data.university || '',
+          whatsapp: data.whatsapp || '',
+          password: '',
+          confirmPassword: ''
+        });
+      }
+    } catch (error) {
+      console.error('Error loading student data:', error);
     }
   };
 
-  const validateUniqueNIM = async () => {
-    // Only validate if NIM has changed
-    if (editFormData.nim === studentProfile?.nim) {
-      return {};
+  const loadExamHistory = async () => {
+    try {
+      // Use collection group query to get all sessions for this student
+      const sessionsQuery = query(
+        collectionGroup(db, 'sessions'),
+        where('studentId', '==', user.id),
+        orderBy('startTime', 'desc'),
+        limit(50)
+      );
+      
+      const sessionsSnapshot = await getDocs(sessionsQuery);
+      const history: ExamHistory[] = [];
+      
+      for (const sessionDoc of sessionsSnapshot.docs) {
+        const sessionData = sessionDoc.data();
+        
+        // Extract exam ID from the document path
+        const examId = sessionDoc.ref.parent.parent?.id;
+        if (!examId) continue;
+        
+        // Get exam details
+        const examDocRef = doc(db, `artifacts/${appId}/public/data/exams`, examId);
+        try {
+          const examSnapshot = await getDocs(query(collection(db, `artifacts/${appId}/public/data/exams`), where('__name__', '==', examId), limit(1)));
+          if (!examSnapshot.empty) {
+            const examData = examSnapshot.docs[0].data();
+            
+            history.push({
+              id: sessionDoc.id,
+              examName: examData.name || 'Unknown Exam',
+              examCode: examData.code || 'N/A',
+              status: sessionData.status || 'unknown',
+              finalScore: sessionData.finalScore,
+              violations: sessionData.violations || 0,
+              startTime: sessionData.startTime?.toDate() || new Date(),
+              finishTime: sessionData.finishTime?.toDate()
+            });
+          }
+        } catch (examError) {
+          console.error('Error loading exam details:', examError);
+        }
+      }
+      
+      setExamHistory(history);
+    } catch (error) {
+      console.error('Error loading exam history:', error);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    const studentsRef = collection(db, `artifacts/${appId}/public/data/students`);
-    const errors: {[key: string]: string} = {};
-    
-    // Check for duplicate NIM (excluding current user)
-    const nimQuery = query(studentsRef, where("nim", "==", editFormData.nim));
-    const nimSnapshot = await getDocs(nimQuery);
-    
-    // Check if any document found is not the current user
-    const duplicateNIM = nimSnapshot.docs.find(doc => doc.id !== user.id);
-    if (duplicateNIM) {
-      errors.nim = "NIM/NIS sudah terdaftar oleh siswa lain. Gunakan NIM/NIS yang berbeda.";
+  const loadApplications = async () => {
+    try {
+      // This is a simplified version - in a real app you'd need to query across all exams
+      // For now, we'll just show empty applications
+      setApplications([]);
+    } catch (error) {
+      console.error('Error loading applications:', error);
     }
-    
-    return errors;
+  };
+
+  const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
+    setEditError('');
+    setEditSuccess('');
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,41 +175,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         return;
       }
       
-      setNewProfileImage(file);
+      setProfileImage(file);
       
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
-        setNewProfileImagePreview(e.target?.result as string);
+        setProfileImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
       setEditError('');
-    }
-  };
-
-  const uploadProfileImage = async (): Promise<string | null> => {
-    if (!profileImage) return null;
-    
-    try {
-      setIsUploadingImage(true);
-      
-      // Compress image before upload
-      const compressedImage = await compressImage(profileImage);
-      
-      const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-      const storage = getStorage();
-      const imageRef = ref(storage, `profile-images/${user.id}/${Date.now()}_profile.jpg`);
-      
-      const snapshot = await uploadBytes(imageRef, compressedImage);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      return downloadURL;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setEditError('Gagal mengupload gambar profil. Silakan coba lagi.');
-      return null;
-    } finally {
-      setIsUploadingImage(false);
     }
   };
 
@@ -328,8 +194,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       const img = new Image();
       
       img.onload = () => {
-        // Calculate new dimensions (max 400x400)
-        const maxSize = 400;
+        // Calculate new dimensions (max 200x200)
+        const maxSize = 200;
         let { width, height } = img;
         
         if (width > height) {
@@ -351,816 +217,620 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
         
         canvas.toBlob((blob) => {
           resolve(blob || file);
-        }, 'image/jpeg', 0.8);
+        }, 'image/jpeg', 0.6);
       };
       
       img.src = URL.createObjectURL(file);
     });
   };
+
+  const uploadProfileImage = async (studentId: string): Promise<string | null> => {
+    if (!profileImage) return null;
+    
+    try {
+      setIsUploadingImage(true);
+      
+      // Compress image before upload
+      const compressedImage = await compressImage(profileImage);
+      
+      const storage = getStorage();
+      const imageRef = ref(storage, `profile-images/${studentId}/${Date.now()}_profile.jpg`);
+      
+      const snapshot = await uploadBytes(imageRef, compressedImage);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError('');
-    setEditValidationErrors({});
-    setIsUpdating(true);
-
-    // Validate password if provided
-    if (editFormData.password && editFormData.password !== editFormData.confirmPassword) {
-      setEditError('Password tidak cocok');
-      setIsUpdating(false);
-      return;
-    }
-
-    if (editFormData.password && editFormData.password.length < 6) {
-      setEditError('Password minimal 6 karakter');
-      setIsUpdating(false);
-      return;
-    }
+    setEditSuccess('');
+    setIsUpdatingProfile(true);
 
     try {
-      // Validate unique NIM
-      const uniqueFieldErrors = await validateUniqueNIM();
-      if (Object.keys(uniqueFieldErrors).length > 0) {
-        setEditValidationErrors(uniqueFieldErrors);
-        setIsUpdating(false);
-        return;
+      // Validate password if provided
+      if (editFormData.password) {
+        if (editFormData.password.length < 6) {
+          setEditError('Password minimal 6 karakter');
+          setIsUpdatingProfile(false);
+          return;
+        }
+        
+        if (editFormData.password !== editFormData.confirmPassword) {
+          setEditError('Password tidak cocok');
+          setIsUpdatingProfile(false);
+          return;
+        }
+      }
+
+      // Upload profile image if exists
+      let profilePhotoURL = studentData?.profilePhoto || '';
+      if (profileImage) {
+        try {
+          const uploadPromise = uploadProfileImage(studentData.id);
+          const timeoutPromise = new Promise<string | null>((_, reject) => 
+            setTimeout(() => reject(new Error('Upload timeout')), 120000)
+          );
+          
+          const uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
+          if (uploadResult) {
+            profilePhotoURL = uploadResult;
+          }
+        } catch (uploadError) {
+          console.error('Image upload failed:', uploadError);
+          setEditError('Upload gambar gagal, tapi profil lainnya akan tetap diupdate');
+        }
       }
 
       // Prepare update data
       const updateData: any = {
         fullName: editFormData.fullName,
-        nim: editFormData.nim,
         major: editFormData.major,
         className: editFormData.className,
         university: editFormData.university,
         whatsapp: editFormData.whatsapp,
+        profilePhoto: profilePhotoURL,
         updatedAt: new Date()
       };
 
-      // Only update password if provided
+      // Add password if provided
       if (editFormData.password) {
         updateData.password = editFormData.password;
       }
 
-      // Upload new profile image if provided
-      if (newProfileImage) {
-        const newImageURL = await uploadProfileImage();
-        if (newImageURL) {
-          updateData.profilePhoto = newImageURL;
-        }
-      }
-
-      // Update in Firestore
-      await updateDoc(doc(db, `artifacts/${appId}/public/data/students`, user.id), updateData);
+      // Update student document
+      const studentDocRef = doc(db, `artifacts/${appId}/public/data/students`, studentData.id);
+      await updateDoc(studentDocRef, updateData);
 
       // Update local state
-      const updatedProfile = { ...studentProfile, ...updateData };
-      setStudentProfile(updatedProfile);
-      
-      // Reset form
-      setEditFormData({
-        ...editFormData,
-        profilePhoto: updatedProfile.profilePhoto || '',
-        password: '',
-        confirmPassword: ''
-      });
-      
-      // Reset image states
-      setNewProfileImage(null);
-      setNewProfileImagePreview('');
-      
-      setShowEditProfile(false);
-      alert('Profil berhasil diperbarui!');
-    } catch (error: any) {
+      setStudentData({ ...studentData, ...updateData });
+      setEditSuccess('Profil berhasil diperbarui!');
+      setIsEditingProfile(false);
+      setProfileImage(null);
+      setProfileImagePreview('');
+      setEditFormData({ ...editFormData, password: '', confirmPassword: '' });
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
       setEditError('Gagal memperbarui profil. Silakan coba lagi.');
     } finally {
-      setIsUpdating(false);
+      setIsUpdatingProfile(false);
     }
   };
 
-  if (isLoading) {
-    return <div className="text-center p-8">Memuat dashboard...</div>;
-  }
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      'finished': { color: 'bg-green-600', text: 'Selesai' },
+      'started': { color: 'bg-blue-600', text: 'Sedang Berlangsung' },
+      'disqualified': { color: 'bg-red-600', text: 'Diskualifikasi' },
+      'pending': { color: 'bg-yellow-600', text: 'Menunggu' },
+      'approved': { color: 'bg-green-600', text: 'Disetujui' },
+      'rejected': { color: 'bg-red-600', text: 'Ditolak' }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || { color: 'bg-gray-600', text: status };
+    
+    return (
+      <span className={`px-3 py-1 text-xs font-bold rounded-full text-white ${config.color}`}>
+        {config.text}
+      </span>
+    );
+  };
 
-  if (!user || !user.id) {
-    return <div className="text-center p-8 text-red-400">Error: User data tidak valid</div>;
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+        <span className="ml-3 text-lg">Memuat data...</span>
+      </div>
+    );
   }
 
   return (
     <div>
-      <div className="flex justify-end items-center mb-6">
+      {canGoBack && (
         <button 
-          onClick={() => navigateTo('home')} 
-          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
+          onClick={navigateBack} 
+          className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
         >
-          Logout
+          &larr; Kembali
+        </button>
+      )}
+
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold mb-2">Dashboard Siswa</h2>
+        <p className="text-gray-400">Selamat datang, {studentData?.fullName || user?.username}</p>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 mb-6 border-b border-gray-700">
+        <button 
+          onClick={() => setActiveTab('dashboard')} 
+          className={`py-2 px-4 font-medium ${
+            activeTab === 'dashboard' 
+              ? 'border-b-2 border-indigo-500 text-white' 
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          📊 Dashboard
+        </button>
+        <button 
+          onClick={() => setActiveTab('history')} 
+          className={`py-2 px-4 font-medium ${
+            activeTab === 'history' 
+              ? 'border-b-2 border-indigo-500 text-white' 
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          📚 Riwayat Ujian
+        </button>
+        <button 
+          onClick={() => setActiveTab('profile')} 
+          className={`py-2 px-4 font-medium ${
+            activeTab === 'profile' 
+              ? 'border-b-2 border-indigo-500 text-white' 
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          👤 Profil
         </button>
       </div>
-      
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-4">Dashboard Siswa</h2>
-        {studentProfile && (
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-6">
+          {/* Quick Actions */}
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                {studentProfile.profilePhoto ? (
-                  <img
-                    src={studentProfile.profilePhoto}
-                    alt="Profile"
-                    className="w-16 h-16 rounded-full object-cover border-2 border-indigo-500"
-                  />
-                ) : (
-                  <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
-                    <span className="text-2xl font-bold text-white">
-                      {studentProfile.fullName.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-xl font-bold">{studentProfile.fullName}</h3>
-                  <p className="text-gray-400">{studentProfile.major} - {studentProfile.className}</p>
-                  <p className="text-gray-400">NIM/NIS: {studentProfile.nim || 'N/A'}</p>
-                  <p className="text-gray-400">{studentProfile.university}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowEditProfile(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
+            <h3 className="text-xl font-bold mb-4">🎯 Aksi Cepat</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button 
+                onClick={() => navigateTo('student_join', { currentUser: user })}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-lg text-left"
               >
-                Edit Profil
+                <div className="text-lg">📝 Ikuti Ujian Baru</div>
+                <div className="text-sm text-indigo-200">Masukkan kode ujian untuk bergabung</div>
+              </button>
+              <button 
+                onClick={() => setActiveTab('history')}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-left"
+              >
+                <div className="text-lg">📚 Lihat Riwayat</div>
+                <div className="text-sm text-green-200">Cek hasil ujian sebelumnya</div>
               </button>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Edit Profile Modal */}
-      {showEditProfile && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold">Edit Profil</h3>
-              <button
-                onClick={() => {
-                  setShowEditProfile(false);
-                  setEditError('');
-                  setEditValidationErrors({});
-                }}
-                className="text-gray-400 hover:text-white text-2xl"
+          {/* Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-blue-600 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold">{examHistory.length}</div>
+              <div className="text-blue-200">Total Ujian</div>
+            </div>
+            <div className="bg-green-600 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold">
+                {examHistory.filter(exam => exam.status === 'finished').length}
+              </div>
+              <div className="text-green-200">Ujian Selesai</div>
+            </div>
+            <div className="bg-yellow-600 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold">
+                {examHistory.filter(exam => exam.finalScore && exam.finalScore >= 70).length}
+              </div>
+              <div className="text-yellow-200">Nilai ≥ 70</div>
+            </div>
+          </div>
+
+          {/* Recent Exams */}
+          <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
+            <h3 className="text-xl font-bold mb-4">📋 Ujian Terbaru</h3>
+            {examHistory.length === 0 ? (
+              <p className="text-gray-400 text-center py-8">
+                Belum ada riwayat ujian. Klik "Ikuti Ujian Baru" untuk memulai.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {examHistory.slice(0, 3).map(exam => (
+                  <div key={exam.id} className="flex justify-between items-center p-4 bg-gray-700 rounded-lg">
+                    <div>
+                      <h4 className="font-bold">{exam.examName}</h4>
+                      <p className="text-sm text-gray-400">
+                        {exam.startTime.toLocaleDateString('id-ID')} • Kode: {exam.examCode}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      {getStatusBadge(exam.status)}
+                      {exam.finalScore !== undefined && (
+                        <div className="text-lg font-bold mt-1">
+                          Nilai: {exam.finalScore.toFixed(1)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* History Tab */}
+      {activeTab === 'history' && (
+        <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
+          <h3 className="text-xl font-bold mb-4">📚 Riwayat Ujian Lengkap</h3>
+          {examHistory.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">📝</div>
+              <p className="text-gray-400 text-lg mb-4">Belum ada riwayat ujian</p>
+              <button 
+                onClick={() => navigateTo('student_join', { currentUser: user })}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
               >
-                ×
+                Ikuti Ujian Pertama
               </button>
             </div>
-
-            {/* Important Notes */}
-            <div className="mb-6 bg-yellow-900 border border-yellow-500 p-4 rounded-lg">
-              <h4 className="text-yellow-300 font-bold mb-2">⚠️ Catatan Penting:</h4>
-              <ul className="text-yellow-200 text-sm space-y-1">
-                <li>• NIM/NIS harus unik dan tidak boleh sama dengan siswa lain</li>
-                <li>• Username tidak dapat diubah setelah registrasi</li>
-                <li>• Password baru minimal 6 karakter (kosongkan jika tidak ingin mengubah)</li>
-                <li>• Pastikan semua data yang dimasukkan benar dan valid</li>
-              </ul>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="p-4">Nama Ujian</th>
+                    <th className="p-4">Kode</th>
+                    <th className="p-4">Tanggal</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Pelanggaran</th>
+                    <th className="p-4">Nilai</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {examHistory.map(exam => (
+                    <tr key={exam.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                      <td className="p-4 font-semibold">{exam.examName}</td>
+                      <td className="p-4 font-mono text-sm">{exam.examCode}</td>
+                      <td className="p-4 text-sm">
+                        {exam.startTime.toLocaleDateString('id-ID')}
+                        <br />
+                        <span className="text-gray-400">
+                          {exam.startTime.toLocaleTimeString('id-ID', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </span>
+                      </td>
+                      <td className="p-4">{getStatusBadge(exam.status)}</td>
+                      <td className="p-4">
+                        <span className={`font-bold ${
+                          exam.violations > 0 ? 'text-red-400' : 'text-green-400'
+                        }`}>
+                          {exam.violations}/3
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {exam.finalScore !== undefined ? (
+                          <span className={`font-bold text-lg ${
+                            exam.finalScore >= 70 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {exam.finalScore.toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          )}
+        </div>
+      )}
 
-            <form onSubmit={handleUpdateProfile} className="space-y-4">
+      {/* Profile Tab */}
+      {activeTab === 'profile' && (
+        <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold">👤 Profil Saya</h3>
+            <button 
+              onClick={() => setIsEditingProfile(!isEditingProfile)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
+            >
+              {isEditingProfile ? 'Batal Edit' : 'Edit Profil'}
+            </button>
+          </div>
+
+          {editSuccess && (
+            <div className="mb-4 bg-green-900 border border-green-500 p-3 rounded-md">
+              <p className="text-green-200">{editSuccess}</p>
+            </div>
+          )}
+
+          {editError && (
+            <div className="mb-4 bg-red-900 border border-red-500 p-3 rounded-md">
+              <p className="text-red-200">{editError}</p>
+            </div>
+          )}
+
+          {!isEditingProfile ? (
+            // View Profile
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="text-center mb-6">
+                  {studentData?.profilePhoto ? (
+                    <img
+                      src={studentData.profilePhoto}
+                      alt="Profile"
+                      className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-gray-600"
+                    />
+                  ) : (
+                    <div className="w-32 h-32 bg-indigo-600 rounded-full flex items-center justify-center mx-auto border-4 border-gray-600">
+                      <span className="text-4xl font-bold text-white">
+                        {(studentData?.fullName || 'U').charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Nama Lengkap</label>
+                  <p className="text-white font-semibold">{studentData?.fullName || 'Tidak tersedia'}</p>
+                </div>
+                
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">NIM</label>
+                  <p className="text-white font-mono">{studentData?.nim || 'Tidak tersedia'}</p>
+                </div>
+                
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                  <p className="text-white font-mono">{studentData?.username || 'Tidak tersedia'}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Program Studi</label>
+                  <p className="text-white">{studentData?.major || 'Tidak tersedia'}</p>
+                </div>
+                
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Kelas</label>
+                  <p className="text-white">{studentData?.className || 'Tidak tersedia'}</p>
+                </div>
+                
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Universitas</label>
+                  <p className="text-white">{studentData?.university || 'Tidak tersedia'}</p>
+                </div>
+                
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">WhatsApp</label>
+                  <p className="text-white">{studentData?.whatsapp || 'Tidak tersedia'}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Edit Profile Form
+            <form onSubmit={handleUpdateProfile} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column - Personal Data */}
                 <div className="space-y-4">
-                  <h4 className="text-lg font-semibold text-gray-300 border-b border-gray-600 pb-2">Data Pribadi</h4>
+                  <div className="text-center mb-6">
+                    {profileImagePreview ? (
+                      <img
+                        src={profileImagePreview}
+                        alt="Preview"
+                        className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-gray-600"
+                      />
+                    ) : studentData?.profilePhoto ? (
+                      <img
+                        src={studentData.profilePhoto}
+                        alt="Profile"
+                        className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-gray-600"
+                      />
+                    ) : (
+                      <div className="w-32 h-32 bg-indigo-600 rounded-full flex items-center justify-center mx-auto border-4 border-gray-600">
+                        <span className="text-4xl font-bold text-white">
+                          {(editFormData.fullName || 'U').charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="mt-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Format: JPG, PNG, GIF. Maksimal 5MB.
+                      </p>
+                    </div>
+                  </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Nama Lengkap</label>
-                    <input 
-                      name="fullName" 
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Lengkap</label>
+                    <input
+                      name="fullName"
                       type="text"
                       value={editFormData.fullName}
-                      onChange={handleEditChange} 
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                      required 
+                      onChange={handleEditFormChange}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Program Studi/Jurusan</label>
-                    <input 
-                      name="major" 
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Program Studi</label>
+                    <input
+                      name="major"
                       type="text"
                       value={editFormData.major}
-                      onChange={handleEditChange} 
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                      required 
+                      onChange={handleEditFormChange}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Kelas</label>
-                    <input 
-                      name="className" 
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Kelas</label>
+                    <input
+                      name="className"
                       type="text"
                       value={editFormData.className}
-                      onChange={handleEditChange} 
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                      required 
+                      onChange={handleEditFormChange}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
                     />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Universitas/Sekolah</label>
-                    <input 
-                      name="university" 
-                      type="text"
-                      value={editFormData.university}
-                      onChange={handleEditChange} 
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                      required 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Nomor WhatsApp</label>
-                    <input 
-                      name="whatsapp" 
-                      type="tel"
-                      value={editFormData.whatsapp}
-                      onChange={handleEditChange} 
-                      placeholder="08123456789"
-                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                      required 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Foto Profil
-                    </label>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        {newProfileImagePreview ? (
-                          <img
-                            src={newProfileImagePreview}
-                            alt="Preview Baru"
-                            className="w-20 h-20 rounded-full object-cover border-2 border-indigo-500"
-                          />
-                        ) : studentProfile.profilePhoto ? (
-                          <img
-                            src={studentProfile.profilePhoto}
-                            alt="Foto Saat Ini"
-                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-600"
-                          />
-                        ) : (
-                          <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center border-2 border-gray-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-grow">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">
-                          Format: JPG, PNG, GIF. Maksimal 5MB. Kosongkan jika tidak ingin mengubah.
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 </div>
                 
-                {/* Right Column - Account Data */}
                 <div className="space-y-4">
-                  <h4 className="text-lg font-semibold text-gray-300 border-b border-gray-600 pb-2">Data Akun</h4>
-                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">NIM/NIS (Nomor Induk)</label>
-                    <input 
-                      name="nim" 
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Universitas</label>
+                    <input
+                      name="university"
                       type="text"
-                      value={editFormData.nim}
-                      onChange={handleEditChange} 
-                      className={`w-full p-3 bg-gray-700 rounded-md border ${
-                        editValidationErrors.nim ? 'border-red-500' : 'border-gray-600'
-                      } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-                      required 
+                      value={editFormData.university}
+                      onChange={handleEditFormChange}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
                     />
-                    {editValidationErrors.nim && (
-                      <p className="text-red-400 text-xs mt-1">{editValidationErrors.nim}</p>
-                    )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                    <input 
-                      type="text"
-                      value={user.username}
-                      disabled
-                      className="w-full p-3 bg-gray-600 rounded-md border border-gray-500 text-gray-400 cursor-not-allowed" 
+                    <label className="block text-sm font-medium text-gray-300 mb-2">WhatsApp</label>
+                    <input
+                      name="whatsapp"
+                      type="tel"
+                      value={editFormData.whatsapp}
+                      onChange={handleEditFormChange}
+                      className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
                     />
-                    <p className="text-xs text-gray-500 mt-1">Username tidak dapat diubah</p>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Password Baru (Opsional)</label>
-                    <div className="relative">
-                      <input 
-                        name="password" 
-                        type={showEditPassword ? "text" : "password"}
-                        value={editFormData.password}
-                        onChange={handleEditChange} 
-                        placeholder="Kosongkan jika tidak ingin mengubah"
-                        className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-12" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowEditPassword(!showEditPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
-                      >
-                        {showEditPassword ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Konfirmasi Password Baru</label>
-                    <div className="relative">
-                      <input 
-                        name="confirmPassword" 
-                        type={showEditConfirmPassword ? "text" : "password"}
-                        value={editFormData.confirmPassword}
-                        onChange={handleEditChange} 
-                        placeholder="Ulangi password baru"
-                        className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-12" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowEditConfirmPassword(!showEditConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
-                      >
-                        {showEditConfirmPassword ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
+                  <div className="bg-yellow-900 border border-yellow-500 p-4 rounded-lg">
+                    <h4 className="text-yellow-300 font-bold mb-2">🔐 Ubah Password (Opsional)</h4>
+                    <p className="text-yellow-200 text-sm mb-3">Kosongkan jika tidak ingin mengubah password</p>
+                    
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <input
+                          name="password"
+                          type={showEditPassword ? "text" : "password"}
+                          value={editFormData.password}
+                          onChange={handleEditFormChange}
+                          placeholder="Password baru (minimal 6 karakter)"
+                          className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEditPassword(!showEditPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                        >
+                          {showEditPassword ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      
+                      <div className="relative">
+                        <input
+                          name="confirmPassword"
+                          type={showEditConfirmPassword ? "text" : "password"}
+                          value={editFormData.confirmPassword}
+                          onChange={handleEditFormChange}
+                          placeholder="Konfirmasi password baru"
+                          className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEditConfirmPassword(!showEditConfirmPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                        >
+                          {showEditConfirmPassword ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {editError && (
-                <div className="bg-red-900 border border-red-500 p-3 rounded-md">
-                  <p className="text-red-200 text-sm">{editError}</p>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-4 pt-6">
-                <button 
+              
+              <div className="flex justify-end space-x-4">
+                <button
                   type="button"
                   onClick={() => {
-                    setShowEditProfile(false);
+                    setIsEditingProfile(false);
+                    setProfileImage(null);
+                    setProfileImagePreview('');
                     setEditError('');
-                    setEditValidationErrors({});
+                    setEditSuccess('');
                   }}
                   className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg"
                 >
                   Batal
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={isUpdating || isUploadingImage}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:bg-indigo-400"
+                <button
+                  type="submit"
+                  disabled={isUpdatingProfile || isUploadingImage}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:bg-indigo-400 flex items-center"
                 >
-                  {isUpdating ? (isUploadingImage ? 'Mengupload gambar...' : 'Menyimpan...') : 'Simpan Perubahan'}
+                  {isUpdatingProfile ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {isUploadingImage ? 'Mengupload...' : 'Menyimpan...'}
+                    </>
+                  ) : (
+                    'Simpan Perubahan'
+                  )}
                 </button>
               </div>
             </form>
-          </div>
+          )}
         </div>
       )}
-
-      {/* Status Aplikasi Ujian Section */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold">Status Aplikasi Ujian</h3>
-          <button 
-            onClick={() => navigateTo('student_join_exam', { currentUser: user })}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
-          >
-            {isUpdatingProfile ? (
-              isUploadingImage ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Mengupload gambar...
-                </div>
-              ) : 'Menyimpan...'
-            ) : 'Simpan Perubahan'}
-          </button>
-        </div>
-
-        {/* Ujian Siap Dimulai (Approved & Active) */}
-        {availableExams.length > 0 && (
-          <div className="mb-6 bg-green-800 border border-green-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">{availableExams.length > 1 ? '📚' : '🎯'}</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-green-400">
-                  {availableExams.length > 1 ? `${availableExams.length} Ujian Siap Dimulai` : 'Ujian Siap Dimulai'}
-                </h4>
-                <p className="text-green-200 text-sm">
-                  {availableExams.length > 1 
-                    ? 'Beberapa ujian sudah disetujui dan bisa dimulai sekarang' 
-                    : 'Ujian yang sudah disetujui dan bisa dimulai sekarang'
-                  }
-                </p>
-              </div>
-            </div>
-            <div className={`grid gap-4 ${
-              availableExams.length === 1 
-                ? 'grid-cols-1' 
-                : availableExams.length === 2 
-                ? 'grid-cols-1 md:grid-cols-2' 
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {availableExams.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-green-400 hover:bg-gray-600 transition-colors">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white">
-                      ✅ DISETUJUI
-                    </span>
-                  </div>
-                  
-                  {/* Exam Status Check */}
-                  {(() => {
-                    const now = new Date();
-                    const startTime = new Date(exam.startTime);
-                    const endTime = new Date(exam.endTime);
-                    
-                    if (now < startTime) {
-                      return (
-                        <div className="bg-blue-900 border border-blue-600 p-3 rounded-md mb-3">
-                          <p className="text-blue-200 text-sm text-center">
-                            ⏰ Ujian akan dimulai pada:<br/>
-                            <span className="font-bold">{startTime.toLocaleString('id-ID')}</span>
-                          </p>
-                        </div>
-                      );
-                    } else if (now > endTime) {
-                      return (
-                        <div className="bg-gray-900 border border-gray-600 p-3 rounded-md mb-3">
-                          <p className="text-gray-400 text-sm text-center">
-                            ⏰ Ujian telah berakhir
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  
-                  <button
-                    onClick={() => navigateTo('student_precheck', { exam, currentUser: user })}
-                    disabled={(() => {
-                      const now = new Date();
-                      const startTime = new Date(exam.startTime);
-                      const endTime = new Date(exam.endTime);
-                      return exam.status !== 'published' || now < startTime || now > endTime;
-                    })()}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center disabled:bg-gray-500 disabled:cursor-not-allowed"
-                  >
-                    {(() => {
-                      const now = new Date();
-                      const startTime = new Date(exam.startTime);
-                      const endTime = new Date(exam.endTime);
-                      
-                      if (exam.status !== 'published') {
-                        return '📝 Belum Dipublikasi';
-                      }
-                      if (exam.status !== 'published') {
-                        return (
-                          <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md mb-3">
-                            <p className="text-yellow-200 text-sm text-center">
-                              📝 Ujian belum dipublikasi oleh dosen
-                            </p>
-                          </div>
-                        );
-                      }
-                      
-                      if (now < startTime) {
-                        return '⏰ Belum Dimulai';
-                      } else if (now > endTime) {
-                        return '⏰ Sudah Berakhir';
-                      } else {
-                        return '🚀 Mulai Ujian Sekarang';
-                      }
-                    })()}
-                  </button>
-                </div>
-              ))}
-            </div>
-            
-            {/* Summary Info */}
-            {availableExams.length > 1 && (
-              <div className="mt-4 bg-green-900 border border-green-600 p-3 rounded-md">
-                <p className="text-green-200 text-sm text-center">
-                  💡 <strong>Tips:</strong> Anda memiliki {availableExams.length} ujian yang disetujui. 
-                  Pastikan untuk mengerjakan semua ujian sesuai jadwal yang ditentukan.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Aplikasi Disetujui tapi Belum Dipublikasi (Purple) */}
-        {rejectedApplications.filter(app => app.specialStatus === 'approved_unpublished').length > 0 && (
-          <div className="mb-6 bg-purple-800 border border-purple-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">✅</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-purple-400">Aplikasi Disetujui</h4>
-                <p className="text-purple-200 text-sm">
-                  Aplikasi disetujui, menunggu publikasi ujian oleh dosen
-                </p>
-              </div>
-            </div>
-            <div className={`grid gap-4 ${
-              rejectedApplications.filter(app => app.specialStatus === 'approved_unpublished').length === 1 
-                ? 'grid-cols-1' 
-                : rejectedApplications.filter(app => app.specialStatus === 'approved_unpublished').length === 2 
-                ? 'grid-cols-1 md:grid-cols-2' 
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {rejectedApplications.filter(app => app.specialStatus === 'approved_unpublished').map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-purple-400">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-purple-600 text-white">
-                      ✅ DISETUJUI
-                    </span>
-                  </div>
-                  <div className="bg-purple-900 border border-purple-600 p-3 rounded-md">
-                    <p className="text-purple-200 text-sm text-center">
-                      📝 Aplikasi Anda untuk ujian "<strong>{exam.name}</strong>" telah disetujui!
-                      <br/><br/>
-                      Ujian belum dipublikasikan oleh dosen. Silakan tunggu hingga ujian siap dimulai.
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Aplikasi Menunggu Konfirmasi (Yellow) */}
-        {pendingApplications.length > 0 && (
-          <div className="mb-6 bg-yellow-800 border border-yellow-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">⏳</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-yellow-400">
-                  {pendingApplications.length === 1 ? 'Menunggu Konfirmasi Dosen' : `${pendingApplications.length} Ujian Menunggu Konfirmasi`}
-                </h4>
-                <p className="text-yellow-200 text-sm">
-                  {pendingApplications.length === 1 
-                    ? 'Aplikasi ujian yang sedang menunggu persetujuan dosen'
-                    : 'Beberapa aplikasi ujian sedang menunggu persetujuan dosen'}
-                </p>
-              </div>
-            </div>
-            <div className={`grid gap-4 ${
-              pendingApplications.length === 1 
-                ? 'grid-cols-1' 
-                : pendingApplications.length === 2 
-                ? 'grid-cols-1 md:grid-cols-2' 
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {pendingApplications.map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-yellow-400">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-600 text-white">
-                      ⏳ MENUNGGU
-                    </span>
-                  </div>
-                  <div className="bg-yellow-900 border border-yellow-600 p-3 rounded-md">
-                    <p className="text-yellow-200 text-sm text-center">
-                      💡 Menunggu persetujuan dari dosen. Silakan tunggu konfirmasi.
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Aplikasi Ditolak (Red) */}
-        {rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length > 0 && (
-          <div className="mb-6 bg-red-800 border border-red-500 p-6 rounded-lg shadow-lg">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mr-4">
-                <span className="text-2xl">❌</span>
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-red-400">
-                  {rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length === 1 
-                    ? 'Aplikasi Ditolak' 
-                    : `${rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length} Aplikasi Ditolak`}
-                </h4>
-                <p className="text-red-200 text-sm">
-                  {rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length === 1
-                    ? 'Aplikasi ujian yang ditolak oleh dosen'
-                    : 'Beberapa aplikasi ujian ditolak oleh dosen'}
-                </p>
-              </div>
-            </div>
-            <div className={`grid gap-4 ${
-              rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length === 1 
-                ? 'grid-cols-1' 
-                : rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length === 2 
-                ? 'grid-cols-1 md:grid-cols-2' 
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').map(exam => (
-                <div key={exam.id} className="bg-gray-700 p-4 rounded-lg border border-red-400">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-grow">
-                      <h5 className="font-bold text-lg text-white">{exam.name}</h5>
-                      <p className="text-gray-300 text-sm">Kode: <span className="font-mono bg-gray-600 px-2 py-1 rounded">{exam.code}</span></p>
-                      <div className="mt-2 text-xs text-gray-400">
-                        <p>📅 Diajukan: {exam.appliedAt.toLocaleString('id-ID')}</p>
-                        <p>📅 Mulai: {new Date(exam.startTime).toLocaleString('id-ID')}</p>
-                        <p>⏰ Selesai: {new Date(exam.endTime).toLocaleString('id-ID')}</p>
-                        <p>⏱️ Durasi: {Math.round((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))} menit</p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
-                      ❌ DITOLAK
-                    </span>
-                  </div>
-                  <div className="bg-red-900 border border-red-600 p-3 rounded-md">
-                    <p className="text-red-200 text-sm text-center">
-                      💬 Hubungi dosen untuk informasi lebih lanjut
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {availableExams.length === 0 && pendingApplications.length === 0 && rejectedApplications.filter(app => app.specialStatus === 'approved_unpublished').length === 0 && rejectedApplications.filter(app => app.specialStatus !== 'approved_unpublished').length === 0 && (
-          <div className="bg-gray-800 border border-gray-600 p-8 rounded-lg text-center">
-            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">📝</span>
-            </div>
-            <h4 className="text-xl font-bold text-gray-400 mb-2">Belum Ada Aplikasi Ujian</h4>
-            <p className="text-gray-500 mb-4">
-              Anda belum mengajukan ujian apapun. Mulai dengan mengajukan ujian pertama Anda.
-            </p>
-            <button 
-              onClick={() => navigateTo('student_join_exam', { currentUser: user })}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg"
-            >
-              🚀 Ajukan Ujian Pertama
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Riwayat Ujian Section */}
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-bold">Riwayat Ujian Selesai</h3>
-      </div>
-      
-      <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
-        {examResults.length === 0 ? (
-          <div className="text-center p-8 text-gray-400">
-            <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">📊</span>
-            </div>
-            <p className="text-lg mb-2">Belum ada riwayat ujian yang selesai</p>
-            <p className="text-sm text-gray-500">Riwayat ujian akan muncul setelah Anda menyelesaikan ujian</p>
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="p-4">Nama Ujian</th>
-                <th className="p-4">Kode Ujian</th>
-                <th className="p-4">Nilai PG</th>
-                <th className="p-4">Nilai Essay</th>
-                <th className="p-4">Nilai Akhir</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Waktu Selesai</th>
-              </tr>
-            </thead>
-            <tbody>
-              {examResults.map(result => (
-                <tr key={result.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                  <td className="p-4 font-semibold">{result.examName}</td>
-                  <td className="p-4 text-gray-400 font-mono">{result.examCode || 'N/A'}</td>
-                  <td className="p-4">
-                    <span className={`font-bold ${
-                      result.status === 'disqualified' 
-                        ? 'text-red-400' 
-                        : result.finalScore >= 70 
-                        ? 'text-green-400' 
-                        : result.finalScore >= 60 
-                        ? 'text-yellow-400' 
-                        : 'text-red-400'
-                    }`}>
-                      {result.finalScore.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-gray-300">
-                      {result.essayScore !== undefined ? result.essayScore.toFixed(2) : 'N/A'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`font-bold ${
-                      result.status === 'disqualified' 
-                        ? 'text-red-400' 
-                        : (result.totalScore || result.finalScore) >= 70 
-                        ? 'text-green-400' 
-                        : (result.totalScore || result.finalScore) >= 60 
-                        ? 'text-yellow-400' 
-                        : 'text-red-400'
-                    }`}>
-                      {result.totalScore ? result.totalScore.toFixed(2) : result.finalScore.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                      result.status === 'finished' 
-                        ? 'bg-green-600 text-white' 
-                        : result.status === 'disqualified'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-yellow-600 text-white'
-                    }`}>
-                      {result.status === 'finished' ? 'Selesai' : 
-                       result.status === 'disqualified' ? 'Diskualifikasi' : 
-                       result.status === 'started' ? 'Sedang Berlangsung' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-400">
-                    {result.finishTime ? result.finishTime.toLocaleString('id-ID') : 'Belum selesai'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 };
