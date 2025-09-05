@@ -677,7 +677,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
       finishExam(`Diskualifikasi: ${reason}`);
     } else {
       setShowViolationModal(true);
-      // Modal will stay open until user dismisses it
+      setTimeout(() => setShowViolationModal(false), 3000);
+      
+      // Auto re-enter fullscreen after violation for first two violations
+      setTimeout(() => {
+        if (!isFinished && !isInFullscreen() && newViolations <= 2) {
+          enterFullscreen();
+        }
+      }, 1500);
     }
   };
 
@@ -897,7 +904,7 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
       </Modal>
 
       {showViolationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex justify-center items-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="bg-gray-800 border-2 border-yellow-500 p-8 rounded-lg text-center shadow-2xl">
             <AlertIcon />
             <h3 className="text-3xl font-bold text-yellow-400 mt-4">PERINGATAN!</h3>
@@ -909,22 +916,9 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
             <p className="text-sm text-gray-400 mt-2">
               Foto telah diambil sebagai bukti pelanggaran
             </p>
-            <div className="mt-6">
-              <button
-                onClick={() => {
-                  setShowViolationModal(false);
-                  if (!isInFullscreen()) {
-                    enterFullscreen();
-                  }
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
-              >
-                🔒 Lanjutkan Ujian (Fullscreen)
-              </button>
-            </div>
-            <div className="mt-3 bg-red-900 border border-red-500 p-3 rounded-md">
-              <p className="text-red-300 text-sm font-bold">
-                ⚠️ Klik tombol di atas untuk melanjutkan ujian
+            <div className="mt-4 bg-blue-900 border border-blue-500 p-3 rounded-md">
+              <p className="text-blue-300 text-sm font-bold">
+                💡 Tekan Enter atau Spasi untuk melanjutkan ujian
               </p>
             </div>
           </div>
