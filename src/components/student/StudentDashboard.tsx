@@ -355,7 +355,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
       
       img.src = URL.createObjectURL(file);
     });
-  };</parameter>
+  };
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError('');
