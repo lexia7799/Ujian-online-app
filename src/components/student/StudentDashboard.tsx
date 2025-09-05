@@ -762,7 +762,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, navigateTo, n
             onClick={() => navigateTo('student_join_exam', { currentUser: user })}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg"
           >
-            + Ajukan Ujian Baru
+            {isUpdatingProfile ? (
+              isUploadingImage ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Mengupload gambar...
+                </div>
+              ) : 'Menyimpan...'
+            ) : 'Simpan Perubahan'}
           </button>
         </div>
 

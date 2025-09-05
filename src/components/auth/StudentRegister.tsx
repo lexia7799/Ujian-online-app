@@ -480,7 +480,14 @@ const StudentRegister: React.FC<StudentRegisterProps> = ({ navigateTo, navigateB
             disabled={isLoading || isUploadingImage}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg disabled:bg-indigo-400"
           >
-            {isLoading ? (isUploadingImage ? 'Mengupload gambar...' : 'Mendaftar...') : 'Daftar'}
+            {isLoading ? (
+              isUploadingImage ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Mengupload gambar...
+                </div>
+              ) : 'Mendaftar...'
+            ) : 'Daftar'}
           </button>
         </form>
         <div className="mt-4 text-center">
