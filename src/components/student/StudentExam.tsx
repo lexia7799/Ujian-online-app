@@ -685,26 +685,24 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
       
       // For first two violations, auto re-enter fullscreen after showing warning
       if (newViolations <= 2) {
-        setTimeout(() => {
-          setShowViolationModal(false);
-          // Auto re-enter fullscreen with multiple attempts
-          const attemptFullscreen = async (attempts = 0) => {
-            if (attempts >= 5 || isFinished) return;
-            
-            try {
-              console.log(`🔄 Attempting fullscreen re-entry (attempt ${attempts + 1})`);
-              await enterFullscreen();
-              console.log("✅ Fullscreen re-entry successful");
-            } catch (error) {
-              console.warn(`❌ Fullscreen attempt ${attempts + 1} failed:`, error);
-              // Retry after a short delay
-              setTimeout(() => attemptFullscreen(attempts + 1), 500);
-            }
-          };
+        // Immediately attempt fullscreen re-entry
+        const attemptFullscreen = async (attempts = 0) => {
+          if (attempts >= 5 || isFinished) return;
           
-          // Start fullscreen attempts after a brief delay
-          setTimeout(() => attemptFullscreen(), 200);
-        }, 3000);
+          try {
+            console.log(`🔄 Attempting fullscreen re-entry (attempt ${attempts + 1})`);
+            await enterFullscreen();
+            console.log("✅ Fullscreen re-entry successful - hiding violation modal");
+            setShowViolationModal(false); // Hide modal when fullscreen is successful
+          } catch (error) {
+            console.warn(`❌ Fullscreen attempt ${attempts + 1} failed:`, error);
+            // Retry after a short delay
+            setTimeout(() => attemptFullscreen(attempts + 1), 500);
+          }
+        };
+        
+        // Start fullscreen attempts immediately
+        setTimeout(() => attemptFullscreen(), 200);
       }
     }
   };
