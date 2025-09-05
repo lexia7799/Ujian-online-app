@@ -401,7 +401,6 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
   // Fullscreen functions
   const enterFullscreen = async () => {
     try {
-      console.log("🔄 Attempting to enter fullscreen...");
       const elem = document.documentElement;
       if (elem.requestFullscreen) {
         await elem.requestFullscreen();
@@ -412,24 +411,20 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
       } else if ((elem as any).msRequestFullscreen) {
         await (elem as any).msRequestFullscreen();
       }
-      console.log("✅ Fullscreen entered successfully");
       fullscreenRetryCount.current = 0;
     } catch (error) {
-      console.error("❌ Failed to enter fullscreen:", error);
+      console.error("Failed to enter fullscreen:", error);
       fullscreenRetryCount.current++;
       
       if (fullscreenRetryCount.current < maxFullscreenRetries) {
-        console.log(`🔄 Retrying fullscreen (${fullscreenRetryCount.current}/${maxFullscreenRetries})`);
         setTimeout(() => {
           if (!isFinished) {
             enterFullscreen();
           }
         }, 2000);
       } else {
-        console.error("❌ Max fullscreen retries reached, triggering violation");
         handleViolation("Fullscreen Required - Unable to Enter");
       }
-      throw error; // Re-throw to allow retry mechanism to work
     }
   };
 
@@ -685,24 +680,18 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
       
       // For first two violations, auto re-enter fullscreen after showing warning
       if (newViolations <= 2) {
-        // Immediately attempt fullscreen re-entry
-        const attemptFullscreen = async (attempts = 0) => {
-          if (attempts >= 5 || isFinished) return;
-          
-          try {
-            console.log(`🔄 Attempting fullscreen re-entry (attempt ${attempts + 1})`);
-            await enterFullscreen();
-            console.log("✅ Fullscreen re-entry successful - hiding violation modal");
-            setShowViolationModal(false); // Hide modal when fullscreen is successful
-          } catch (error) {
-            console.warn(`❌ Fullscreen attempt ${attempts + 1} failed:`, error);
-            // Retry after a short delay
-            setTimeout(() => attemptFullscreen(attempts + 1), 500);
-          }
-        };
-        
-        // Start fullscreen attempts immediately
-        setTimeout(() => attemptFullscreen(), 200);
+        setTimeout(() => {
+          setShowViolationModal(false);
+          // Auto re-enter fullscreen immediately after closing modal
+          setTimeout(() => {
+            if (!isFinished && !isInFullscreen()) {
+              enterFullscreen();
+            }
+          }, 100);
+        }, 3000);
+      } else {
+        // For third violation, modal stays open (exam will be finished)
+        setTimeout(() => setShowViolationModal(false), 3000);
       }
     }
   };
