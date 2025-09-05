@@ -916,6 +916,14 @@ const StudentExam: React.FC<StudentExamProps> = ({ appState, navigateTo, user })
             <p className="text-sm text-gray-400 mt-2">
               Foto telah diambil sebagai bukti pelanggaran
             </p>
+            <div className="mt-4 bg-red-900 border border-red-500 p-3 rounded-md">
+              <p className="text-red-300 text-sm font-bold">
+                ⚠️ <strong>PERINGATAN PENTING:</strong>
+              </p>
+              <p className="text-red-200 text-xs mt-1">
+                Jika Anda mengunjungi tab baru atau desktop baru maka akan langsung didiskualifikasi tanpa peringatan tambahan.
+              </p>
+            </div>
             <div className="mt-4 bg-blue-900 border border-blue-500 p-3 rounded-md">
               <p className="text-blue-300 text-sm font-bold">
                 💡 Tekan Enter atau Spasi untuk melanjutkan ujian
