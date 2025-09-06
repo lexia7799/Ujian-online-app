@@ -219,6 +219,45 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           </div>
         )}
         
+        {checks.device && (
+          <div className="mb-4 p-4 bg-red-900 border border-red-500 rounded-md">
+            <h4 className="text-red-300 font-bold mb-3 text-center">⚠️ PERINGATAN PELANGGARAN UJIAN</h4>
+            
+            <div className="mb-4">
+              <h5 className="text-red-400 font-bold mb-2">🚫 LANGSUNG DISKUALIFIKASI (Nilai 0):</h5>
+              <ul className="text-red-200 text-sm space-y-1 list-disc list-inside">
+                <li>Mengunjungi browser lain atau membuka browser baru</li>
+                <li>Melakukan pencarian (searching) di browser</li>
+                <li>Menggunakan double desktop atau virtual desktop</li>
+                <li>Membuka aplikasi lain selain browser ujian</li>
+              </ul>
+            </div>
+            
+            <div className="mb-4">
+              <h5 className="text-yellow-400 font-bold mb-2">⚠️ MASIH DITOLERANSI (Maksimal 3x Peringatan):</h5>
+              <ul className="text-yellow-200 text-sm space-y-1 list-disc list-inside">
+                <li>Copy paste teks (Ctrl+C, Ctrl+V)</li>
+                <li>Mencoba screenshot atau print screen</li>
+                <li>Keluar dari mode fullscreen</li>
+                <li>Switch tab dalam browser yang sama</li>
+                <li>Mencoba membuka Developer Tools (F12, Inspect Element)</li>
+              </ul>
+            </div>
+            
+            <div className="bg-orange-900 border border-orange-500 p-3 rounded-md">
+              <p className="text-orange-300 text-sm font-bold mb-2">
+                💡 <strong>Catatan Penting:</strong>
+              </p>
+              <ul className="text-orange-200 text-xs space-y-1">
+                <li>• Jika terkena deteksi pelanggaran, silahkan tekan <strong>SPASI/ENTER</strong> atau <strong>klik satu kali</strong> untuk melanjutkan ujian</li>
+                <li>• Sistem akan mengambil foto sebagai bukti pelanggaran</li>
+                <li>• Jika melebihi batas pelanggaran (3x), maka akan <strong>LANGSUNG DISKUALIFIKASI</strong> dengan nilai 0</li>
+                <li>• Semua aktivitas direkam dan dimonitor secara real-time oleh dosen</li>
+              </ul>
+            </div>
+          </div>
+        )}
+        
         <button 
           onClick={startExam} 
           disabled={!allChecksPassed} 
