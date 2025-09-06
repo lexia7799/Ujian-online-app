@@ -58,7 +58,19 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.error("Error accessing media devices.", err);
+        console.error("Error accessing media devices:", err);
+        
+        // Handle specific permission errors
+        if (err instanceof Error) {
+          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+            console.log("Camera permission denied by user");
+          } else if (err.name === 'NotFoundError') {
+            console.log("No camera device found");
+          } else if (err.name === 'NotReadableError') {
+            console.log("Camera is being used by another application");
+          }
+        }
+        
         setChecks(c => ({ ...c, camera: false }));
       }
     };
@@ -247,8 +259,23 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
         )}
         
         {checks.camera === false && (
-          <p className="text-yellow-400 text-center mb-4">
-            ⚠️ Akses kamera diperlukan untuk ujian. Mohon izinkan akses kamera di browser Anda.
+          <div className="text-red-400 text-center mb-4 p-3 bg-red-900 border border-red-500 rounded-md">
+            <p className="font-bold mb-2">❌ Akses Kamera Diperlukan</p>
+            <p className="text-sm mb-2">
+              Ujian memerlukan akses kamera untuk proctoring. Silakan:
+            </p>
+            <ol className="text-xs text-left list-decimal list-inside space-y-1">
+              <li>Klik ikon kamera di address bar browser</li>
+              <li>Pilih "Allow" atau "Izinkan" untuk akses kamera</li>
+              <li>Pastikan tidak ada aplikasi lain yang menggunakan kamera</li>
+              <li>Refresh halaman setelah memberikan izin</li>
+            </ol>
+          </div>
+        )}
+        
+        {checks.camera === false && (
+          <p className="text-yellow-400 text-center mb-4 text-sm">
+            💡 <strong>Tips:</strong> Jika masih bermasalah, coba tutup aplikasi video call lain dan restart browser.
           </p>
         )}
         
