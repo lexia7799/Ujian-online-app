@@ -19,7 +19,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
   const { studentInfo } = appState;
   const [checks, setChecks] = useState<DeviceChecks>({ device: null, camera: null, screenCount: null });
   const videoRef = useRef<HTMLVideoElement>(null);
-  const monitoringIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
@@ -77,51 +76,30 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
     
     setupCamera();
     
-    // Start continuous monitoring
-    monitoringIntervalRef.current = setInterval(() => {
-      // Check camera status
-      if (streamRef.current) {
-        const videoTracks = streamRef.current.getVideoTracks();
-        const isCameraActive = videoTracks.length > 0 && videoTracks[0].readyState === 'live';
-        setChecks(c => ({ ...c, camera: isCameraActive }));
-        
-        if (!isCameraActive) {
-          console.log("Camera access lost, attempting to re-enable...");
-          setupCamera();
-        }
-      } else {
-        setChecks(c => ({ ...c, camera: false }));
-        setupCamera();
-      }
-      
-      // Re-check screen count
-      const recheckScreens = async () => {
-        try {
-          if ('getScreenDetails' in window) {
-            const screenDetails = await (window as any).getScreenDetails();
-            setChecks(c => ({ ...c, screenCount: screenDetails.screens.length === 1 }));
-          } else {
-            // Fallback: assume single screen if API not available
-            setChecks(c => ({ ...c, screenCount: true }));
-          }
-        } catch {
-          setChecks(c => ({ ...c, screenCount: true }));
-        }
-      };
-      
-      recheckScreens();
-    }, 2000); // Check every 2 seconds
-    
     // Cleanup function
     return () => {
-      if (monitoringIntervalRef.current) {
-        clearInterval(monitoringIntervalRef.current);
-      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
+
+  const retryCamera = async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      streamRef.current = stream;
+      setChecks(c => ({ ...c, camera: true }));
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Error retrying camera access:", err);
+      setChecks(c => ({ ...c, camera: false }));
+    }
+  };
 
   const allChecksPassed = checks.device && checks.camera && checks.screenCount;
 
@@ -268,8 +246,14 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
               <li>Klik ikon kamera di address bar browser</li>
               <li>Pilih "Allow" atau "Izinkan" untuk akses kamera</li>
               <li>Pastikan tidak ada aplikasi lain yang menggunakan kamera</li>
-              <li>Refresh halaman setelah memberikan izin</li>
+              <li>Klik tombol "Coba Lagi Kamera" di bawah</li>
             </ol>
+            <button 
+              onClick={retryCamera}
+              className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
+            >
+              🔄 Coba Lagi Kamera
+            </button>
           </div>
         )}
         
@@ -293,21 +277,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
             muted 
             className="w-full h-full object-cover"
           />
-        </div>
-        
-        {/* Real-time status indicator */}
-        <div className="mb-4 p-3 bg-gray-700 rounded-md">
-          <p className="text-sm text-gray-300 text-center">
-            🔄 <strong>Status Monitoring:</strong> Sistem terus memantau perangkat Anda
-          </p>
-          <div className="mt-2 flex justify-center space-x-4 text-xs">
-            <span className={`px-2 py-1 rounded ${checks.camera ? 'bg-green-600' : 'bg-red-600'}`}>
-              📷 Kamera: {checks.camera ? 'Aktif' : 'Tidak Aktif'}
-            </span>
-            <span className={`px-2 py-1 rounded ${checks.screenCount ? 'bg-green-600' : 'bg-red-600'}`}>
-              🖥️ Layar: {checks.screenCount ? 'Tunggal' : 'Multiple'}
-            </span>
-          </div>
         </div>
         
         {checks.device && (
@@ -335,7 +304,6 @@ const StudentPreCheck: React.FC<StudentPreCheckProps> = ({ navigateTo, navigateB
           <div className="mt-3 p-3 bg-yellow-900 border border-yellow-500 rounded-md">
             <p className="text-yellow-300 text-sm text-center">
               ⚠️ <strong>Perhatian:</strong> Pastikan semua pemeriksaan menunjukkan status "OK" sebelum memulai ujian.
-              Sistem akan terus memantau perangkat Anda.
             </p>
           </div>
         )}
