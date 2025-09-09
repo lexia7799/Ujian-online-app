@@ -22,7 +22,7 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo, navigateBack, canGoBack
         Platform Sistem dekteksi Ujian Daring Online
       </h1>
       <p className="text-lg text-gray-400 mb-12 text-center">
-        Lingkungan ujian online dengan pengawasan anti-curang (dekteksi kecurangan)
+        Lingkungan ujian online dengan pengawasan anti-curang 
       </p>
       <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6">
         <button 
